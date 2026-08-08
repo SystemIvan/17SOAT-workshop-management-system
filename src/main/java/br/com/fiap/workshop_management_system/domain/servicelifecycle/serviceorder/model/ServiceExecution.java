@@ -34,6 +34,28 @@ public class ServiceExecution {
         this.status = ServiceExecutionStatus.PENDING;
     }
 
+    /**
+     * Rebuilds a ServiceExecution from previously persisted state. Used exclusively by
+     * {@link ServiceOrder#reconstitute} via the persistence adapter.
+     */
+    public static ServiceExecution reconstitute(
+            UUID id,
+            UUID diagnosisId,
+            UUID catalogServiceId,
+            String name,
+            Money price,
+            ServiceExecutionStatus status,
+            UUID authorizedByEstimateId,
+            UUID assignedTechnicianId,
+            List<StockRequirement> stockRequirements) {
+        ServiceExecution execution = new ServiceExecution(id, diagnosisId, catalogServiceId, name, price);
+        execution.status = status;
+        execution.authorizedByEstimateId = authorizedByEstimateId;
+        execution.assignedTechnicianId = assignedTechnicianId;
+        execution.stockRequirements.addAll(stockRequirements);
+        return execution;
+    }
+
     void attachStockRequirement(StockRequirement requirement) {
         stockRequirements.add(requirement);
     }

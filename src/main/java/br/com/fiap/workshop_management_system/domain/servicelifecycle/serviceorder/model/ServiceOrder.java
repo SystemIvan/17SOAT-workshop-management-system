@@ -50,6 +50,31 @@ public class ServiceOrder {
         this.priority = priority;
     }
 
+    /**
+     * Rebuilds a ServiceOrder from previously persisted state. Used exclusively by the
+     * persistence adapter - unlike {@link #create}, it does not run creation rules and
+     * restores the exact state given (id, snapshots, executions, flags).
+     */
+    public static ServiceOrder reconstitute(
+            UUID id,
+            UUID customerId,
+            UUID vehicleId,
+            VehicleSnapshot vehicleSnapshot,
+            Priority priority,
+            ServiceOrderStatus statusSnapshot,
+            UUID openDiagnosisId,
+            boolean hasSentEstimateWithPendingLines,
+            Set<UUID> approvedEstimateIds,
+            List<ServiceExecution> serviceExecutions) {
+        ServiceOrder serviceOrder = new ServiceOrder(id, customerId, vehicleId, vehicleSnapshot, priority);
+        serviceOrder.statusSnapshot = statusSnapshot;
+        serviceOrder.openDiagnosisId = openDiagnosisId;
+        serviceOrder.hasSentEstimateWithPendingLines = hasSentEstimateWithPendingLines;
+        serviceOrder.approvedEstimateIds.addAll(approvedEstimateIds);
+        serviceOrder.serviceExecutions.addAll(serviceExecutions);
+        return serviceOrder;
+    }
+
     public void definePriority(Priority newPriority) {
         this.priority = newPriority;
     }
@@ -251,5 +276,13 @@ public class ServiceOrder {
 
     public List<ServiceExecution> serviceExecutions() {
         return List.copyOf(serviceExecutions);
+    }
+
+    public UUID openDiagnosisId() {
+        return openDiagnosisId;
+    }
+
+    public boolean hasSentEstimateWithPendingLines() {
+        return hasSentEstimateWithPendingLines;
     }
 }
