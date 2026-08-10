@@ -21,85 +21,47 @@ Guia de instruções para o time desenvolver o **MVP de Gestão de Oficina Mecâ
 
 ## 🏗️ Arquitetura e Bounded Contexts
 
-### Estrutura de Pastas
+O projeto usa **Spring Modulith**: cada bounded context é um pacote direto sob a raiz da aplicação (`br.com.fiap.workshop_management_system`), anotado com `@ApplicationModule` em seu `package-info.java`. As fronteiras entre módulos são verificadas automaticamente pelo teste `ModuleStructureTest` (`src/test/.../ModuleStructureTest.java`), que roda `ApplicationModules.of(...).verify()` — `mvn test` falha se algum módulo importar classes internas de outro.
+
+Código verdadeiramente transversal (ex.: `GlobalExceptionHandler`, `ErrorResponse`) fica no pacote raiz, junto da classe `@SpringBootApplication` — pacotes diretos da raiz é que são tratados como módulos, então o pacote raiz em si fica fora da verificação de fronteiras.
+
+### Estrutura de Pastas (real)
 
 ```
-src/main/java/com/workshop/
-├── shared/                          # Código compartilhado
-│   ├── domain/
-│   │   ├── ValueObject.java
-│   │   ├── Entity.java
-│   │   └── AggregateRoot.java
-│   ├── application/
-│   │   └── UseCase.java
-│   └── infrastructure/
-│       ├── config/
-│       └── persistence/
-│
-├── serviceorder/                    # Bounded Context: Service Orders
-│   ├── domain/
-│   │   ├── aggregates/
-│   │   │   ├── ServiceOrder.java    # Aggregate Root
-│   │   │   └── ServiceOrderId.java
-│   │   ├── entities/
-│   │   │   └── ServiceExecution.java
-│   │   ├── valueobjects/
-│   │   │   ├── ServiceOrderStatus.java
-│   │   │   ├── ExecutionStatus.java
-│   │   │   └── Priority.java
-│   │   └── repositories/
-│   │       └── IServiceOrderRepository.java
-│   ├── application/
-│   │   ├── usecases/
-│   │   │   ├── CreateServiceOrderUseCase.java
-│   │   │   ├── AssignTechnicianUseCase.java
-│   │   │   ├── StartExecutionUseCase.java
-│   │   │   ├── UpdateExecutionProgressUseCase.java
-│   │   │   └── CompleteExecutionUseCase.java
-│   │   ├── dto/
-│   │   │   ├── CreateServiceOrderDTO.java
-│   │   │   ├── ServiceOrderResponseDTO.java
-│   │   │   ├── ServiceExecutionDTO.java
-│   │   │   └── UpdateExecutionDTO.java
-│   │   └── mappers/
-│   │       └── ServiceOrderMapper.java
-│   ├── infrastructure/
-│   │   ├── persistence/
-│   │   │   ├── ServiceOrderJpaRepository.java
-│   │   │   └── ServiceOrderRepositoryImpl.java
-│   │   └── controller/
-│   │       └── ServiceOrderController.java
-│   └── ServiceOrderModule.java      # Configuração do módulo
-│
-├── technician/                      # Bounded Context: Technicians
-│   ├── domain/
-│   ├── application/
-│   ├── infrastructure/
-│   └── TechnicianModule.java
+src/main/java/br/com/fiap/workshop_management_system/
+├── WorkshopManagementSystemApplication.java   # @SpringBootApplication
+├── ErrorResponse.java                         # Código transversal (fora de qualquer módulo)
+├── GlobalExceptionHandler.java                # @RestControllerAdvice global
 │
 ├── customer/                        # Bounded Context: Customers
+│   ├── package-info.java            # @ApplicationModule(displayName = "Customer")
 │   ├── domain/
+│   │   ├── model/                   # Customer (aggregate root), ContactInfo (VO)
+│   │   └── repository/              # CustomerRepository (interface)
 │   ├── application/
-│   ├── infrastructure/
-│   └── CustomerModule.java
+│   │   ├── dto/
+│   │   └── usecase/                 # CreateCustomerUseCase, RenameCustomerUseCase, ...
+│   └── infrastructure/
+│       ├── persistence/             # CustomerJpaEntity, CustomerRepositoryImpl, ...
+│       └── web/                     # CustomerController
 │
-├── parts/                           # Bounded Context: Parts/Inventory
-│   ├── domain/
-│   ├── application/
-│   ├── infrastructure/
-│   └── PartsModule.java
+├── technician/                      # Bounded Context: Technicians (mesma forma acima)
+├── parts/                           # Bounded Context: Parts/Inventory (mesma forma acima)
 │
-└── shared/
-    ├── exceptions/
-    │   ├── DomainException.java
-    │   ├── BusinessRuleException.java
-    │   └── GlobalExceptionHandler.java
-    ├── events/
-    │   └── DomainEvent.java
-    └── config/
-        ├── JpaAuditingConfig.java
-        └── MySQLDialectConfig.java
+└── serviceorder/                    # Bounded Context: Service Orders (core subdomain)
+    ├── package-info.java            # @ApplicationModule(displayName = "Service Order")
+    ├── domain/
+    │   ├── model/                   # ServiceOrder (aggregate root), ServiceExecution, ...
+    │   └── repository/              # ServiceOrderRepository (interface)
+    ├── application/
+    │   ├── dto/
+    │   └── usecase/                 # CreateServiceOrderUseCase, AssignTechnicianUseCase, ...
+    └── infrastructure/
+        ├── persistence/
+        └── web/                     # ServiceOrderController
 ```
+
+Hoje o acoplamento entre `serviceorder` e `customer`/`technician` é feito só por `UUID` (ex.: `ServiceOrder.customerId`, `ServiceExecution.assignedTechnicianId`) — não há chamadas diretas entre módulos. Se isso mudar no futuro, use o padrão Port (interface em `application/`) + Adapter (implementação em `infrastructure/`) chamando a API pública do outro módulo, nunca importando classes de `domain/` de outro contexto.
 
 ### Bounded Contexts (DDD)
 
@@ -107,7 +69,7 @@ src/main/java/com/workshop/
 **Aggregate Root:** `ServiceOrder`
 - **Entities:** ServiceExecution, ServiceExecutionItem
 - **Value Objects:** ServiceOrderStatus, ExecutionStatus, Priority, ServiceOrderNumber
-- **Repository:** IServiceOrderRepository
+- **Repository:** ServiceOrderRepository
 - **Use Cases:**
     - Criar nova Service Order
     - Atribuir técnico
@@ -120,17 +82,17 @@ src/main/java/com/workshop/
 #### 2. **Technician Context**
 **Aggregate Root:** `Technician`
 - **Value Objects:** TechnicianId, Specialty, Availability
-- **Repository:** ITechnicianRepository
+- **Repository:** TechnicianRepository
 
 #### 3. **Customer Context**
 **Aggregate Root:** `Customer`
 - **Value Objects:** CustomerId, ContactInfo
-- **Repository:** ICustomerRepository
+- **Repository:** CustomerRepository
 
 #### 4. **Parts Context**
 **Aggregate Root:** `Part`
 - **Value Objects:** PartId, Quantity, Price
-- **Repository:** IPartRepository
+- **Repository:** PartRepository
 
 ---
 
@@ -186,7 +148,7 @@ public class ServiceOrderStatus implements Serializable {
 #### Repository Pattern
 ```java
 // Domain
-public interface IServiceOrderRepository {
+public interface ServiceOrderRepository {
     void save(ServiceOrder serviceOrder);
     Optional<ServiceOrder> findById(ServiceOrderId id);
     List<ServiceOrder> findByStatus(ServiceOrderStatus status);
@@ -194,7 +156,7 @@ public interface IServiceOrderRepository {
 
 // Infrastructure
 @Repository
-public class ServiceOrderRepositoryImpl implements IServiceOrderRepository {
+public class ServiceOrderRepositoryImpl implements ServiceOrderRepository {
     @Autowired
     private ServiceOrderJpaRepository jpaRepository;
     
@@ -510,9 +472,9 @@ mvn clean test jacoco:report
 
 | Elemento | Padrão | Exemplo |
 |----------|--------|---------|
-| Packages | `com.workshop.{bounded-context}.{layer}` | `com.workshop.serviceorder.domain` |
+| Packages | `br.com.fiap.workshop_management_system.{bounded-context}.{layer}` | `br.com.fiap.workshop_management_system.serviceorder.domain` |
 | Classes | PascalCase | `ServiceOrder`, `CreateServiceOrderUseCase` |
-| Interfaces | I + PascalCase | `IServiceOrderRepository` |
+| Interfaces | PascalCase (sem prefixo `I`) | `ServiceOrderRepository` |
 | Methods | camelCase, verbo primeiro | `getStatus()`, `updateProgress()` |
 | Constants | UPPER_SNAKE_CASE | `MAX_RETRY_ATTEMPTS`, `DEFAULT_TIMEOUT` |
 | Variables | camelCase | `serviceOrderId`, `technicianName` |
@@ -521,7 +483,7 @@ mvn clean test jacoco:report
 
 - **Indentation:** 4 spaces (configurar no IntelliJ)
 - **Line length:** Máximo 120 caracteres
-- **Imports:** Use wildcard imports `import com.workshop.*` só se absolutamente necessário
+- **Imports:** Evite wildcard imports
 - **Comments:** Inglês, apenas para lógica complexa. Self-explanatory code é preferível.
 
 ```java
@@ -755,7 +717,7 @@ fi
 - **Value Object:** Não tem identidade, é imutável (Status, Priority)
 
 ### "Repository deve estar na domain ou infrastructure?"
-- **Interface (IServiceOrderRepository):** Domain (define contrato)
+- **Interface (ServiceOrderRepository):** Domain (define contrato)
 - **Implementação (ServiceOrderRepositoryImpl):** Infrastructure (detalhes de persistência)
 
 ### "Como testar métodos privados?"
