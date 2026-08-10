@@ -1,0 +1,29 @@
+#name: CI
+#
+#on: [push, pull_request]
+#
+#jobs:
+#  build:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v3
+#
+#      - name: Set up Java
+#        uses: actions/setup-java@v3
+#        with:
+#          java-version: '17'
+#          distribution: 'temurin'
+#
+#      - name: Build and Test
+#        run: mvn clean verify
+#
+#      - name: SonarLint Check
+#        run: mvn sonar:sonar -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+#
+#      - name: Check Coverage
+#        run: |
+#          coverage=$(mvn jacoco:report | grep -o '[0-9]*%')
+#          if [ ${coverage%\%} -lt 80 ]; then
+#            echo "Coverage abaixo de 80%: $coverage"
+#            exit 1
+#          fi
