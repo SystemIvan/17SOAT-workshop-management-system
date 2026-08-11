@@ -747,3 +747,113 @@ Se houver dúvidas sobre:
 **Last Updated:** Agosto 2026  
 **Versão:** 1.0  
 **Status:** ✅ Ativo para Fase 1 do Tech Challenge
+
+<!--
+# AGENTS.md — Workshop Management System
+
+Operational guidance for Codex and contributors working on the FIAP Tech Challenge MVP.
+
+## Source precedence
+
+Before architecture-sensitive work:
+
+1. Read `docs/Architecture.md` for the consolidated current and target architecture.
+2. Read `docs/Architecture-Decisions.md` and follow only decisions marked **Resolved**.
+3. Read `docs/PROJECT-STRUCTURE.md` before creating packages, modules or directories.
+4. Inspect the current repository; it is the evidence of what is actually implemented.
+5. Use the official **Tech Challenge** requirements for mandatory outcomes and the named Miro artifacts for the
+   group's domain design.
+
+Do not treat a recommendation, temporary assumption, Miro draft or unresolved decision as approval to invent
+architecture. If sources conflict, preserve the conflict and escalate the relevant decision owner.
+
+## Architecture guidance
+
+- The system is a Java 21 Spring Boot modular monolith using Spring Modulith, REST and MySQL.
+- Current top-level modules are `customer`, `technician`, `parts` and `serviceorder` under
+  `br.com.fiap.workshop_management_system`.
+- Do not add, rename, merge or move top-level modules until AD-001 is resolved by the team.
+- Preserve `@ApplicationModule` boundaries and keep `ModuleStructureTest` passing.
+- Do not import another module's internal `domain`, `application` or `infrastructure` types.
+- Cross-aggregate and cross-module references use IDs and immutable snapshots. Final synchronous/event contracts
+  remain subject to AD-011 and AD-012.
+- Do not introduce a new architectural pattern, framework or infrastructure dependency without an explicit
+  requirement or resolved decision.
+
+Within a module:
+
+- `domain/model`: framework-agnostic aggregates, entities, value objects and business invariants.
+- `domain/repository`: repository contracts owned by aggregate roots.
+- `application/usecase`: one use case per class; coordinates domain behavior and transaction boundaries.
+- `application/dto`: request/response records and mapping at application boundaries.
+- `infrastructure/persistence`: JPA entities, Spring Data repositories, persistence mappers and repository adapters.
+- `infrastructure/web`: REST controllers; controllers validate transport input and delegate to use cases.
+- Keep JPA and HTTP annotations out of domain objects. Never expose domain or JPA entities directly through REST.
+- Truly cross-cutting bootstrap/error handling may remain in the root package; do not use it as a shared-domain
+  dumping ground.
+
+## Resolved registration decisions
+
+- **AD-002:** Customer CPF/CNPJ is an immutable `TaxId` value object in `customer/domain/model`. Check-digit validity
+  is a domain invariant; uniqueness is enforced through repository/application coordination. Keep DTO and JPA
+  mapping concerns outside the value object.
+- **AD-003:** Vehicle is an independent aggregate root with its own repository, selected to live inside `customer`.
+  This placement is conditional on team-owned AD-001. Until AD-001 confirms that `customer` hosts Cadastros, do not
+  create Vehicle packages or implementation. Vehicle is not a child entity inside the Customer aggregate.
+- **AD-004:** ServiceCatalog is an independent aggregate root with its own repository, selected to live inside
+  `customer`. This is also conditional on AD-001; do not implement its package before confirmation. Consumers retain
+  copied service name and price snapshots rather than live mutable catalog objects.
+- **AD-005:** Removal of Customer, Vehicle and ServiceCatalog means logical deactivation/archival. Inactive records
+  cannot be selected for new work, but historical IDs and snapshots remain readable. Do not physically delete
+  referenced registration data.
+
+Resolved does not mean implemented. Inspect the code before claiming any of these rules is already present.
+
+## Unresolved boundaries
+
+- AD-001 still blocks implementation placement for Vehicle and ServiceCatalog, but not their Jira planning.
+- Technician ownership, Stock/PurchaseOrder boundaries, Estimate decisions, module integration, event delivery,
+  notifications, tracking transport/cache, identity ownership, schema migrations, external integrations and the
+  execution-time metric remain governed by their unresolved entries.
+- Do not use this file to settle those decisions. In particular, do not assume polling cache, a simplified execution
+  state machine, Manager approval, a Payment Gateway, Flyway, or new authentication modules are accepted.
+
+## Current implementation guardrails
+
+- Current code implements Customer, Technician, Part and ServiceOrder/ServiceExecution capabilities only.
+- `Customer` still stores a raw document string; AD-002 implementation is pending.
+- Vehicle and ServiceCatalog aggregates, logical deactivation, Estimate, PurchaseOrder, Notification, JWT,
+  OpenAPI, cache and versioned schema migrations are not currently implemented.
+- `ServiceOrder` materializes `statusSnapshot`; preserve its implemented state machine and aggregate entry points.
+- `ServiceExecution` progress is currently a note guarded by state, not a decided percentage model.
+- `spring.jpa.hibernate.ddl-auto=update` is current configuration, not an approved long-term migration policy.
+
+## Testing and quality
+
+- Mirror production packages under `src/test/java`.
+- Add focused unit tests for domain invariants and state transitions.
+- Add use-case, persistence and controller/integration tests when implementing those layers.
+- The official target is at least 80% automated coverage in critical domains. JaCoCo enforcement is not currently
+  configured; do not claim the target is met without a generated report.
+- Run `./mvnw test` (or `mvnw.cmd test` on Windows) after code changes. This includes Spring Modulith verification.
+- Validate success, invalid input, not-found, conflict/uniqueness and forbidden state-transition paths as applicable.
+
+## Code conventions
+
+- Packages: lowercase; classes/interfaces: PascalCase; methods/variables: camelCase; constants: UPPER_SNAKE_CASE.
+- Repository interfaces have no `I` prefix. Use-case class names describe the command/query they perform.
+- Use four-space indentation, avoid wildcard imports and keep lines near 120 characters.
+- Prefer intention-revealing aggregate methods over public setters.
+- Use immutable value objects and replace-on-change semantics.
+- Use Conventional Commits when commits are explicitly requested; do not commit, push or open a PR without user
+  authorization.
+
+## Required documentation synchronization
+
+When a decision changes:
+
+- update `docs/Architecture-Decisions.md` first;
+- update affected current/target/traceability/gap sections in `docs/Architecture.md`;
+- update `docs/PROJECT-STRUCTURE.md` only when the structural change is approved by the appropriate owner/team;
+- update this file only with operational rules supported by a requirement, current accepted architecture or a
+  resolved decision. -->
