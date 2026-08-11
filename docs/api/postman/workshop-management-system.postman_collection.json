@@ -1,0 +1,219 @@
+{
+  "info": {
+    "_postman_id": "c0d4f6e8-0f31-4d2f-9ba8-17f0b5fe2026",
+    "name": "Workshop Management System",
+    "description": "REST API collection grouped by bounded context.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "customerId", "value": "11111111-1111-1111-1111-111111111111" },
+    { "key": "vehicleId", "value": "22222222-2222-2222-2222-222222222222" },
+    { "key": "technicianId", "value": "33333333-3333-3333-3333-333333333333" },
+    { "key": "partId", "value": "44444444-4444-4444-4444-444444444444" },
+    { "key": "serviceOrderId", "value": "55555555-5555-5555-5555-555555555555" },
+    { "key": "executionId", "value": "66666666-6666-6666-6666-666666666666" },
+    { "key": "catalogServiceId", "value": "77777777-7777-7777-7777-777777777777" }
+  ],
+  "item": [
+    {
+      "name": "Registrations",
+      "item": [
+        {
+          "name": "Create customer",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('customerId', pm.response.json().id); }"] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Maria Silva\",\n  \"document\": \"12345678900\",\n  \"contactInfo\": {\n    \"email\": \"maria@example.test\",\n    \"phone\": \"+5511999999999\"\n  }\n}" },
+            "url": "{{baseUrl}}/api/customers"
+          }
+        },
+        { "name": "Get customer", "request": { "method": "GET", "url": "{{baseUrl}}/api/customers/{{customerId}}" } },
+        { "name": "List customers", "request": { "method": "GET", "url": "{{baseUrl}}/api/customers" } },
+        {
+          "name": "Rename customer",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Maria Souza\"\n}" },
+            "url": "{{baseUrl}}/api/customers/{{customerId}}"
+          }
+        },
+        {
+          "name": "Update customer contact",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"contactInfo\": {\n    \"email\": \"maria.souza@example.test\",\n    \"phone\": \"+5511888888888\"\n  }\n}" },
+            "url": "{{baseUrl}}/api/customers/{{customerId}}/contact-info"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Service Lifecycle",
+      "item": [
+        {
+          "name": "Technicians",
+          "item": [
+            {
+              "name": "Create technician",
+              "event": [{
+                "listen": "test",
+                "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('technicianId', pm.response.json().id); }"] }
+              }],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Joao Technician\",\n  \"specialties\": [\"MECHANICAL\", \"DIAGNOSTICS\"]\n}" },
+                "url": "{{baseUrl}}/api/technicians"
+              }
+            },
+            { "name": "Get technician", "request": { "method": "GET", "url": "{{baseUrl}}/api/technicians/{{technicianId}}" } },
+            { "name": "List technicians", "request": { "method": "GET", "url": "{{baseUrl}}/api/technicians" } },
+            {
+              "name": "Rename technician",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Joao Senior Technician\"\n}" },
+                "url": "{{baseUrl}}/api/technicians/{{technicianId}}"
+              }
+            },
+            {
+              "name": "Update technician status",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"status\": \"BUSY\"\n}" },
+                "url": "{{baseUrl}}/api/technicians/{{technicianId}}/status"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Service Orders",
+          "item": [
+            {
+              "name": "Create service order",
+              "event": [{
+                "listen": "test",
+                "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('serviceOrderId', pm.response.json().id); }"] }
+              }],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"vehicleId\": \"{{vehicleId}}\",\n  \"vehicleSnapshot\": {\n    \"licensePlate\": \"ABC1D23\",\n    \"brand\": \"Fiat\",\n    \"model\": \"Argo\",\n    \"year\": 2024\n  },\n  \"priority\": \"NORMAL\"\n}" },
+                "url": "{{baseUrl}}/api/service-orders"
+              }
+            },
+            { "name": "Get service order", "request": { "method": "GET", "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}" } },
+            { "name": "Get service order status", "request": { "method": "GET", "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/status" } },
+            {
+              "name": "Perform diagnosis",
+              "event": [{
+                "listen": "test",
+                "script": { "exec": ["if (pm.response.code === 200 && pm.response.json().executions.length > 0) { pm.collectionVariables.set('executionId', pm.response.json().executions[0].id); }"] }
+              }],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"items\": [{\n    \"catalogServiceId\": \"{{catalogServiceId}}\",\n    \"name\": \"Oil and filter change\",\n    \"price\": { \"value\": 150.00, \"currency\": \"BRL\" },\n    \"stockRequirements\": [{\n      \"stockItemId\": \"{{partId}}\",\n      \"type\": \"PART\",\n      \"quantity\": 1,\n      \"nameSnapshot\": \"Oil filter\",\n      \"priceSnapshot\": { \"value\": 45.90, \"currency\": \"BRL\" }\n    }]\n  }]\n}" },
+                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/diagnosis"
+              }
+            },
+            {
+              "name": "Assign technician",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"technicianId\": \"{{technicianId}}\"\n}" },
+                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/assign-technician"
+              }
+            },
+            { "name": "Start execution", "request": { "method": "POST", "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/start" } },
+            {
+              "name": "Update execution progress",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"note\": \"Oil drained and filter replaced\"\n}" },
+                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/progress"
+              }
+            },
+            { "name": "Complete execution", "request": { "method": "POST", "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/complete" } },
+            {
+              "name": "Finalize service order",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"vehicleDelivered\": true\n}" },
+                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/finalize"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Stock & Procurement",
+      "item": [
+        {
+          "name": "Create stock item",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('partId', pm.response.json().id); }"] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Oil filter\",\n  \"sku\": \"FILTER-001\",\n  \"initialQuantity\": 20,\n  \"price\": { \"value\": 45.90 }\n}" },
+            "url": "{{baseUrl}}/api/parts"
+          }
+        },
+        { "name": "Get stock item", "request": { "method": "GET", "url": "{{baseUrl}}/api/parts/{{partId}}" } },
+        { "name": "List stock items", "request": { "method": "GET", "url": "{{baseUrl}}/api/parts" } },
+        {
+          "name": "Rename stock item",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Premium oil filter\"\n}" },
+            "url": "{{baseUrl}}/api/parts/{{partId}}"
+          }
+        },
+        {
+          "name": "Increase stock",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": 10\n}" },
+            "url": "{{baseUrl}}/api/parts/{{partId}}/stock/increase"
+          }
+        },
+        {
+          "name": "Decrease stock",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": 1\n}" },
+            "url": "{{baseUrl}}/api/parts/{{partId}}/stock/decrease"
+          }
+        },
+        {
+          "name": "Update stock item price",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"price\": { \"value\": 49.90 }\n}" },
+            "url": "{{baseUrl}}/api/parts/{{partId}}/price"
+          }
+        }
+      ]
+    }
+  ]
+}
