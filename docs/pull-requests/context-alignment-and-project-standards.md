@@ -49,16 +49,3 @@ por `ddl-auto=update`; use `make docker-reset` apenas para o ambiente local quan
   dedicada antes de uso produtivo.
 - A cobertura atual de linhas é 48,37%, abaixo da meta de 80% do projeto. Esta PR não reduz a cobertura e acrescenta
   testes de estrutura, migração, OpenAPI e seeds.
-
-## Resumo para WhatsApp
-
-Pessoal, alinhamos a estrutura do projeto com o desenho DDD do Miro. Agora temos três contextos claros:
-Registration (cliente/veículo/catálogo), Service Lifecycle (ordem de serviço/orçamento/técnico) e Stock & Procurement
-(estoque/compras).
-
-Também deixamos a base mais organizada para as próximas features: banco agora é versionado com Flyway, temos dados de
-exemplo só no ambiente de desenvolvimento, Swagger e collection do Postman para a API, Makefile para os comandos mais
-comuns e um fluxo padrão de specs + plano + validações.
-
-Tudo passou nos testes (51 verdes). Como próximos débitos técnicos, precisamos evoluir a cobertura até 80% e implementar
-autenticação/autorização antes de pensar em produção.
