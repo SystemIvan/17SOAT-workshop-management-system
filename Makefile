@@ -1,112 +1,71 @@
-.PHONY: help build up down logs test clean docker-build docker-up docker-down docker-clean dev
+MVNW := ./mvnw
+COMPOSE := docker compose
+
+.PHONY: help test coverage verify compile build clean run run-dev \
+	docker-build docker-up docker-down docker-reset docker-logs docker-ps db-shell
 
 help:
-	@echo "Workshop Management System - Makefile Commands"
+	@echo "Workshop Management System"
 	@echo ""
 	@echo "Development:"
-	@echo "  make dev              - Rodar aplicação localmente (requer MySQL)"
-	@echo "  make test             - Rodar testes unitários"
-	@echo "  make compile          - Compilar o projeto"
-	@echo "  make clean            - Limpar arquivos de build"
+	@echo "  make test          Run the automated tests"
+	@echo "  make coverage      Run verification and generate target/site/jacoco/index.html"
+	@echo "  make verify        Run the complete local quality gate"
+	@echo "  make compile       Compile the application"
+	@echo "  make build         Build the application JAR"
+	@echo "  make run           Run without demonstration seeds"
+	@echo "  make run-dev       Run with the dev profile and idempotent demo seeds"
 	@echo ""
 	@echo "Docker:"
-	@echo "  make docker-build     - Build da imagem Docker"
-	@echo "  make docker-up        - Iniciar containers (MySQL + App)"
-	@echo "  make docker-down      - Parar containers"
-	@echo "  make docker-clean     - Remove containers e volumes"
-	@echo "  make docker-logs      - Ver logs da aplicação"
-	@echo ""
-	@echo "Database:"
-	@echo "  make db-init          - Inicializar banco de dados"
-	@echo "  make db-shell         - Acessar shell do MySQL"
-	@echo ""
-
-# ============ Development Commands ============
-
-dev:
-	@echo "🚀 Starting application locally..."
-	mvn spring-boot:run
+	@echo "  make docker-up     Start MySQL and the application in dev mode"
+	@echo "  make docker-down   Stop containers without deleting data"
+	@echo "  make docker-reset  Stop containers and DELETE the local MySQL volume"
+	@echo "  make docker-logs   Follow application logs"
+	@echo "  make db-shell      Open the MySQL client"
 
 test:
-	@echo "🧪 Running tests..."
-	mvn clean test
+	$(MVNW) test
+
+coverage:
+	$(MVNW) verify
+
+verify:
+	$(MVNW) verify
 
 compile:
-	@echo "🔨 Compiling project..."
-	mvn clean compile
+	$(MVNW) compile
+
+build:
+	$(MVNW) package
 
 clean:
-	@echo "🧹 Cleaning project..."
-	mvn clean
+	$(MVNW) clean
 
-# ============ Docker Commands ============
+run:
+	$(MVNW) spring-boot:run
+
+run-dev:
+	SPRING_PROFILES_ACTIVE=dev APP_SEED_ENABLED=true $(MVNW) spring-boot:run
 
 docker-build:
-	@echo "🐳 Building Docker image..."
-	docker build -t workshop-management-system:latest .
-	@echo "✅ Image built successfully!"
+	$(COMPOSE) build app
 
 docker-up:
-	@echo "🚀 Starting Docker containers..."
-	@if [ ! -f .env ]; then \
-		echo "⚠️  .env not found. Creating from .env.example..."; \
-		cp .env.example .env; \
-	fi
-	docker-compose up -d
-	@echo "✅ Containers started!"
-	@echo "📍 App: http://localhost:8080"
-	@echo "📍 MySQL: localhost:3306"
+	@if [ ! -f .env ]; then cp .env.example .env; fi
+	$(COMPOSE) up -d --build
 
 docker-down:
-	@echo "⬇️  Stopping Docker containers..."
-	docker-compose down
-	@echo "✅ Containers stopped!"
+	$(COMPOSE) down
 
-docker-clean:
-	@echo "🧹 Removing Docker containers and volumes..."
-	docker-compose down -v
-	@echo "✅ Cleaned!"
+docker-reset:
+	@echo "WARNING: deleting containers and the local MySQL volume"
+	$(COMPOSE) down --volumes
 
 docker-logs:
-	@echo "📋 Showing application logs..."
-	docker-compose logs -f app
+	$(COMPOSE) logs --follow app
 
 docker-ps:
-	@echo "📊 Docker containers status:"
-	docker-compose ps
-
-# ============ Database Commands ============
-
-db-init:
-	@echo "🗄️  Initializing database..."
-	docker-compose exec mysql mysql -uworkshop_user -pworkshop_pass workshop < scripts/init-db.sql
-	@echo "✅ Database initialized!"
+	$(COMPOSE) ps
 
 db-shell:
-	@echo "💻 Accessing MySQL shell..."
-	docker-compose exec mysql mysql -uworkshop_user -pworkshop_pass workshop
-
-# ============ Useful Commands ============
-
-status:
-	@echo "📊 System Status:"
-	@docker-compose ps
-	@echo ""
-	@echo "📝 Recent logs:"
-	@docker-compose logs --tail=10 app
-
-restart:
-	@echo "🔄 Restarting containers..."
-	docker-compose restart
-
-rebuild: docker-clean docker-build docker-up
-	@echo "✅ Rebuild complete!"
-
-# ============ CI/CD Style Commands ============
-
-ci-test:
-	@echo "🔍 Running CI tests..."
-	mvn clean verify
-
-ci-build: ci-test docker-build
-	@echo "✅ CI build successful!"
+	$(COMPOSE) exec mysql sh -lc 'mysql -u"$$MYSQL_USER" -p"$$MYSQL_PASSWORD" "$$MYSQL_DATABASE"'
