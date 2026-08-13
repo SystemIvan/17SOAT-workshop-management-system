@@ -1,749 +1,178 @@
 # AGENTS.md — Workshop Management System
 
-Guia de instruções para o time desenvolver o **MVP de Gestão de Oficina Mecânica** com coerência, qualidade e escalabilidade. Este documento é referência **obrigatória** para todos os 5 membros do time.
-
----
-
-## 📋 Informações do Projeto
-
-| Aspecto | Detalhes |
-|--------|----------|
-| **Nome** | Workshop Management System |
-| **Objetivo** | Sistema de gestão back-end para oficina mecânica |
-| **Desafio** | Tech Challenge Pós Tech FIAP (Fase 1) |
-| **Prazo** | 1 mês |
-| **Time** | 5 desenvolvedores |
-| **Formato** | Monolítico (Spring Boot) |
-| **API** | REST |
-| **DB** | MySQL (pronto para migração PostgreSQL em AWS) |
-
----
-
-## 🏗️ Arquitetura e Bounded Contexts
-
-O projeto usa **Spring Modulith**: cada bounded context é um pacote direto sob a raiz da aplicação (`br.com.fiap.workshop_management_system`), anotado com `@ApplicationModule` em seu `package-info.java`. As fronteiras entre módulos são verificadas automaticamente pelo teste `ModuleStructureTest` (`src/test/.../ModuleStructureTest.java`), que roda `ApplicationModules.of(...).verify()` — `mvn test` falha se algum módulo importar classes internas de outro.
-
-Código verdadeiramente transversal (ex.: `GlobalExceptionHandler`, `ErrorResponse`) fica no pacote raiz, junto da classe `@SpringBootApplication` — pacotes diretos da raiz é que são tratados como módulos, então o pacote raiz em si fica fora da verificação de fronteiras.
-
-### Estrutura de Pastas (real)
-
-```
-src/main/java/br/com/fiap/workshop_management_system/
-├── WorkshopManagementSystemApplication.java   # @SpringBootApplication
-├── ErrorResponse.java                         # Código transversal (fora de qualquer módulo)
-├── GlobalExceptionHandler.java                # @RestControllerAdvice global
-│
-├── customer/                        # Bounded Context: Customers
-│   ├── package-info.java            # @ApplicationModule(displayName = "Customer")
-│   ├── domain/
-│   │   ├── model/                   # Customer (aggregate root), ContactInfo (VO)
-│   │   └── repository/              # CustomerRepository (interface)
-│   ├── application/
-│   │   ├── dto/
-│   │   └── usecase/                 # CreateCustomerUseCase, RenameCustomerUseCase, ...
-│   └── infrastructure/
-│       ├── persistence/             # CustomerJpaEntity, CustomerRepositoryImpl, ...
-│       └── web/                     # CustomerController
-│
-├── technician/                      # Bounded Context: Technicians (mesma forma acima)
-├── parts/                           # Bounded Context: Parts/Inventory (mesma forma acima)
-│
-└── serviceorder/                    # Bounded Context: Service Orders (core subdomain)
-    ├── package-info.java            # @ApplicationModule(displayName = "Service Order")
-    ├── domain/
-    │   ├── model/                   # ServiceOrder (aggregate root), ServiceExecution, ...
-    │   └── repository/              # ServiceOrderRepository (interface)
-    ├── application/
-    │   ├── dto/
-    │   └── usecase/                 # CreateServiceOrderUseCase, AssignTechnicianUseCase, ...
-    └── infrastructure/
-        ├── persistence/
-        └── web/                     # ServiceOrderController
-```
-
-Hoje o acoplamento entre `serviceorder` e `customer`/`technician` é feito só por `UUID` (ex.: `ServiceOrder.customerId`, `ServiceExecution.assignedTechnicianId`) — não há chamadas diretas entre módulos. Se isso mudar no futuro, use o padrão Port (interface em `application/`) + Adapter (implementação em `infrastructure/`) chamando a API pública do outro módulo, nunca importando classes de `domain/` de outro contexto.
-
-### Bounded Contexts (DDD)
-
-#### 1. **Service Order Context**
-**Aggregate Root:** `ServiceOrder`
-- **Entities:** ServiceExecution, ServiceExecutionItem
-- **Value Objects:** ServiceOrderStatus, ExecutionStatus, Priority, ServiceOrderNumber
-- **Repository:** ServiceOrderRepository
-- **Use Cases:**
-    - Criar nova Service Order
-    - Atribuir técnico
-    - Iniciar execução
-    - Atualizar progresso
-    - Aprovar antes da execução
-    - Completar execução
-    - Obter status em tempo real
-
-#### 2. **Technician Context**
-**Aggregate Root:** `Technician`
-- **Value Objects:** TechnicianId, Specialty, Availability
-- **Repository:** TechnicianRepository
-
-#### 3. **Customer Context**
-**Aggregate Root:** `Customer`
-- **Value Objects:** CustomerId, ContactInfo
-- **Repository:** CustomerRepository
-
-#### 4. **Parts Context**
-**Aggregate Root:** `Part`
-- **Value Objects:** PartId, Quantity, Price
-- **Repository:** PartRepository
-
----
-
-## 🎯 Padrões de Projeto
-
-### Domain-Driven Design (DDD)
-
-#### Aggregate Root
-```java
-@Entity
-@Table(name = "service_orders")
-public class ServiceOrder extends AggregateRoot {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    
-    @Embedded
-    private ServiceOrderId serviceOrderId;
-    
-    @Enumerated(EnumType.STRING)
-    private ServiceOrderStatus status;
-    
-    @OneToMany(mappedBy = "serviceOrder", cascade = CascadeType.ALL)
-    private List<ServiceExecution> executions = new ArrayList<>();
-    
-    // Constructor, getters, business methods
-}
-```
-
-#### Value Object
-```java
-@Embeddable
-public class ServiceOrderStatus implements Serializable {
-    @Column(name = "status")
-    private String value;
-    
-    private ServiceOrderStatus() {}
-    
-    public ServiceOrderStatus(String value) {
-        if (!isValid(value)) {
-            throw new BusinessRuleException("Status inválido: " + value);
-        }
-        this.value = value;
-    }
-    
-    private static boolean isValid(String status) {
-        return Arrays.asList("PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED")
-            .contains(status);
-    }
-}
-```
-
-#### Repository Pattern
-```java
-// Domain
-public interface ServiceOrderRepository {
-    void save(ServiceOrder serviceOrder);
-    Optional<ServiceOrder> findById(ServiceOrderId id);
-    List<ServiceOrder> findByStatus(ServiceOrderStatus status);
-}
-
-// Infrastructure
-@Repository
-public class ServiceOrderRepositoryImpl implements ServiceOrderRepository {
-    @Autowired
-    private ServiceOrderJpaRepository jpaRepository;
-    
-    @Override
-    public void save(ServiceOrder serviceOrder) {
-        jpaRepository.save(serviceOrder);
-    }
-    
-    // Implementar outros métodos
-}
-```
-
-### DTOs para Requisições/Respostas
-
-**Nunca exponha Entities diretamente na API!**
-
-```java
-// Request DTO
-public record CreateServiceOrderDTO(
-    Long customerId,
-    String description,
-    String priority,
-    List<String> requiredServices
-) {}
-
-// Response DTO
-public record ServiceOrderResponseDTO(
-    String serviceOrderId,
-    String customerName,
-    String status,
-    LocalDateTime createdAt,
-    List<ServiceExecutionDTO> executions
-) {}
-
-// Execução DTO
-public record ServiceExecutionDTO(
-    String executionId,
-    String technicianName,
-    String currentStatus,  // "PENDING", "IN_PROGRESS", "COMPLETED"
-    Integer progressPercentage,
-    LocalDateTime startedAt,
-    LocalDateTime completedAt
-) {}
-```
-
-### Exception Handling
-
-```java
-// Domain Exception
-public class BusinessRuleException extends RuntimeException {
-    public BusinessRuleException(String message) {
-        super(message);
-    }
-}
-
-// Controller Advice
-@RestControllerAdvice
-public class GlobalExceptionHandler {
-    
-    @ExceptionHandler(BusinessRuleException.class)
-    public ResponseEntity<?> handleBusinessRule(BusinessRuleException ex) {
-        return ResponseEntity
-            .badRequest()
-            .body(new ErrorResponse("BUSINESS_RULE_VIOLATION", ex.getMessage()));
-    }
-    
-    @ExceptionHandler(EntityNotFoundException.class)
-    public ResponseEntity<?> handleNotFound(EntityNotFoundException ex) {
-        return ResponseEntity
-            .notFound()
-            .build();
-    }
-}
-```
-
----
-
-## 🔄 Fluxo da Service Execution (Épico 3)
-
-### Estados e Transições
-
-```
-        ┌─────────────┐
-        │   PENDING   │  (Pendente de aprovação)
-        └──────┬──────┘
-               │ ✓ Aprovado
-               ▼
-        ┌─────────────────┐
-        │  IN_PROGRESS    │  (Técnico atribuído)
-        └──────┬──────────┘
-               │ Progresso atualizado
-               │ (0% → 50% → 100%)
-               ▼
-        ┌─────────────┐
-        │  COMPLETED  │  (Serviço finalizado)
-        └─────────────┘
-        
-        Alternativa: CANCELLED (em qualquer estado)
-```
-
-### Fluxo Use Case por Use Case
-
-#### 1. Criar Service Order
-```
-Input: CreateServiceOrderDTO
-├─ Validar dados do cliente
-├─ Criar agregado ServiceOrder com status PENDING
-├─ Salvar no repositório
-└─ Retornar ID + status
-```
-
-#### 2. Atribuir Técnico
-```
-Input: serviceOrderId, technicianId
-├─ Buscar ServiceOrder pelo ID
-├─ Validar se técnico existe
-├─ Atribuir técnico ao ServiceOrder
-├─ Salvar
-└─ Retornar confirmação
-```
-
-#### 3. Aprovar Execução (antes de iniciar)
-```
-Input: serviceOrderId
-├─ Buscar ServiceOrder
-├─ Validar se está em status PENDING
-├─ Mudar para IN_PROGRESS
-├─ Registrar timestamp de início
-└─ Salvar
-```
-
-#### 4. Atualizar Progresso
-```
-Input: serviceOrderId, progressPercentage (0-100)
-├─ Buscar ServiceExecution
-├─ Validar porcentagem
-├─ Validar se está IN_PROGRESS
-├─ Atualizar campo progressPercentage
-├─ Emitir evento de progresso (para tempo real)
-└─ Salvar
-```
-
-#### 5. Completar Execução
-```
-Input: serviceOrderId
-├─ Buscar ServiceOrder
-├─ Validar se está IN_PROGRESS
-├─ Mudar para COMPLETED
-├─ Registrar timestamp de conclusão
-├─ Calcular tempo total
-├─ Emitir evento de conclusão
-└─ Salvar
-```
-
----
-
-## 🔐 Permissões e Acesso
-
-### Matriz de Permissões
-
-| Ação | Customer | Technician | Manager | Admin |
-|------|----------|-----------|---------|-------|
-| Visualizar própria SO | ✅ | - | ✅ | ✅ |
-| Visualizar todas SO | - | - | ✅ | ✅ |
-| Criar SO | ✅ | - | ✅ | ✅ |
-| Atribuir técnico | - | - | ✅ | ✅ |
-| Iniciar execução | - | ✅ | - | ✅ |
-| Atualizar progresso | - | ✅ | ✅ | ✅ |
-| Aprovar SO | - | - | ✅ | ✅ |
-| Cancelar SO | - | - | ✅ | ✅ |
-
-**Implementar com Spring Security:**
-```java
-@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
-@PostMapping("/service-orders/{id}/approve")
-public ResponseEntity<?> approveServiceOrder(@PathVariable Long id) {
-    // ...
-}
-```
-
----
-
-## 📡 Tempo Real - Estratégia Recomendada
-
-### Para MVP: **Polling com cache**
-
-✅ **Por quê:** Simples, sem dependências extras, não requer WebSocket
-✅ **Para:** Status basic, ideal para MVP
-
-```java
-@GetMapping("/service-orders/{id}/status")
-@Cacheable(value = "statusCache", key = "#id", unless = "#result == null")
-public ResponseEntity<ServiceExecutionDTO> getStatus(@PathVariable Long id) {
-    ServiceExecution execution = useCase.getExecution(id);
-    return ResponseEntity.ok(mapper.toDTO(execution));
-}
-```
-
-### Para Futuro: **WebSocket com eventos**
-
-Para versões posteriores, quando precisar de real-time true:
-```java
-@Configuration
-@EnableWebSocketMessageBroker
-public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
-    // Configuração para push de eventos
-}
-```
-
-**Por enquanto: Polling é suficiente e mais simples.**
-
----
-
-## 🧪 Testes (Obrigatório: 80% Cobertura)
-
-### Estrutura de Testes
-
-```
-src/test/java/com/workshop/
-├── serviceorder/
-│   ├── domain/
-│   │   └── aggregates/
-│   │       └── ServiceOrderTest.java          # Unit tests da entidade
-│   ├── application/
-│   │   └── usecases/
-│   │       ├── CreateServiceOrderUseCaseTest.java
-│   │       ├── AssignTechnicianUseCaseTest.java
-│   │       └── UpdateExecutionProgressUseCaseTest.java
-│   └── infrastructure/
-│       └── controller/
-│           └── ServiceOrderControllerTest.java  # Integration tests
-```
-
-### Exemplo: Unit Test
-
-```java
-@DisplayName("ServiceOrder - Regras de Negócio")
-class ServiceOrderTest {
-    
-    @Test
-    @DisplayName("Deve criar ServiceOrder com status PENDING")
-    void shouldCreateWithPendingStatus() {
-        // Arrange
-        Long customerId = 1L;
-        String description = "Revisão completa";
-        
-        // Act
-        ServiceOrder order = new ServiceOrder(customerId, description, Priority.HIGH);
-        
-        // Assert
-        assertEquals(ServiceOrderStatus.PENDING, order.getStatus());
-        assertNotNull(order.getCreatedAt());
-    }
-    
-    @Test
-    @DisplayName("Deve rejeitar transição PENDING → COMPLETED direta")
-    void shouldRejectDirectTransition() {
-        // Arrange
-        ServiceOrder order = new ServiceOrder(1L, "Revisão", Priority.NORMAL);
-        
-        // Act & Assert
-        assertThrows(BusinessRuleException.class, () -> {
-            order.complete();  // Sem passar por IN_PROGRESS
-        });
-    }
-}
-```
-
-### Exemplo: Integration Test
-
-```java
-@SpringBootTest
-@AutoConfigureMockMvc
-class ServiceOrderControllerTest {
-    
-    @Autowired
-    private MockMvc mockMvc;
-    
-    @Test
-    @DisplayName("POST /service-orders deve criar e retornar 201")
-    void shouldCreateServiceOrder() throws Exception {
-        CreateServiceOrderDTO request = new CreateServiceOrderDTO(
-            1L, "Revisão", "HIGH", List.of("Óleo", "Filtro")
-        );
-        
-        mockMvc.perform(post("/service-orders")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(asJsonString(request)))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.status").value("PENDING"));
-    }
-}
-```
-
-### Checklist de Cobertura
-
-- **Unit Tests:** Cada classe de domain (agregados, entities, value objects)
-- **Integration Tests:** Cada endpoint REST
-- **Testes de Fluxo:** Cenários completos (criar → atribuir → iniciar → atualizar → completar)
-- **Testes de Erro:** Exceções de negócio, validações
-
-**Comando para verificar cobertura:**
-```bash
-mvn clean test jacoco:report
-# Relatório em: target/site/jacoco/index.html
-```
-
----
-
-## 📝 Convenções de Código
-
-### Naming Conventions
-
-| Elemento | Padrão | Exemplo |
-|----------|--------|---------|
-| Packages | `br.com.fiap.workshop_management_system.{bounded-context}.{layer}` | `br.com.fiap.workshop_management_system.serviceorder.domain` |
-| Classes | PascalCase | `ServiceOrder`, `CreateServiceOrderUseCase` |
-| Interfaces | PascalCase (sem prefixo `I`) | `ServiceOrderRepository` |
-| Methods | camelCase, verbo primeiro | `getStatus()`, `updateProgress()` |
-| Constants | UPPER_SNAKE_CASE | `MAX_RETRY_ATTEMPTS`, `DEFAULT_TIMEOUT` |
-| Variables | camelCase | `serviceOrderId`, `technicianName` |
-
-### Code Style
-
-- **Indentation:** 4 spaces (configurar no IntelliJ)
-- **Line length:** Máximo 120 caracteres
-- **Imports:** Evite wildcard imports
-- **Comments:** Inglês, apenas para lógica complexa. Self-explanatory code é preferível.
-
-```java
-// ❌ Ruim
-ServiceOrder so = new ServiceOrder(1L, "Revisão", Priority.HIGH);
-so.setStatus(ServiceOrderStatus.IN_PROGRESS);  // Muda status
-
-// ✅ Bom
-ServiceOrder serviceOrder = new ServiceOrder(1L, "Revisão", Priority.HIGH);
-serviceOrder.startExecution(technicianId);  // Method name explica a intenção
-```
-
----
-
-## 🔗 Conventional Commits
-
-**Obrigatório para todo commit!**
-
-```
-<type>(<scope>): <subject>
-
-<body>
-
-<footer>
-```
-
-### Tipos Permitidos
-
-| Tipo | Uso | Exemplo |
-|------|-----|---------|
-| `feat` | Nova feature | `feat(serviceorder): add execution approval` |
-| `fix` | Bug fix | `fix(serviceorder): correct status transition` |
-| `refactor` | Refatoração | `refactor(serviceorder): extract validation logic` |
-| `test` | Testes | `test(serviceorder): add status transition tests` |
-| `docs` | Documentação | `docs: update AGENTS.md` |
-| `chore` | Tarefas | `chore: update dependencies` |
-
-### Exemplos
-
-```
-✅ feat(serviceorder): implement execution approval workflow
-
-- Add ApproveServiceOrderUseCase
-- Add status transition validation
-- Add integration tests for approval flow
-
-Closes #45
-
-❌ fixed the thing
-❌ implemented new stuff
-❌ update code
-```
-
----
-
-## 🔄 Fluxo de Desenvolvimento (Code Review)
-
-### Procedimento Obrigatório
-
-1. **Branch**
-   ```bash
-   git checkout -b feat/serviceorder-approval
-   # Nomenclatura: {tipo}/{bounded-context}-{feature}
-   ```
-
-2. **Desenvolvimento Local**
-   ```bash
-   # Rodar testes continuamente
-   mvn test -Dtest=ServiceOrderTest
-   mvn clean test jacoco:report  # Verificar cobertura
-   mvn sonar:sonar  # Se configurado
-   ```
-
-3. **Commit com Conventional Commits**
-   ```bash
-   git commit -m "feat(serviceorder): add execution approval
-
-   - Create ApproveServiceOrderUseCase
-   - Add status transition validation
-   - Add unit and integration tests"
-   ```
-
-4. **Push e Pull Request**
-   ```bash
-   git push origin feat/serviceorder-approval
-   # Abrir PR no GitHub com descrição clara
-   ```
-
-5. **Code Review (Obrigatório: 1 pessoa)**
-    - Verificar regras de negócio
-    - Verificar cobertura de testes (>= 80%)
-    - Rodar localmente: `mvn clean test`
-    - Verificar SonarLint
-    - Checklist da PR (veja abaixo)
-
-6. **Merge**
-    - Apenas após aprovação
-    - Usar "Squash and merge" se múltiplos commits pequenos
-    - Deletar branch remoto
-
----
-
-## ✅ Checklist para Pull Request
-
-**Cole isso na descrição de toda PR:**
+Project instructions for humans and coding agents working on the FIAP Workshop Management System MVP.
+
+## Project context
+
+- Backend REST API for an automotive workshop.
+- Java 21, Spring Boot 4.1, Spring Modulith 2.1, Spring Data JPA and MySQL.
+- Modular monolith organized around the bounded contexts defined in the project Miro board.
+- Package root: `br.com.fiap.workshop_management_system`.
+- Use `./mvnw`; do not depend on a globally installed Maven.
+
+## Bounded contexts
+
+Only direct packages below the application root are Spring Modulith modules:
+
+- `registration`: Customer, Vehicle and Service Catalog.
+- `servicelifecycle`: Service Order, Estimate and supporting Technician capabilities.
+- `stockprocurement`: Stock and Purchase Order.
+
+Some aggregates are intentionally represented only by documented package placeholders. Do not invent CRUD, entities,
+repositories or tables for a placeholder without an approved feature specification.
+
+`Notifications` is not currently a bounded context. Notification delivery is an outbound effect owned by the consuming
+module. Introduce a consumer-owned port only when a real use case needs delivery. See
+`docs/ADR-002-notifications-boundary.md`.
+
+## Architecture rules
+
+- Keep the domain model free from Spring, JPA and transport concerns.
+- Put aggregate roots, entities and value objects in `domain/model`; repository contracts belong to `domain/repository`.
+- Application use cases orchestrate domain behavior and define transaction boundaries.
+- Infrastructure contains persistence adapters, HTTP controllers and external integrations.
+- Never expose domain or JPA entities as HTTP contracts. Use request/response records and Bean Validation at the boundary.
+- Prefer constructor injection. Do not use field injection.
+- Change aggregate state through intention-revealing business methods, not public setters.
+- Use `BigDecimal` for monetary values and validate invariants when value objects are created.
+- Do not import another module's internal packages. Communicate through public APIs, stable IDs, domain events or a
+  consumer-owned port and adapter.
+- Keep cross-module dependencies acyclic and run the Modulith verification for every structural change.
+- Keep truly cross-cutting HTTP concerns in the application root; do not create a generic shared domain module.
+
+## Feature specification workflow
+
+Every non-trivial feature starts in `docs/features/<feature-slug>/`, copied from `docs/features/_template/`.
+
+1. Write `functional-spec.md` with the problem, behaviors, rules, exclusions and acceptance criteria.
+2. Write `technical-spec.md` with context impact, contracts, persistence, failures, security and test strategy.
+3. Write `implementation-plan.md` with ordered checkpoints and verification evidence.
+4. Mark the functional and technical specs `Approved` before implementation.
+5. Implement checkpoint by checkpoint and keep the plan status current.
+6. Run tests, perform the security review and update API/database documentation.
+7. Mark the feature `Implemented` only after all completion gates pass.
+
+Small typo-only or documentation-only changes may use a single concise plan, but must still satisfy relevant checks.
+
+## Persistent data and seeds
+
+Every feature that creates or changes persistent data must classify it in the technical spec as one of:
+
+- no seed required;
+- mandatory reference data;
+- local demonstration data;
+- test fixture.
+
+Rules:
+
+- Flyway is the only schema and mandatory reference-data mechanism.
+- Production uses `spring.jpa.hibernate.ddl-auto=validate`; never restore `update` or `create`.
+- Versioned migrations live in `src/main/resources/db/migration` and are immutable after merge.
+- `scripts/` is reserved for container bootstrap and operational scripts, not application schema evolution.
+- Business examples such as customers and stock items must never be inserted automatically in production.
+- Demonstration seeders require both the `dev` profile and `app.seed.enabled=true`.
+- Seeders are module-owned, idempotent, contain no real personal data or secrets, and create valid domain objects.
+- Automated tests use dedicated fixtures/builders and must not depend on development seeds.
+
+## HTTP contracts and documentation
+
+- Preserve backward compatibility unless the functional spec explicitly approves a breaking change.
+- Any endpoint, request, response, validation or status-code change must update in the same feature:
+  - Springdoc/OpenAPI annotations and the generated contract expectations;
+  - `docs/api/postman/workshop-management-system.postman_collection.json`;
+  - affected functional and technical specs.
+- OpenAPI generated by the application is the source of truth. Do not maintain a duplicate handwritten YAML.
+- Swagger UI is available at `/swagger-ui.html`; JSON OpenAPI is available at `/v3/api-docs`.
+- Map business and validation errors through the global exception handler using stable error codes.
+
+## Testing and quality gates
+
+- Domain rules require fast unit tests.
+- Use-case orchestration requires unit or module integration tests.
+- HTTP contract changes require MockMvc integration tests.
+- Persistence changes require migration/startup coverage against the test database.
+- Module interactions should use `@ApplicationModuleTest` where isolation or events matter.
+- Cover business-rule failures and end-to-end use-case flows when they are changed.
+- `ModuleStructureTest` must remain green.
+- Run `make test` while developing and `make verify` before completion.
+- `make coverage` generates the JaCoCo report. The project target is at least 80%; do not reduce coverage of changed code.
+- Do not disable, ignore or weaken tests merely to make a build pass.
+
+## Security review
+
+Every feature plan contains a security checkpoint. Review, as applicable:
+
+- input validation and unsafe mass assignment;
+- authentication and authorization boundaries;
+- exposure of customer, vehicle or operational data;
+- secrets, credentials and sensitive log content;
+- SQL, persistence and migration safety;
+- error responses and information disclosure;
+- new dependencies and known vulnerabilities;
+- abuse cases for new or changed endpoints.
+
+Record findings and mitigations in the implementation plan. If an item is not applicable, record `N/A` with a short
+reason. A feature cannot be marked implemented while a critical/high finding remains unresolved.
+
+## Code style
+
+- Four-space indentation, maximum 120 characters per line and no wildcard imports.
+- Use English names and comments; comments should explain non-obvious decisions rather than restate code.
+- Classes use PascalCase, methods/variables camelCase and constants UPPER_SNAKE_CASE.
+- Prefer small cohesive methods, explicit names and early validation over nested conditionals.
+- Avoid speculative abstractions, unused ports, generic utility packages and premature bounded contexts.
+
+## Transactions and error handling
+
+- Put `@Transactional` on public application use-case methods that change aggregate state; use `readOnly = true` for
+  query-only use cases when applicable.
+- Translate expected business, validation and not-found failures in `GlobalExceptionHandler` using `ErrorResponse` and a
+  stable error code. Do not expose stack traces, SQL details or internal exception types in HTTP responses.
+- Let unexpected technical failures propagate to the platform's standard error handling and log them without secrets or
+  personal data.
+
+## Git and pull requests
+
+- Create branches as `{type}/{bounded-context}-{feature}`; use `platform` as the scope for cross-cutting work.
+- Use Conventional Commits: `<type>(<scope>): <subject>`. Allowed types are `feat`, `fix`, `refactor`, `test`, `docs`
+  and `chore`.
+- Keep commits focused on a cohesive, reviewable step. Do not mix formatting, unrelated cleanup and behavior changes.
+- Every pull request needs at least one team review and must describe the context, behavior, risks and verification.
+- Use the following checklist in the PR description, removing items that are clearly not applicable and explaining why:
 
 ```markdown
-## Description
-Descreva brevemente o que foi feito
+## Resumo
 
-## Type of Change
-- [ ] New feature (nova funcionalidade)
-- [ ] Bug fix (correção)
-- [ ] Breaking change
-- [ ] Refactoring
+## Tipo de mudança
+- [ ] Feature
+- [ ] Correção
+- [ ] Refatoração
+- [ ] Documentação / manutenção
 
-## Testing
-- [ ] Testes unitários criados/atualizados
-- [ ] Cobertura >= 80%
-- [ ] Teste de integração passa
-- [ ] Testei manualmente no Postman/Insomnia
+## Validação
+- [ ] Testes relevantes criados ou atualizados
+- [ ] `make verify` executado
+- [ ] Cobertura revisada (meta do projeto: 80%)
+- [ ] Fronteiras Modulith verificadas, quando aplicável
 
-## Code Quality
-- [ ] Sem SonarLint warnings
-- [ ] Conventional Commits usados
-- [ ] Code style segue AGENTS.md
-- [ ] Sem código duplicado
+## Contratos e dados
+- [ ] OpenAPI e Postman atualizados, quando aplicável
+- [ ] Migração Flyway e classificação de seed incluídas, quando aplicável
+- [ ] Compatibilidade de contrato avaliada
 
-## Business Logic
-- [ ] Regras de DDD respeitadas
-- [ ] Transições de estado validadas
-- [ ] Permissions/Authorization verificadas
-- [ ] Documentação de APIs atualizada (se necessário)
-
-## Related Issues
-Closes #XXX
+## Segurança e qualidade
+- [ ] Revisão de segurança registrada
+- [ ] Sem segredos, dados pessoais reais ou logs sensíveis
+- [ ] Convenções de código e arquitetura respeitadas
 ```
 
----
+## Completion checklist
 
-## 📚 Dependências Spring Boot
-
-**pom.xml - Versões Principais**
-
-```xml
-<properties>
-    <java.version>17</java.version>
-    <spring-boot.version>4.1.0</spring-boot.version>
-    <maven.compiler.source>17</maven.compiler.source>
-    <maven.compiler.target>17</maven.compiler.target>
-</properties>
-
-<dependencies>
-    <!-- Spring -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-web</artifactId>
-    </dependency>
-    
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-data-jpa</artifactId>
-    </dependency>
-    
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-security</artifactId>
-    </dependency>
-    
-    <!-- Database -->
-    <dependency>
-        <groupId>com.mysql</groupId>
-        <artifactId>mysql-connector-java</artifactId>
-        <version>8.0.33</version>
-    </dependency>
-    
-    <!-- Testing -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-test</artifactId>
-        <scope>test</scope>
-    </dependency>
-    
-    <!-- Code Coverage -->
-    <dependency>
-        <groupId>org.jacoco</groupId>
-        <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.10</version>
-    </dependency>
-    
-    <!-- Validation -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-validation</artifactId>
-    </dependency>
-</dependencies>
-```
-
----
-
-## 🛠️ Configuração Recomendada do IntelliJ
-
-### Code Style
-1. **File → Settings → Code Style → Java**
-    - Line length limit: 120
-    - Indentation: 4 spaces
-    - Import static: Desabilitado inicialmente
-
-### Plugins Recomendados
-- SonarLint
-- Lombok (se usar)
-- Spring Boot Assistant
-
-### Git Hooks (Opcional)
-```bash
-# .git/hooks/pre-commit
-#!/bin/bash
-mvn clean test
-if [ $? -ne 0 ]; then
-  echo "Testes falharam. Commit cancelado."
-  exit 1
-fi
-```
-
----
-
-## 📞 Dúvidas Frequentes
-
-### "Quando usar Entity vs Value Object?"
-- **Entity:** Tem identidade única que persiste no tempo (ServiceOrder, Technician)
-- **Value Object:** Não tem identidade, é imutável (Status, Priority)
-
-### "Repository deve estar na domain ou infrastructure?"
-- **Interface (ServiceOrderRepository):** Domain (define contrato)
-- **Implementação (ServiceOrderRepositoryImpl):** Infrastructure (detalhes de persistência)
-
-### "Como testar métodos privados?"
-- Não teste. Se precisa testar, método deve ser público.
-- Se lógica é complexa, extraia para um novo método testável.
-
-### "Pode usar @Transactional nos Use Cases?"
-- Sim. Use `@Transactional` nos métodos públicos dos Use Cases.
-- Deixa Spring gerenciar commit/rollback.
-
-### "Como lidar com erros de negócio vs técnicos?"
-- **BusinessRuleException:** Erros de regra (status inválido)
-- **RuntimeException:** Erros técnicos (DB indisponível) - deixa tratar no handler global
-
----
-
-## 📞 Contato e Clarificações
-
-Se houver dúvidas sobre:
-- **Arquitetura DDD:** Revisite as seções de DDD acima ou veja quadro no [miro](https://miro.com/app/board/uXjVH9faCu4=/)
-- **Testes:** Verifique os exemplos de Unit e Integration Tests
-- **Padrões de código:** Consulte Naming Conventions e Code Style
-- **Fluxo de trabalho:** Siga rigorosamente o seção "Code Review"
-
----
-
-**Last Updated:** Agosto 2026  
-**Versão:** 1.0  
-**Status:** ✅ Ativo para Fase 1 do Tech Challenge
+- Approved specs and completed checkpoints.
+- `make verify` passes without inappropriate skipped tests.
+- Modulith boundaries remain valid.
+- Security review is recorded and actionable findings are resolved.
+- Flyway migration and seed classification are present when persistence changed.
+- OpenAPI and Postman are updated when HTTP contracts changed.
+- README/architecture documentation reflects structural changes.
+- Commit messages follow Conventional Commits: `<type>(<scope>): <subject>`.
