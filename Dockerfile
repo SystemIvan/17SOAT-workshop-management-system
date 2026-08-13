@@ -5,16 +5,17 @@ FROM maven:3.9.6-eclipse-temurin-21 AS builder
 WORKDIR /app
 
 # Copiar apenas pom.xml primeiro (aproveita cache Docker)
-COPY pom.xml .
+COPY pom.xml mvnw ./
+COPY .mvn ./.mvn
 
 # Download das dependências (cacheable layer)
-RUN mvn dependency:go-offline
+RUN chmod +x mvnw && ./mvnw dependency:go-offline
 
 # Copiar código-fonte
 COPY src ./src
 
 # Build da aplicação
-RUN mvn clean package -DskipTests
+RUN ./mvnw clean package -DskipTests
 
 # ---
 
@@ -42,12 +43,6 @@ USER appuser
 
 # Porta padrão do Spring Boot
 EXPOSE 8080
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD java -cp app.jar \
-    org.springframework.boot.loader.tools.JarLauncher \
-    --server.port=8080 || exit 1
 
 # Comando de execução
 ENTRYPOINT ["java", "-jar", "app.jar"]
