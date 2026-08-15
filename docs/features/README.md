@@ -1,6 +1,8 @@
 # Especificações de Features
 
-Use um diretório para cada feature não trivial: `docs/features/<feature-slug>/`.
+Use um diretório para cada feature não trivial, agrupado por bounded context:
+`docs/features/<bounded-context>/<feature-slug>/`. Use `platform` para mudanças transversais que não pertencem a um
+bounded context.
 
 Os documentos são criados em português e de forma sequencial:
 
