@@ -44,6 +44,6 @@ Essas entregas estão rastreadas em `docs/backlog.md` e exigirão suas próprias
 
 ## Referências
 
-- `docs/features/stock-domain-foundation/functional-spec.md`;
+- `docs/features/stockprocurement/stock-domain-foundation/functional-spec.md`;
 - `docs/backlog.md`;
 - [Ubiquitous Language no Miro](https://miro.com/app/board/uXjVH9faCu4=/?moveToWidget=3458764679684049703).
