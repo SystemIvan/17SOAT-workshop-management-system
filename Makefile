@@ -2,7 +2,7 @@ MVNW := ./mvnw
 COMPOSE := docker compose
 
 .PHONY: help test coverage verify compile build clean run run-dev \
-	docker-build docker-up docker-down docker-reset docker-logs docker-ps db-shell
+	docker-build docker-up docker-up-interactive docker-down docker-reset docker-logs docker-ps db-shell
 
 help:
 	@echo "Workshop Management System"
@@ -18,6 +18,7 @@ help:
 	@echo ""
 	@echo "Docker:"
 	@echo "  make docker-up     Start MySQL and the application in dev mode"
+	@echo "  make docker-up-interactive  Start MySQL and the application in the foreground"
 	@echo "  make docker-down   Stop containers without deleting data"
 	@echo "  make docker-reset  Stop containers and DELETE the local MySQL volume"
 	@echo "  make docker-logs   Follow application logs"
@@ -53,6 +54,10 @@ docker-build:
 docker-up:
 	@if [ ! -f .env ]; then cp .env.example .env; fi
 	$(COMPOSE) up -d --build
+
+docker-up-interactive:
+	@if [ ! -f .env ]; then cp .env.example .env; fi
+	$(COMPOSE) up --build
 
 docker-down:
 	$(COMPOSE) down
