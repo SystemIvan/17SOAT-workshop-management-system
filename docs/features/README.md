@@ -1,12 +1,15 @@
-# Feature Specifications
+# Especificações de Features
 
-Use one directory per non-trivial feature: `docs/features/<feature-slug>/`.
+Use um diretório para cada feature não trivial: `docs/features/<feature-slug>/`.
 
-Copy the three files from `_template`, complete them in order and keep their status current:
+Os documentos são criados em português e de forma sequencial:
 
-1. `functional-spec.md`: desired behavior and acceptance criteria.
-2. `technical-spec.md`: architecture, contracts, persistence, security and tests.
-3. `implementation-plan.md`: executable checkpoints and evidence.
+1. Crie `functional-spec.md` com comportamento desejado e critérios de aceite.
+2. Obtenha aprovação humana explícita da spec funcional e registre responsável/data.
+3. Somente então crie `technical-spec.md` com arquitetura, contratos, persistência, segurança e testes.
+4. Obtenha aprovação humana explícita da spec técnica e registre responsável/data.
+5. Somente então crie `implementation-plan.md` com checkpoints executáveis e evidências.
 
-Allowed statuses are `Draft`, `Approved`, `In Progress` and `Implemented`. Functional and technical specs must be
-approved before implementation starts.
+Os status permitidos são `Draft`, `Approved`, `In Progress` e `Implemented`. Um agente não pode inferir aprovação nem
+aprovar em nome de uma pessoa. Mudança material em spec aprovada devolve seu status para `Draft` e invalida documentos
+posteriores até nova aprovação e revisão.

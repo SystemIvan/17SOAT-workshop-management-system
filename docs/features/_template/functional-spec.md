@@ -1,30 +1,32 @@
-# Functional Specification: <feature name>
+# Especificação Funcional: <nome da feature>
 
-| Field | Value |
+| Campo | Valor |
 |---|---|
 | Feature | `<feature-slug>` |
 | Status | Draft |
-| Owner | `<owner>` |
-| Updated at | `<YYYY-MM-DD>` |
-| References | `<issues, Miro frames or supporting docs>` |
+| Responsável | `<responsável>` |
+| Atualizado em | `<AAAA-MM-DD>` |
+| Aprovado por | — |
+| Aprovado em | — |
+| Referências | `<issues, frames do Miro ou documentos de apoio>` |
 
-## Problem and outcome
+## Problema e resultado esperado
 
-Describe the user/business problem and the observable outcome.
+Descreva o problema do usuário ou negócio e o resultado observável.
 
-## Actors and scenarios
+## Atores e cenários
 
-List actors and end-to-end scenarios in business language.
+Liste atores e cenários ponta a ponta usando a linguagem de negócio.
 
-## Business rules
+## Regras de negócio
 
-List invariants, permissions, state transitions and failure behavior.
+Liste invariantes, permissões, transições de estado e comportamento de falhas.
 
-## Out of scope
+## Fora de escopo
 
-State what this feature intentionally does not solve.
+Registre o que esta feature intencionalmente não resolve.
 
-## Acceptance criteria
+## Critérios de aceite
 
-- [ ] Define independently verifiable behavior.
-- [ ] Include relevant error and boundary scenarios.
+- [ ] Definir comportamentos verificáveis de forma independente.
+- [ ] Incluir cenários relevantes de erro e de limites.
