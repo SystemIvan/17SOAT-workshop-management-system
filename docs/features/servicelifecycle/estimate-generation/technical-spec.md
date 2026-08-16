@@ -1,4 +1,4 @@
-﻿# Especificação Técnica: Geração de Estimate
+# Especificação Técnica: Geração de Estimate
 
 | Campo | Valor |
 |---|---|
@@ -206,7 +206,15 @@ Expor operação REST para geração da Estimate.
 
 Contrato proposto:
 
-`POST /api/service-orders/{serviceOrderId}/diagnoses/{diagnosisId}/estimate`
+`POST /api/service-orders/{serviceOrderId}/estimates`
+
+Request:
+
+`{ "diagnosisId": "<UUID>" }`
+
+Consulta da Estimate criada:
+
+`GET /api/estimates/{estimateId}`
 
 Resposta de sucesso: `201 Created`.
 
@@ -295,13 +303,13 @@ Antes da implementação:
 
 Antes do PR:
 
-- [ ] testes unitários passando;
-- [ ] testes de integração aplicáveis passando;
-- [ ] `make verify` passando;
-- [ ] migration Flyway validada;
-- [ ] OpenAPI atualizado;
-- [ ] Postman atualizado;
-- [ ] evento `EstimateGenerated` testado;
-- [ ] nenhuma fronteira do Spring Modulith violada.
+- [x] testes unitários passando;
+- [x] testes de integração aplicáveis passando;
+- [x] `make verify` passando;
+- [x] migration Flyway validada;
+- [x] OpenAPI atualizado;
+- [x] Postman atualizado;
+- [x] evento `EstimateGenerated` testado;
+- [x] nenhuma fronteira do Spring Modulith violada.
 
 

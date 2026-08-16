@@ -13,7 +13,9 @@
     { "key": "stockItemId", "value": "44444444-4444-4444-4444-444444444444" },
     { "key": "serviceOrderId", "value": "55555555-5555-5555-5555-555555555555" },
     { "key": "executionId", "value": "66666666-6666-6666-6666-666666666666" },
-    { "key": "catalogServiceId", "value": "77777777-7777-7777-7777-777777777777" }
+    { "key": "catalogServiceId", "value": "77777777-7777-7777-7777-777777777777" },
+    { "key": "diagnosisId", "value": "88888888-8888-8888-8888-888888888888" },
+    { "key": "estimateId", "value": "99999999-9999-9999-9999-999999999999" }
   ],
   "item": [
     {
@@ -156,6 +158,31 @@
               }
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "Estimates",
+      "item": [
+        {
+          "name": "Generate estimate",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('estimateId', pm.response.json().id); }"] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"diagnosisId\": \"{{diagnosisId}}\"\n}" },
+            "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/estimates"
+          }
+        },
+        {
+          "name": "Get estimate",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/estimates/{{estimateId}}"
+          }
         }
       ]
     },

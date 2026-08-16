@@ -1,4 +1,4 @@
-﻿# Especificação Funcional: Geração de Estimate
+# Especificação Funcional: Geração de Estimate
 
 | Campo | Valor |
 |---|---|
@@ -89,15 +89,15 @@ Ao final da geração:
 
 ## Critérios de aceite
 
-- [ ] Uma Estimate pode ser gerada para um Diagnosis existente com pelo menos uma Service Execution.
-- [ ] A Estimate referencia a Service Order e o Diagnosis que a originaram.
-- [ ] As Service Executions daquele Diagnosis são representadas na Estimate como snapshots comerciais.
-- [ ] Dados comerciais copiados para a Estimate não dependem de leitura viva posterior do catálogo.
-- [ ] Não é possível gerar mais de uma Estimate para o mesmo ciclo de Diagnosis.
-- [ ] A Service Order continua sendo a fonte de verdade das Service Executions.
-- [ ] Após a criação válida da Estimate é produzido `EstimateGenerated`.
-- [ ] `EstimateGenerated` contém dados suficientes para identificar Estimate, Service Order, Diagnosis e Customer.
-- [ ] A geração da Estimate não aprova Service Executions nem reserva Stock.
-- [ ] A feature permite representar `expiresAt` sem hard-code da duração do prazo.
-- [ ] Nenhum comportamento de Notification é implementado dentro do domínio de Estimate.
+- [x] Uma Estimate pode ser gerada para um Diagnosis existente com pelo menos uma Service Execution.
+- [x] A Estimate referencia a Service Order e o Diagnosis que a originaram.
+- [x] As Service Executions daquele Diagnosis são representadas na Estimate como snapshots comerciais.
+- [x] Dados comerciais copiados para a Estimate não dependem de leitura viva posterior do catálogo.
+- [x] Não é possível gerar mais de uma Estimate para o mesmo ciclo de Diagnosis.
+- [x] A Service Order continua sendo a fonte de verdade das Service Executions.
+- [x] Após a criação válida da Estimate é produzido `EstimateGenerated`.
+- [x] `EstimateGenerated` contém dados suficientes para identificar Estimate, Service Order, Diagnosis e Customer.
+- [x] A geração da Estimate não aprova Service Executions nem reserva Stock.
+- [x] A feature permite representar `expiresAt` sem hard-code da duração do prazo.
+- [x] Nenhum comportamento de Notification é implementado dentro do domínio de Estimate.
 

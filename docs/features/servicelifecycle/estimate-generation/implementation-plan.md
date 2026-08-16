@@ -1,4 +1,4 @@
-﻿# Plano de Implementação: Geração de Estimate
+# Plano de Implementação: Geração de Estimate
 
 | Campo | Valor |
 |---|---|
@@ -85,7 +85,15 @@ Validar round-trip entre domínio e JPA.
 
 Criar endpoint:
 
-`POST /api/service-orders/{serviceOrderId}/diagnoses/{diagnosisId}/estimate`
+`POST /api/service-orders/{serviceOrderId}/estimates`
+
+Request:
+
+`{ "diagnosisId": "<UUID>" }`
+
+Também disponibilizar consulta do recurso criado:
+
+`GET /api/estimates/{estimateId}`
 
 Resultado esperado:
 
@@ -136,15 +144,15 @@ Revisar:
 
 ## Definition of Done
 
-- [ ] Estimate implementada como Aggregate Root.
-- [ ] EstimateLine implementada como snapshot comercial.
-- [ ] EstimateRepository implementado.
-- [ ] GenerateEstimateUseCase implementado.
-- [ ] Persistência e migration implementadas.
-- [ ] Endpoint REST implementado.
-- [ ] `EstimateGenerated` implementado e testado.
-- [ ] OpenAPI atualizado.
-- [ ] Postman atualizado.
-- [ ] Testes relevantes passando.
-- [ ] `make verify` passando.
+- [x] Estimate implementada como Aggregate Root.
+- [x] EstimateLine implementada como snapshot comercial.
+- [x] EstimateRepository implementado.
+- [x] GenerateEstimateUseCase implementado.
+- [x] Persistência e migration implementadas.
+- [x] Endpoint REST implementado.
+- [x] `EstimateGenerated` implementado e testado.
+- [x] OpenAPI atualizado.
+- [x] Postman atualizado.
+- [x] Testes relevantes passando.
+- [x] `make verify` passando.
 - [ ] PR pronto para review.
