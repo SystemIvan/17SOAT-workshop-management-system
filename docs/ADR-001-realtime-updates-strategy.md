@@ -1,6 +1,6 @@
 # ADR 001: Real-Time Updates Strategy — Polling vs WebSocket
 
-**Status:** -
+**Status:** Accepted
 **Date:** Agosto 2026  
 **Deciders:** Time de Desenvolvimento (5 pessoas)  
 **Affected By:** Épico 3 (ServiceExecution Status Updates), Customers, Technicians  
@@ -536,4 +536,4 @@ class ServiceOrderStatusControllerTest {
 **Last Updated:** Agosto 2026  
 **Decision Maker:** Santiago Silvestre  
 **Reviewed By:** [Time]  
-**Status:**  - 
+**Status:** Accepted
