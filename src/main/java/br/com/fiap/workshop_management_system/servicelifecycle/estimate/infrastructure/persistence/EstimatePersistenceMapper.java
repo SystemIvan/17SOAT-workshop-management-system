@@ -6,6 +6,7 @@ import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.m
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Money;
 import org.springframework.stereotype.Component;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,19 +23,25 @@ public class EstimatePersistenceMapper {
                 estimate.expiresAt()
         );
 
-        estimate.lines().forEach(line -> {
+        for (int lineIndex = 0; lineIndex < estimate.lines().size(); lineIndex++) {
+            EstimateLine line = estimate.lines().get(lineIndex);
+
             EstimateLineJpaEntity lineEntity = new EstimateLineJpaEntity(
                     UUID.randomUUID(),
+                    lineIndex,
                     line.serviceExecutionId(),
                     line.serviceName(),
                     line.servicePrice().value(),
                     line.servicePrice().currency()
             );
 
-            line.stockItems().forEach(item -> {
+            for (int itemIndex = 0; itemIndex < line.stockItems().size(); itemIndex++) {
+                EstimateStockItem item = line.stockItems().get(itemIndex);
+
                 EstimateStockItemJpaEntity itemEntity =
                         new EstimateStockItemJpaEntity(
                                 UUID.randomUUID(),
+                                itemIndex,
                                 item.stockItemId(),
                                 item.type(),
                                 item.quantity(),
@@ -44,16 +51,17 @@ public class EstimatePersistenceMapper {
                         );
 
                 lineEntity.addStockItem(itemEntity);
-            });
+            }
 
             entity.addLine(lineEntity);
-        });
+        }
 
         return entity;
     }
 
     public Estimate toDomain(EstimateJpaEntity entity) {
         List<EstimateLine> lines = entity.getLines().stream()
+                .sorted(Comparator.comparingInt(EstimateLineJpaEntity::getLineOrder))
                 .map(this::toDomainLine)
                 .toList();
 
@@ -71,6 +79,9 @@ public class EstimatePersistenceMapper {
     private EstimateLine toDomainLine(EstimateLineJpaEntity entity) {
         List<EstimateStockItem> stockItems =
                 entity.getStockItems().stream()
+                        .sorted(Comparator.comparingInt(
+                                EstimateStockItemJpaEntity::getItemOrder
+                        ))
                         .map(this::toDomainStockItem)
                         .toList();
 

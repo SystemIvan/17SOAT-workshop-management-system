@@ -18,6 +18,9 @@ public class EstimateLineJpaEntity {
     @JoinColumn(name = "estimate_id", nullable = false)
     private EstimateJpaEntity estimate;
 
+    @Column(name = "line_order", nullable = false)
+    private int lineOrder;
+
     @Column(name = "service_execution_id", nullable = false)
     private UUID serviceExecutionId;
 
@@ -35,7 +38,6 @@ public class EstimateLineJpaEntity {
             cascade = CascadeType.ALL,
             orphanRemoval = true
     )
-    @OrderColumn(name = "item_order")
     private List<EstimateStockItemJpaEntity> stockItems = new ArrayList<>();
 
     protected EstimateLineJpaEntity() {
@@ -43,11 +45,13 @@ public class EstimateLineJpaEntity {
 
     public EstimateLineJpaEntity(
             UUID id,
+            int lineOrder,
             UUID serviceExecutionId,
             String serviceName,
             BigDecimal servicePriceValue,
             String servicePriceCurrency) {
         this.id = id;
+        this.lineOrder = lineOrder;
         this.serviceExecutionId = serviceExecutionId;
         this.serviceName = serviceName;
         this.servicePriceValue = servicePriceValue;
@@ -64,6 +68,7 @@ public class EstimateLineJpaEntity {
     }
 
     public UUID getId() { return id; }
+    public int getLineOrder() { return lineOrder; }
     public UUID getServiceExecutionId() { return serviceExecutionId; }
     public String getServiceName() { return serviceName; }
     public BigDecimal getServicePriceValue() { return servicePriceValue; }

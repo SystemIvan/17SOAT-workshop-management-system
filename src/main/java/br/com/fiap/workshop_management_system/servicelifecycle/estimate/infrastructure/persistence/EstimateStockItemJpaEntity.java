@@ -17,6 +17,9 @@ public class EstimateStockItemJpaEntity {
     @JoinColumn(name = "estimate_line_id", nullable = false)
     private EstimateLineJpaEntity estimateLine;
 
+    @Column(name = "item_order", nullable = false)
+    private int itemOrder;
+
     @Column(name = "stock_item_id", nullable = false)
     private UUID stockItemId;
 
@@ -41,6 +44,7 @@ public class EstimateStockItemJpaEntity {
 
     public EstimateStockItemJpaEntity(
             UUID id,
+            int itemOrder,
             UUID stockItemId,
             StockItemType type,
             int quantity,
@@ -48,6 +52,7 @@ public class EstimateStockItemJpaEntity {
             BigDecimal priceSnapshotValue,
             String priceSnapshotCurrency) {
         this.id = id;
+        this.itemOrder = itemOrder;
         this.stockItemId = stockItemId;
         this.type = type;
         this.quantity = quantity;
@@ -61,6 +66,7 @@ public class EstimateStockItemJpaEntity {
     }
 
     public UUID getId() { return id; }
+    public int getItemOrder() { return itemOrder; }
     public UUID getStockItemId() { return stockItemId; }
     public StockItemType getType() { return type; }
     public int getQuantity() { return quantity; }

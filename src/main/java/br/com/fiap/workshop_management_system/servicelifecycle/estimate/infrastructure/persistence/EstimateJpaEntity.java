@@ -40,7 +40,6 @@ public class EstimateJpaEntity {
             cascade = CascadeType.ALL,
             orphanRemoval = true
     )
-    @OrderColumn(name = "line_order")
     private List<EstimateLineJpaEntity> lines = new ArrayList<>();
 
     protected EstimateJpaEntity() {
