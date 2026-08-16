@@ -18,6 +18,8 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.UpdateExecutionProgressUseCase;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -95,6 +97,14 @@ public class ServiceOrderController {
 
     @PostMapping("/{id}/executions/{executionId}/assign-technician")
     @Operation(summary = "Assign a technician to a service execution")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Technician assigned"),
+            @ApiResponse(responseCode = "400", description = "Invalid or missing technicianId"),
+            @ApiResponse(responseCode = "404",
+                    description = "Service order, service execution or technician not found"),
+            @ApiResponse(responseCode = "409",
+                    description = "Service execution is completed or rejected")
+    })
     public ResponseEntity<ServiceOrderResponse> assignTechnician(
             @PathVariable UUID id, @PathVariable UUID executionId, @Valid @RequestBody AssignTechnicianRequest request) {
         return ResponseEntity.ok(assignTechnicianUseCase.execute(id, executionId, request));
