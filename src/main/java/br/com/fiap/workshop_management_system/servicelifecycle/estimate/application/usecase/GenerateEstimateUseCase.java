@@ -9,6 +9,7 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.doma
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockRequirement;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +28,8 @@ public class GenerateEstimateUseCase {
     private final ServiceOrderRepository serviceOrderRepository;
     private final EstimateRepository estimateRepository;
     private final Clock clock;
+
+    @Autowired
 
     public GenerateEstimateUseCase(
             ServiceOrderRepository serviceOrderRepository,
