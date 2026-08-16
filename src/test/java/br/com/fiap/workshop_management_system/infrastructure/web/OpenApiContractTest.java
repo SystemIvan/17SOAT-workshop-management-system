@@ -31,6 +31,7 @@ class OpenApiContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paths['/api/customers'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/customers'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/customers/identify'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/customers/{id}'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/customers/{id}'].patch").exists())
                 .andExpect(jsonPath("$.paths['/api/customers/{id}/contact-info'].patch").exists())

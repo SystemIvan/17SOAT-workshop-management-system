@@ -12,7 +12,7 @@ class CustomerTest {
     private final ContactInfo contactInfo = new ContactInfo("cliente@example.com", "11999998888");
 
     private Customer newCustomer() {
-        return Customer.create("Maria Souza", "12345678900", contactInfo);
+        return Customer.create("Maria Souza", new TaxId("529.982.247-25"), contactInfo);
     }
 
     @Test
@@ -20,23 +20,25 @@ class CustomerTest {
         Customer customer = newCustomer();
 
         assertEquals("Maria Souza", customer.name());
-        assertEquals("12345678900", customer.document());
+        assertEquals("52998224725", customer.taxId().value());
         assertEquals(contactInfo, customer.contactInfo());
     }
 
     @Test
     void cannotCreateCustomerWithBlankName() {
-        assertThrows(IllegalArgumentException.class, () -> Customer.create(" ", "12345678900", contactInfo));
+        assertThrows(IllegalArgumentException.class,
+                () -> Customer.create(" ", new TaxId("52998224725"), contactInfo));
     }
 
     @Test
-    void cannotCreateCustomerWithBlankDocument() {
-        assertThrows(IllegalArgumentException.class, () -> Customer.create("Maria Souza", " ", contactInfo));
+    void cannotCreateCustomerWithoutTaxId() {
+        assertThrows(IllegalArgumentException.class, () -> Customer.create("Maria Souza", null, contactInfo));
     }
 
     @Test
     void cannotCreateCustomerWithoutContactInfo() {
-        assertThrows(IllegalArgumentException.class, () -> Customer.create("Maria Souza", "12345678900", null));
+        assertThrows(IllegalArgumentException.class,
+                () -> Customer.create("Maria Souza", new TaxId("52998224725"), null));
     }
 
     @Test
@@ -48,11 +50,13 @@ class CustomerTest {
     @Test
     void updateContactInfoReplacesTheCurrentContact() {
         Customer customer = newCustomer();
+        TaxId originalTaxId = customer.taxId();
         ContactInfo newContactInfo = new ContactInfo("novo@example.com", "11888887777");
 
         customer.updateContactInfo(newContactInfo);
 
         assertEquals(newContactInfo, customer.contactInfo());
+        assertEquals(originalTaxId, customer.taxId());
     }
 
     @Test
@@ -65,9 +69,11 @@ class CustomerTest {
     @Test
     void renameUpdatesNameButRejectsBlank() {
         Customer customer = newCustomer();
+        TaxId originalTaxId = customer.taxId();
 
         customer.rename("Maria Oliveira");
         assertEquals("Maria Oliveira", customer.name());
+        assertEquals(originalTaxId, customer.taxId());
         assertThrows(IllegalArgumentException.class, () -> customer.rename(""));
     }
 
@@ -75,11 +81,11 @@ class CustomerTest {
     void reconstituteRestoresExactPersistedState() {
         UUID id = UUID.randomUUID();
 
-        Customer customer = Customer.reconstitute(id, "Joao Pedro", "98765432100", contactInfo);
+        Customer customer = Customer.reconstitute(id, "Joao Pedro", new TaxId("11.222.333/0001-81"), contactInfo);
 
         assertEquals(id, customer.id());
         assertEquals("Joao Pedro", customer.name());
-        assertEquals("98765432100", customer.document());
+        assertEquals("11222333000181", customer.taxId().value());
         assertEquals(contactInfo, customer.contactInfo());
     }
 }

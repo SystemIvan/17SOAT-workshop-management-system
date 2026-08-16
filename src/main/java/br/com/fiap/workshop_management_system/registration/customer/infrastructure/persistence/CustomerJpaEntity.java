@@ -9,11 +9,12 @@ import org.springframework.data.domain.Persistable;
 import java.util.UUID;
 
 /**
- * JPA projection of the {@link br.com.fiap.workshop_management_system.registration.customer.domain.model.Customer}
- * aggregate. Kept separate from the domain class so the domain stays framework-agnostic.
+ * Projeção JPA do agregado
+ * {@link br.com.fiap.workshop_management_system.registration.customer.domain.model.Customer}.
+ * Permanece separada da classe de domínio para que o domínio não dependa de frameworks.
  *
- * <p>Implements {@link Persistable} because the id (UUID) is always assigned by the domain
- * before persistence - without this, Spring Data would assume every save() is an update.
+ * <p>Implementa {@link Persistable} para declarar explicitamente a estratégia de merge
+ * usada quando o domínio atribui o ID (UUID) antes da persistência.
  */
 @Entity
 @Table(name = "customers")
@@ -22,13 +23,16 @@ public class CustomerJpaEntity implements Persistable<UUID> {
     @Id
     private UUID id;
 
+    @Column(nullable = false, length = 255)
     private String name;
+
+    @Column(nullable = false, unique = true, length = 14)
     private String document;
 
-    @Column(name = "contact_email")
+    @Column(name = "contact_email", nullable = false, length = 255)
     private String contactEmail;
 
-    @Column(name = "contact_phone")
+    @Column(name = "contact_phone", nullable = false, length = 255)
     private String contactPhone;
 
     protected CustomerJpaEntity() {

@@ -4,8 +4,8 @@ import br.com.fiap.workshop_management_system.registration.customer.domain.model
 import br.com.fiap.workshop_management_system.registration.customer.domain.model.Customer;
 
 /**
- * Converts between the Customer aggregate and the application-layer DTOs.
- * Entities never cross the controller boundary directly.
+ * Converte o agregado Customer e os DTOs da camada de aplicação.
+ * Entidades nunca atravessam diretamente a fronteira do controller.
  */
 public final class CustomerMapper {
 
@@ -13,7 +13,8 @@ public final class CustomerMapper {
     }
 
     public static CustomerResponse toResponse(Customer customer) {
-        return new CustomerResponse(customer.id(), customer.name(), customer.document(), toContactInfoDTO(customer.contactInfo()));
+        return new CustomerResponse(customer.id(), customer.name(), customer.taxId().value(),
+                toContactInfoDTO(customer.contactInfo()));
     }
 
     public static ContactInfo toContactInfo(ContactInfoDTO dto) {

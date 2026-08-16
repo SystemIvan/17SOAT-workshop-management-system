@@ -1,6 +1,7 @@
 package br.com.fiap.workshop_management_system.registration.customer.infrastructure.bootstrap;
 
 import br.com.fiap.workshop_management_system.registration.customer.domain.model.Customer;
+import br.com.fiap.workshop_management_system.registration.customer.domain.model.TaxId;
 import br.com.fiap.workshop_management_system.registration.customer.domain.repository.CustomerRepository;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +23,7 @@ class CustomerDevelopmentDataSeederTest {
         seeder.run(null);
 
         assertEquals(1, repository.customers.size());
-        assertEquals("00000000000", repository.customers.getFirst().document());
+        assertEquals("11144477735", repository.customers.getFirst().taxId().value());
     }
 
     private static final class InMemoryCustomerRepository implements CustomerRepository {
@@ -32,6 +33,16 @@ class CustomerDevelopmentDataSeederTest {
         @Override
         public Optional<Customer> findById(UUID id) {
             return customers.stream().filter(customer -> customer.id().equals(id)).findFirst();
+        }
+
+        @Override
+        public Optional<Customer> findByTaxId(TaxId taxId) {
+            return customers.stream().filter(customer -> customer.taxId().equals(taxId)).findFirst();
+        }
+
+        @Override
+        public boolean existsByTaxId(TaxId taxId) {
+            return findByTaxId(taxId).isPresent();
         }
 
         @Override

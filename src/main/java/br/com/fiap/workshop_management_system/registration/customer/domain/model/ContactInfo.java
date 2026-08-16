@@ -4,10 +4,10 @@ public record ContactInfo(String email, String phone) {
 
     public ContactInfo {
         if (email == null || !email.contains("@")) {
-            throw new IllegalArgumentException("ContactInfo email must be a valid address");
+            throw new IllegalArgumentException("O e-mail de contato deve ser válido");
         }
         if (phone == null || phone.isBlank()) {
-            throw new IllegalArgumentException("ContactInfo phone must not be blank");
+            throw new IllegalArgumentException("O telefone de contato não pode estar em branco");
         }
     }
 }

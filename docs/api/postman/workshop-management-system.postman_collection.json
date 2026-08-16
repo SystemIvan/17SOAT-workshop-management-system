@@ -2,12 +2,13 @@
   "info": {
     "_postman_id": "c0d4f6e8-0f31-4d2f-9ba8-17f0b5fe2026",
     "name": "Workshop Management System",
-    "description": "REST API collection grouped by bounded context.",
+    "description": "Coleção da API REST agrupada por contexto delimitado.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:8080" },
     { "key": "customerId", "value": "11111111-1111-1111-1111-111111111111" },
+    { "key": "customerTaxId", "value": "52998224725" },
     { "key": "vehicleId", "value": "22222222-2222-2222-2222-222222222222" },
     { "key": "technicianId", "value": "33333333-3333-3333-3333-333333333333" },
     { "key": "stockItemId", "value": "44444444-4444-4444-4444-444444444444" },
@@ -20,7 +21,7 @@
       "name": "Registrations",
       "item": [
         {
-          "name": "Create customer",
+          "name": "Cadastrar cliente",
           "event": [{
             "listen": "test",
             "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('customerId', pm.response.json().id); }"] }
@@ -28,14 +29,15 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Maria Silva\",\n  \"document\": \"12345678900\",\n  \"contactInfo\": {\n    \"email\": \"maria@example.test\",\n    \"phone\": \"+5511999999999\"\n  }\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Maria Silva\",\n  \"document\": \"529.982.247-25\",\n  \"contactInfo\": {\n    \"email\": \"maria@example.test\",\n    \"phone\": \"+5511999999999\"\n  }\n}" },
             "url": "{{baseUrl}}/api/customers"
           }
         },
-        { "name": "Get customer", "request": { "method": "GET", "url": "{{baseUrl}}/api/customers/{{customerId}}" } },
-        { "name": "List customers", "request": { "method": "GET", "url": "{{baseUrl}}/api/customers" } },
+        { "name": "Consultar cliente", "request": { "method": "GET", "url": "{{baseUrl}}/api/customers/{{customerId}}" } },
+        { "name": "Identificar cliente por CPF/CNPJ", "request": { "method": "GET", "url": "{{baseUrl}}/api/customers/identify?document={{customerTaxId}}" } },
+        { "name": "Listar clientes", "request": { "method": "GET", "url": "{{baseUrl}}/api/customers" } },
         {
-          "name": "Rename customer",
+          "name": "Alterar nome do cliente",
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
@@ -44,7 +46,7 @@
           }
         },
         {
-          "name": "Update customer contact",
+          "name": "Atualizar contato do cliente",
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],

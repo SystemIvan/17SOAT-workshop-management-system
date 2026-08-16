@@ -2,23 +2,25 @@ package br.com.fiap.workshop_management_system.registration.customer.infrastruct
 
 import br.com.fiap.workshop_management_system.registration.customer.domain.model.ContactInfo;
 import br.com.fiap.workshop_management_system.registration.customer.domain.model.Customer;
+import br.com.fiap.workshop_management_system.registration.customer.domain.model.TaxId;
 import org.springframework.stereotype.Component;
 
 /**
- * Converts between the framework-agnostic {@link Customer} aggregate and its JPA
- * projection. Reconstruction of the domain object goes through {@link Customer#reconstitute},
- * which restores exact persisted state without re-running creation rules.
+ * Converte o agregado {@link Customer}, independente de framework, e sua projeção JPA.
+ * A reconstrução do objeto de domínio usa {@link Customer#reconstitute}, restaurando
+ * exatamente o estado persistido sem executar novamente as regras de criação.
  */
 @Component
 public class CustomerPersistenceMapper {
 
     public CustomerJpaEntity toEntity(Customer customer) {
         ContactInfo contactInfo = customer.contactInfo();
-        return new CustomerJpaEntity(customer.id(), customer.name(), customer.document(), contactInfo.email(), contactInfo.phone());
+        return new CustomerJpaEntity(customer.id(), customer.name(), customer.taxId().value(), contactInfo.email(),
+                contactInfo.phone());
     }
 
     public Customer toDomain(CustomerJpaEntity entity) {
         ContactInfo contactInfo = new ContactInfo(entity.getContactEmail(), entity.getContactPhone());
-        return Customer.reconstitute(entity.getId(), entity.getName(), entity.getDocument(), contactInfo);
+        return Customer.reconstitute(entity.getId(), entity.getName(), new TaxId(entity.getDocument()), contactInfo);
     }
 }
