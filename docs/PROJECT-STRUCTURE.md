@@ -9,7 +9,7 @@ The application is a Spring Modulith modular monolith. Its module boundaries fol
 br.com.fiap.workshop_management_system
 ├── registration
 │   ├── customer                 # Implemented aggregate
-│   ├── vehicle                  # Planned aggregate
+│   ├── vehicle                  # Registration and descriptive-data updates implemented
 │   └── servicecatalog           # Planned aggregate
 ├── servicelifecycle
 │   ├── serviceorder             # Implemented aggregate
@@ -27,7 +27,7 @@ parts of their owning bounded context.
 
 | Context | Responsibilities | Current state |
 |---|---|---|
-| Registrations | Identify and register customers and vehicles; maintain the service catalog | Customer identity, contact and lifecycle implemented |
+| Registrations | Identify and register customers and vehicles; maintain the service catalog | Customer management and Vehicle registration/update implemented |
 | Service Lifecycle | Create, diagnose, estimate, authorize and execute service orders | Service Order and Technician implemented |
 | Stock & Procurement | Maintain the StockItem catalog; inventory, reservations and procurement are future work | StockItem catalog implemented |
 
