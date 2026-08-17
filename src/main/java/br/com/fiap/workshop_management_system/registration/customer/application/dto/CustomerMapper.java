@@ -15,7 +15,7 @@ public final class CustomerMapper {
 
     public static CustomerResponse toResponse(Customer customer) {
         return new CustomerResponse(customer.id(), customer.name(), customer.taxId().value(),
-                toContactInfoDTO(customer.contactInfo()));
+                toContactInfoDTO(customer.contactInfo()), customer.active());
     }
 
     public static ContactInfo toContactInfo(ContactInfoDTO dto) {

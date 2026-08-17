@@ -36,18 +36,21 @@ class CustomerDevelopmentDataSeederTest {
         }
 
         @Override
-        public Optional<Customer> findByTaxId(TaxId taxId) {
-            return customers.stream().filter(customer -> customer.taxId().equals(taxId)).findFirst();
+        public Optional<Customer> findActiveByTaxId(TaxId taxId) {
+            return customers.stream()
+                    .filter(Customer::active)
+                    .filter(customer -> customer.taxId().equals(taxId))
+                    .findFirst();
         }
 
         @Override
         public boolean existsByTaxId(TaxId taxId) {
-            return findByTaxId(taxId).isPresent();
+            return customers.stream().anyMatch(customer -> customer.taxId().equals(taxId));
         }
 
         @Override
-        public List<Customer> findAll() {
-            return List.copyOf(customers);
+        public List<Customer> findAllActive() {
+            return customers.stream().filter(Customer::active).toList();
         }
 
         @Override

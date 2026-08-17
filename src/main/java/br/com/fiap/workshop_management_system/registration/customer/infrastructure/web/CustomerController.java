@@ -4,6 +4,7 @@ import br.com.fiap.workshop_management_system.registration.customer.application.
 import br.com.fiap.workshop_management_system.registration.customer.application.dto.CustomerResponse;
 import br.com.fiap.workshop_management_system.registration.customer.application.dto.RenameCustomerRequest;
 import br.com.fiap.workshop_management_system.registration.customer.application.dto.UpdateCustomerContactRequest;
+import br.com.fiap.workshop_management_system.registration.customer.application.usecase.ArchiveCustomerUseCase;
 import br.com.fiap.workshop_management_system.registration.customer.application.usecase.CreateCustomerUseCase;
 import br.com.fiap.workshop_management_system.registration.customer.application.usecase.GetCustomerUseCase;
 import br.com.fiap.workshop_management_system.registration.customer.application.usecase.IdentifyCustomerByTaxIdUseCase;
@@ -17,6 +18,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,6 +37,7 @@ import java.util.UUID;
 @Tag(name = "Clientes", description = "Operações de cadastro de clientes")
 public class CustomerController {
 
+    private final ArchiveCustomerUseCase archiveCustomerUseCase;
     private final CreateCustomerUseCase createCustomerUseCase;
     private final GetCustomerUseCase getCustomerUseCase;
     private final IdentifyCustomerByTaxIdUseCase identifyCustomerByTaxIdUseCase;
@@ -43,12 +46,14 @@ public class CustomerController {
     private final UpdateCustomerContactUseCase updateCustomerContactUseCase;
 
     public CustomerController(
+            ArchiveCustomerUseCase archiveCustomerUseCase,
             CreateCustomerUseCase createCustomerUseCase,
             GetCustomerUseCase getCustomerUseCase,
             IdentifyCustomerByTaxIdUseCase identifyCustomerByTaxIdUseCase,
             ListCustomersUseCase listCustomersUseCase,
             RenameCustomerUseCase renameCustomerUseCase,
             UpdateCustomerContactUseCase updateCustomerContactUseCase) {
+        this.archiveCustomerUseCase = archiveCustomerUseCase;
         this.createCustomerUseCase = createCustomerUseCase;
         this.getCustomerUseCase = getCustomerUseCase;
         this.identifyCustomerByTaxIdUseCase = identifyCustomerByTaxIdUseCase;
@@ -65,26 +70,48 @@ public class CustomerController {
     }
 
     @GetMapping("/identify")
-    @Operation(summary = "Identificar cliente por CPF ou CNPJ")
+    @Operation(
+            summary = "Identificar cliente ativo por CPF ou CNPJ",
+            description = "Clientes arquivados não participam da identificação operacional")
     public ResponseEntity<CustomerResponse> identify(
             @RequestParam @Parameter(description = "CPF ou CNPJ, formatado ou apenas números") String document) {
         return ResponseEntity.ok(identifyCustomerByTaxIdUseCase.execute(document));
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Consultar cliente por ID")
+    @Operation(
+            summary = "Consultar cliente por ID",
+            description = "Consulta histórica que retorna clientes ativos ou arquivados")
     public ResponseEntity<CustomerResponse> get(@PathVariable UUID id) {
         return ResponseEntity.ok(getCustomerUseCase.execute(id));
     }
 
     @GetMapping
-    @Operation(summary = "Listar clientes")
+    @Operation(summary = "Listar clientes ativos")
     public ResponseEntity<List<CustomerResponse>> list() {
         return ResponseEntity.ok(listCustomersUseCase.execute());
     }
 
+    @DeleteMapping("/{id}")
+    @Operation(
+            summary = "Arquivar cliente",
+            description = "Arquiva logicamente o cliente; repetir a operação mantém o mesmo estado final")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Cliente arquivado"),
+            @ApiResponse(responseCode = "404", description = "Cliente não encontrado")
+    })
+    public ResponseEntity<Void> archive(@PathVariable UUID id) {
+        archiveCustomerUseCase.execute(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @PatchMapping("/{id}")
     @Operation(summary = "Alterar nome do cliente")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Nome atualizado"),
+            @ApiResponse(responseCode = "404", description = "Cliente não encontrado"),
+            @ApiResponse(responseCode = "409", description = "Cliente arquivado")
+    })
     public ResponseEntity<CustomerResponse> rename(
             @PathVariable UUID id, @Valid @RequestBody RenameCustomerRequest request) {
         return ResponseEntity.ok(renameCustomerUseCase.execute(id, request));
@@ -97,7 +124,8 @@ public class CustomerController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Informações de contato atualizadas"),
             @ApiResponse(responseCode = "400", description = "Dados de contato inválidos"),
-            @ApiResponse(responseCode = "404", description = "Cliente não encontrado")
+            @ApiResponse(responseCode = "404", description = "Cliente não encontrado"),
+            @ApiResponse(responseCode = "409", description = "Cliente arquivado")
     })
     public ResponseEntity<CustomerResponse> updateContactInfo(
             @PathVariable UUID id, @Valid @RequestBody UpdateCustomerContactRequest request) {

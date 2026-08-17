@@ -13,7 +13,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 class CustomerRepositoryIntegrationTest {
@@ -28,7 +30,7 @@ class CustomerRepositoryIntegrationTest {
 
         assertThrows(CustomerTaxIdAlreadyExistsException.class,
                 () -> repository.save(customer("Segundo Cliente", taxId)));
-        assertEquals("Primeiro Cliente", repository.findByTaxId(taxId).orElseThrow().name());
+        assertEquals("Primeiro Cliente", repository.findActiveByTaxId(taxId).orElseThrow().name());
     }
 
     @Test
@@ -47,6 +49,22 @@ class CustomerRepositoryIntegrationTest {
         assertEquals("updated@example.test", updated.contactInfo().email().value());
         assertEquals("+5511999998888", updated.contactInfo().phone().value());
         assertEquals(address, updated.contactInfo().address());
+        assertTrue(updated.active());
+    }
+
+    @Test
+    void persistsArchiveWithoutDeletingAndExcludesItFromActiveQueries() {
+        Customer customer = customer("Cliente Arquivado", new TaxId("11144477735"));
+        repository.save(customer);
+
+        customer.archive();
+        repository.save(customer);
+
+        Customer historicalCustomer = repository.findById(customer.id()).orElseThrow();
+        assertFalse(historicalCustomer.active());
+        assertTrue(repository.findActiveByTaxId(customer.taxId()).isEmpty());
+        assertTrue(repository.findAllActive().stream().noneMatch(found -> found.id().equals(customer.id())));
+        assertTrue(repository.existsByTaxId(customer.taxId()));
     }
 
     private static Customer customer(String name, TaxId taxId) {

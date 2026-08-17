@@ -27,7 +27,7 @@ parts of their owning bounded context.
 
 | Context | Responsibilities | Current state |
 |---|---|---|
-| Registrations | Identify and register customers and vehicles; maintain the service catalog | Customer implemented |
+| Registrations | Identify and register customers and vehicles; maintain the service catalog | Customer identity, contact and lifecycle implemented |
 | Service Lifecycle | Create, diagnose, estimate, authorize and execute service orders | Service Order and Technician implemented |
 | Stock & Procurement | Maintain the StockItem catalog; inventory, reservations and procurement are future work | StockItem catalog implemented |
 

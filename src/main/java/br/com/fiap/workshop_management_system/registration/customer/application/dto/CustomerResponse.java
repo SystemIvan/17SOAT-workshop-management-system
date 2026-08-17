@@ -9,5 +9,7 @@ public record CustomerResponse(
         String name,
         @Schema(description = "CPF ou CNPJ normalizado contendo apenas dígitos", example = "52998224725")
         String document,
-        ContactInfoDTO contactInfo) {
+        ContactInfoDTO contactInfo,
+        @Schema(description = "Indica se o cliente está disponível para operações atuais", example = "true")
+        boolean active) {
 }

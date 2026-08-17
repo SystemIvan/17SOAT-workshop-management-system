@@ -56,6 +56,9 @@ public class CustomerJpaEntity implements Persistable<UUID> {
     @Column(name = "address_postal_code", length = 8)
     private String addressPostalCode;
 
+    @Column(nullable = false)
+    private boolean active;
+
     protected CustomerJpaEntity() {
     }
 
@@ -71,7 +74,8 @@ public class CustomerJpaEntity implements Persistable<UUID> {
             String addressNeighborhood,
             String addressCity,
             String addressState,
-            String addressPostalCode) {
+            String addressPostalCode,
+            boolean active) {
         this.id = id;
         this.name = name;
         this.document = document;
@@ -84,6 +88,7 @@ public class CustomerJpaEntity implements Persistable<UUID> {
         this.addressCity = addressCity;
         this.addressState = addressState;
         this.addressPostalCode = addressPostalCode;
+        this.active = active;
     }
 
     @Override
@@ -138,5 +143,9 @@ public class CustomerJpaEntity implements Persistable<UUID> {
 
     public String getAddressPostalCode() {
         return addressPostalCode;
+    }
+
+    public boolean isActive() {
+        return active;
     }
 }

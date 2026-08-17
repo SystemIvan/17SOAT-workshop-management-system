@@ -15,11 +15,11 @@ public interface CustomerRepository {
 
     Optional<Customer> findById(UUID id);
 
-    Optional<Customer> findByTaxId(TaxId taxId);
+    Optional<Customer> findActiveByTaxId(TaxId taxId);
 
     boolean existsByTaxId(TaxId taxId);
 
-    List<Customer> findAll();
+    List<Customer> findAllActive();
 
     void save(Customer customer);
 }

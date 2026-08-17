@@ -34,6 +34,7 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.paths['/api/customers/identify'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/customers/{id}'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/customers/{id}'].patch").exists())
+                .andExpect(jsonPath("$.paths['/api/customers/{id}'].delete").exists())
                 .andExpect(jsonPath("$.paths['/api/customers/{id}/contact-info'].patch").exists())
                 .andExpect(jsonPath("$.paths['/api/technicians'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/technicians'].get").exists())
@@ -78,5 +79,17 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.components.schemas.AddressDTO.properties.street").exists())
                 .andExpect(jsonPath("$.components.schemas.AddressDTO.properties.state").exists())
                 .andExpect(jsonPath("$.components.schemas.AddressDTO.properties.postalCode").exists());
+    }
+
+    @Test
+    void documentCustomerLifecycleContract() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/customers/{id}'].delete.responses['204']").exists())
+                .andExpect(jsonPath("$.paths['/api/customers/{id}'].delete.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/api/customers/{id}'].patch.responses['409']").exists())
+                .andExpect(jsonPath(
+                        "$.paths['/api/customers/{id}/contact-info'].patch.responses['409']").exists())
+                .andExpect(jsonPath("$.components.schemas.CustomerResponse.properties.active").exists());
     }
 }

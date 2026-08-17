@@ -4,6 +4,7 @@ import br.com.fiap.workshop_management_system.ErrorResponse;
 import br.com.fiap.workshop_management_system.registration.customer.application.exception.CustomerNotFoundException;
 import br.com.fiap.workshop_management_system.registration.customer.application.exception
         .CustomerTaxIdAlreadyExistsException;
+import br.com.fiap.workshop_management_system.registration.customer.domain.model.CustomerArchivedException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -26,6 +27,12 @@ class CustomerExceptionHandler {
     ResponseEntity<ErrorResponse> handleDuplicateTaxId(CustomerTaxIdAlreadyExistsException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse("CUSTOMER_TAX_ID_ALREADY_EXISTS", exception.getMessage()));
+    }
+
+    @ExceptionHandler(CustomerArchivedException.class)
+    ResponseEntity<ErrorResponse> handleArchived(CustomerArchivedException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("CUSTOMER_ARCHIVED", exception.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)

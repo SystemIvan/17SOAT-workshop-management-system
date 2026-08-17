@@ -136,7 +136,7 @@ top-level package. This preserves the current structure but is not a mapping dec
 **Blocking:**
 
 - No longer blocks RF01 at the architectural level.
-- Implementation is still pending and will affect Customer API, persistence and tests.
+- Implemented for Customer RF01 in the API, persistence and automated tests.
 
 **Related Epic / responsibility:** Epic 1 — Cadastros (Ivan), RF01.
 
@@ -331,7 +331,7 @@ preventing their use in new operations while preserving historical references.
 **Blocking:**
 
 - No longer blocks deletion/deactivation acceptance criteria.
-- Implementation remains pending for Customer, Vehicle and ServiceCatalog.
+- Implemented for Customer; Vehicle and ServiceCatalog remain pending.
 
 **Related Epic / responsibility:** Epic 1 — Cadastros (Ivan).
 
@@ -341,8 +341,9 @@ referenced by historical Service Orders and snapshots.
 **Why this is a decision rather than an implementation gap:** Deletion changes invariants, auditability,
 referential integrity and API semantics; a normal missing DELETE endpoint cannot answer those questions.
 
-**Conflicting evidence:** Official brief says CRUD; Miro requires historical snapshots and explicitly lists Vehicle
-removal, but does not define Customer/catalog deletion. Current controllers expose no delete operations.
+**Conflicting evidence:** At decision time, the official brief said CRUD; Miro required historical snapshots and
+explicitly listed Vehicle removal, but did not define Customer/catalog deletion. Controllers then exposed no delete
+operations.
 
 **Options:**
 
@@ -985,12 +986,12 @@ Priority reflects blocking power, downstream impact and dependencies—not decis
 
 1. **AD-001 — Context-to-module mapping**: team-owned; blocks implementing the conditionally selected placement of
    Vehicle and ServiceCatalog, but not their Jira refinement.
-2. **AD-002 — TaxId modeling**: resolved with an immutable domain value object; implementation remains pending.
+2. **AD-002 — TaxId modeling**: resolved and implemented for Customer with an immutable domain value object.
 3. **AD-003 — Vehicle placement**: resolved as an independent aggregate in `customer`, conditional on AD-001.
 4. **AD-004 — ServiceCatalog placement**: resolved as an independent aggregate in `customer`, conditional on
    AD-001; consumers retain historical snapshots.
-5. **AD-005 — Registration deletion semantics**: resolved with logical deactivation/archival; implementation
-   remains pending.
+5. **AD-005 — Registration deletion semantics**: resolved with logical deactivation/archival and implemented for
+   Customer; Vehicle and ServiceCatalog remain pending.
 6. **AD-011 — Cross-module integration**: team-owned; contracts can be mocked meanwhile.
 7. **AD-016 — Identity/authorization ownership**: team-owned; domain work can remain security-agnostic.
 8. **AD-017 — Schema migration policy**: shared; resolve before several epics alter the database concurrently.
@@ -1004,10 +1005,9 @@ AD-001 and must not be treated as approval of the shared context mapping.
 
 - **Jira planning for RF01–RF08:** the approved domain choices, consequences and dependencies are sufficiently clear
   to create and refine stories without inventing architecture.
-- **RF01 — Customer CPF/CNPJ:** AD-002 defines the domain invariant and affected API, repository, persistence and
-  test work. Implementation may proceed when feature work is authorized.
-- **RF02 — Customer contact maintenance:** the current aggregate/use cases already establish the pattern; normal
-  completion and tests require no further architecture decision.
+- **RF01 — Customer CPF/CNPJ:** implemented with the domain invariant, API, repository, persistence and tests defined
+  by AD-002.
+- **RF02 — Customer contact maintenance:** implemented in the existing aggregate and use-case boundaries.
 - **Registration lifecycle stories:** AD-005 defines logical deactivation/archival for Customer, Vehicle and
   ServiceCatalog. Acceptance criteria can be planned now.
 - **RF03–RF08 domain and acceptance-criteria refinement:** Vehicle and ServiceCatalog are independent aggregates,
@@ -1069,8 +1069,6 @@ These items do not need a new architecture decision once their related decision,
 
 - Implement Vehicle CRUD/validation after AD-001/AD-003.
 - Implement ServiceCatalog registration and price update after AD-001/AD-004.
-- Add a CPF/CNPJ uniqueness query and validation tests after AD-002.
-- Complete missing Customer CRUD behavior using the logical deactivation semantics resolved in AD-005.
 - Add ServiceOrder list endpoint and administrative filters.
 - Implement Estimate code after AD-008/AD-009/AD-013.
 - Implement PurchaseOrder and stock reservation after AD-007.
@@ -1125,12 +1123,12 @@ The existing file is exactly `AGENTS.md` at the repository root. No duplicate fi
 
 - `Architecture.md` now distinguishes the four Ivan-approved decisions from current implementation and from
   team-owned dependencies.
-- `PROJECT-STRUCTURE.md` remains unchanged because adding Vehicle/ServiceCatalog under `customer` would assert the
-  unresolved AD-001 mapping, even though AD-003/AD-004 selected that destination conditionally.
+- `PROJECT-STRUCTURE.md` continues to omit Vehicle/ServiceCatalog packages because adding them under `customer` would
+  assert the unresolved AD-001 mapping, even though AD-003/AD-004 selected that destination conditionally.
 - `AGENTS.md` permits AD-002 and AD-005 implementation guidance but prevents activating AD-003/AD-004 before
   AD-001. It no longer presents pending team recommendations as accepted architecture.
-- The current repository still contains no `TaxId`, Vehicle, ServiceCatalog or logical-deactivation implementation;
-  documentation describes these as target decisions, not completed features.
+- The current repository contains `TaxId` and logical archival for Customer. Vehicle and ServiceCatalog remain planned
+  and their lifecycle implementations are still pending.
 - No contradiction was introduced between the approved decisions and Miro's Cadastros aggregates/snapshot rules.
   The unresolved contradiction is physical module naming/ownership (`customer` versus Cadastros), tracked by AD-001.
 - Existing unrelated contradictions—Technician ownership, Stock aggregate shape, Estimate decisions, internal

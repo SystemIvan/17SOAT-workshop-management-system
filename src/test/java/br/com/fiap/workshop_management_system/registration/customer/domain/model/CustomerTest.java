@@ -5,7 +5,9 @@ import org.junit.jupiter.api.Test;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CustomerTest {
 
@@ -22,6 +24,7 @@ class CustomerTest {
         assertEquals("Maria Souza", customer.name());
         assertEquals("52998224725", customer.taxId().value());
         assertEquals(contactInfo, customer.contactInfo());
+        assertTrue(customer.active());
     }
 
     @Test
@@ -81,11 +84,43 @@ class CustomerTest {
     void reconstituteRestoresExactPersistedState() {
         UUID id = UUID.randomUUID();
 
-        Customer customer = Customer.reconstitute(id, "Joao Pedro", new TaxId("11.222.333/0001-81"), contactInfo);
+        Customer customer = Customer.reconstitute(
+                id, "Joao Pedro", new TaxId("11.222.333/0001-81"), contactInfo, false);
 
         assertEquals(id, customer.id());
         assertEquals("Joao Pedro", customer.name());
         assertEquals("11222333000181", customer.taxId().value());
         assertEquals(contactInfo, customer.contactInfo());
+        assertFalse(customer.active());
+    }
+
+    @Test
+    void archiveIsIdempotent() {
+        Customer customer = newCustomer();
+
+        customer.archive();
+        customer.archive();
+
+        assertFalse(customer.active());
+    }
+
+    @Test
+    void archivedCustomerCannotBeRenamed() {
+        Customer customer = newCustomer();
+        customer.archive();
+
+        assertThrows(CustomerArchivedException.class, () -> customer.rename("Maria Oliveira"));
+        assertEquals("Maria Souza", customer.name());
+    }
+
+    @Test
+    void archivedCustomerContactCannotBeUpdated() {
+        Customer customer = newCustomer();
+        ContactInfo originalContactInfo = customer.contactInfo();
+        customer.archive();
+
+        assertThrows(CustomerArchivedException.class,
+                () -> customer.updateContactInfo(new Email("novo@example.com"), null, null));
+        assertEquals(originalContactInfo, customer.contactInfo());
     }
 }

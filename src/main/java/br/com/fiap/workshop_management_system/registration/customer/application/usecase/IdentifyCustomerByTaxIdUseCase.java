@@ -20,7 +20,7 @@ public class IdentifyCustomerByTaxIdUseCase {
     @Transactional(readOnly = true)
     public CustomerResponse execute(String document) {
         TaxId taxId = new TaxId(document);
-        return repository.findByTaxId(taxId)
+        return repository.findActiveByTaxId(taxId)
                 .map(CustomerMapper::toResponse)
                 .orElseThrow(CustomerNotFoundException::new);
     }

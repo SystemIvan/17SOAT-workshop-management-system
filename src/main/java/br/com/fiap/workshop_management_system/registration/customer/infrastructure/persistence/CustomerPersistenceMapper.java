@@ -29,13 +29,15 @@ public class CustomerPersistenceMapper {
                 address == null ? null : address.neighborhood(),
                 address == null ? null : address.city(),
                 address == null ? null : address.state(),
-                address == null ? null : address.postalCode());
+                address == null ? null : address.postalCode(),
+                customer.active());
     }
 
     public Customer toDomain(CustomerJpaEntity entity) {
         Address address = toAddress(entity);
         ContactInfo contactInfo = new ContactInfo(entity.getContactEmail(), entity.getContactPhone(), address);
-        return Customer.reconstitute(entity.getId(), entity.getName(), new TaxId(entity.getDocument()), contactInfo);
+        return Customer.reconstitute(entity.getId(), entity.getName(), new TaxId(entity.getDocument()), contactInfo,
+                entity.isActive());
     }
 
     private static Address toAddress(CustomerJpaEntity entity) {

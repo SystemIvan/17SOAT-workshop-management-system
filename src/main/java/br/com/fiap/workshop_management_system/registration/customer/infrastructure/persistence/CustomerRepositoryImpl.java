@@ -33,8 +33,8 @@ public class CustomerRepositoryImpl implements CustomerRepository {
     }
 
     @Override
-    public Optional<Customer> findByTaxId(TaxId taxId) {
-        return jpaRepository.findByDocument(taxId.value()).map(mapper::toDomain);
+    public Optional<Customer> findActiveByTaxId(TaxId taxId) {
+        return jpaRepository.findByDocumentAndActiveTrue(taxId.value()).map(mapper::toDomain);
     }
 
     @Override
@@ -43,8 +43,8 @@ public class CustomerRepositoryImpl implements CustomerRepository {
     }
 
     @Override
-    public List<Customer> findAll() {
-        return jpaRepository.findAll().stream().map(mapper::toDomain).toList();
+    public List<Customer> findAllActive() {
+        return jpaRepository.findAllByActiveTrue().stream().map(mapper::toDomain).toList();
     }
 
     @Override
