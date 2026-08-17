@@ -35,15 +35,55 @@ public class CustomerJpaEntity implements Persistable<UUID> {
     @Column(name = "contact_phone", nullable = false, length = 255)
     private String contactPhone;
 
+    @Column(name = "address_street", length = 255)
+    private String addressStreet;
+
+    @Column(name = "address_number", length = 255)
+    private String addressNumber;
+
+    @Column(name = "address_complement", length = 255)
+    private String addressComplement;
+
+    @Column(name = "address_neighborhood", length = 255)
+    private String addressNeighborhood;
+
+    @Column(name = "address_city", length = 255)
+    private String addressCity;
+
+    @Column(name = "address_state", length = 2)
+    private String addressState;
+
+    @Column(name = "address_postal_code", length = 8)
+    private String addressPostalCode;
+
     protected CustomerJpaEntity() {
     }
 
-    public CustomerJpaEntity(UUID id, String name, String document, String contactEmail, String contactPhone) {
+    public CustomerJpaEntity(
+            UUID id,
+            String name,
+            String document,
+            String contactEmail,
+            String contactPhone,
+            String addressStreet,
+            String addressNumber,
+            String addressComplement,
+            String addressNeighborhood,
+            String addressCity,
+            String addressState,
+            String addressPostalCode) {
         this.id = id;
         this.name = name;
         this.document = document;
         this.contactEmail = contactEmail;
         this.contactPhone = contactPhone;
+        this.addressStreet = addressStreet;
+        this.addressNumber = addressNumber;
+        this.addressComplement = addressComplement;
+        this.addressNeighborhood = addressNeighborhood;
+        this.addressCity = addressCity;
+        this.addressState = addressState;
+        this.addressPostalCode = addressPostalCode;
     }
 
     @Override
@@ -70,5 +110,33 @@ public class CustomerJpaEntity implements Persistable<UUID> {
 
     public String getContactPhone() {
         return contactPhone;
+    }
+
+    public String getAddressStreet() {
+        return addressStreet;
+    }
+
+    public String getAddressNumber() {
+        return addressNumber;
+    }
+
+    public String getAddressComplement() {
+        return addressComplement;
+    }
+
+    public String getAddressNeighborhood() {
+        return addressNeighborhood;
+    }
+
+    public String getAddressCity() {
+        return addressCity;
+    }
+
+    public String getAddressState() {
+        return addressState;
+    }
+
+    public String getAddressPostalCode() {
+        return addressPostalCode;
     }
 }

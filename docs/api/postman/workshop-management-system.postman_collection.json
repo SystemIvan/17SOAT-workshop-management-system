@@ -18,7 +18,7 @@
   ],
   "item": [
     {
-      "name": "Registrations",
+      "name": "Cadastros (Registrations)",
       "item": [
         {
           "name": "Cadastrar cliente",
@@ -46,11 +46,20 @@
           }
         },
         {
-          "name": "Atualizar contato do cliente",
+          "name": "Atualizar e-mail do cliente",
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"contactInfo\": {\n    \"email\": \"maria.souza@example.test\",\n    \"phone\": \"+5511888888888\"\n  }\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"contactInfo\": {\n    \"email\": \"maria.souza@example.test\"\n  }\n}" },
+            "url": "{{baseUrl}}/api/customers/{{customerId}}/contact-info"
+          }
+        },
+        {
+          "name": "Adicionar ou substituir endereço do cliente",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"contactInfo\": {\n    \"address\": {\n      \"street\": \"Avenida Paulista\",\n      \"number\": \"1000\",\n      \"complement\": \"Conjunto 101\",\n      \"neighborhood\": \"Bela Vista\",\n      \"city\": \"São Paulo\",\n      \"state\": \"SP\",\n      \"postalCode\": \"01310-100\"\n    }\n  }\n}" },
             "url": "{{baseUrl}}/api/customers/{{customerId}}/contact-info"
           }
         }

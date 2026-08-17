@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class CustomerTest {
 
-    private final ContactInfo contactInfo = new ContactInfo("cliente@example.com", "11999998888");
+    private final ContactInfo contactInfo = new ContactInfo("cliente@example.com", "(11) 99999-8888");
 
     private Customer newCustomer() {
         return Customer.create("Maria Souza", new TaxId("529.982.247-25"), contactInfo);
@@ -53,7 +53,7 @@ class CustomerTest {
         TaxId originalTaxId = customer.taxId();
         ContactInfo newContactInfo = new ContactInfo("novo@example.com", "11888887777");
 
-        customer.updateContactInfo(newContactInfo);
+        customer.updateContactInfo(newContactInfo.email(), newContactInfo.phone(), null);
 
         assertEquals(newContactInfo, customer.contactInfo());
         assertEquals(originalTaxId, customer.taxId());
@@ -63,7 +63,7 @@ class CustomerTest {
     void updateContactInfoRejectsNull() {
         Customer customer = newCustomer();
 
-        assertThrows(IllegalArgumentException.class, () -> customer.updateContactInfo(null));
+        assertThrows(IllegalArgumentException.class, () -> customer.updateContactInfo(null, null, null));
     }
 
     @Test

@@ -48,11 +48,8 @@ public class Customer {
         this.name = newName;
     }
 
-    public void updateContactInfo(ContactInfo newContactInfo) {
-        if (newContactInfo == null) {
-            throw new IllegalArgumentException("As informações de contato do cliente não podem ser nulas");
-        }
-        this.contactInfo = newContactInfo;
+    public void updateContactInfo(Email email, Phone phone, Address address) {
+        this.contactInfo = contactInfo.withUpdates(email, phone, address);
     }
 
     public UUID id() {

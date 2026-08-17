@@ -10,10 +10,12 @@ import br.com.fiap.workshop_management_system.registration.customer.application.
 import br.com.fiap.workshop_management_system.registration.customer.application.usecase.ListCustomersUseCase;
 import br.com.fiap.workshop_management_system.registration.customer.application.usecase.RenameCustomerUseCase;
 import br.com.fiap.workshop_management_system.registration.customer.application.usecase.UpdateCustomerContactUseCase;
-import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -89,7 +91,14 @@ public class CustomerController {
     }
 
     @PatchMapping("/{id}/contact-info")
-    @Operation(summary = "Atualizar informações de contato do cliente")
+    @Operation(
+            summary = "Atualizar informações de contato do cliente",
+            description = "Atualiza parcialmente e-mail, telefone ou endereço; campos omitidos são preservados")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Informações de contato atualizadas"),
+            @ApiResponse(responseCode = "400", description = "Dados de contato inválidos"),
+            @ApiResponse(responseCode = "404", description = "Cliente não encontrado")
+    })
     public ResponseEntity<CustomerResponse> updateContactInfo(
             @PathVariable UUID id, @Valid @RequestBody UpdateCustomerContactRequest request) {
         return ResponseEntity.ok(updateCustomerContactUseCase.execute(id, request));

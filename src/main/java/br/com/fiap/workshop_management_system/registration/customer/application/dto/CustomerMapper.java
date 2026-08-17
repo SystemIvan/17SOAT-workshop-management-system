@@ -1,5 +1,6 @@
 package br.com.fiap.workshop_management_system.registration.customer.application.dto;
 
+import br.com.fiap.workshop_management_system.registration.customer.domain.model.Address;
 import br.com.fiap.workshop_management_system.registration.customer.domain.model.ContactInfo;
 import br.com.fiap.workshop_management_system.registration.customer.domain.model.Customer;
 
@@ -18,10 +19,27 @@ public final class CustomerMapper {
     }
 
     public static ContactInfo toContactInfo(ContactInfoDTO dto) {
-        return new ContactInfo(dto.email(), dto.phone());
+        return new ContactInfo(dto.email(), dto.phone(), toAddress(dto.address()));
     }
 
     public static ContactInfoDTO toContactInfoDTO(ContactInfo contactInfo) {
-        return new ContactInfoDTO(contactInfo.email(), contactInfo.phone());
+        return new ContactInfoDTO(contactInfo.email().value(), contactInfo.phone().value(),
+                toAddressDTO(contactInfo.address()));
+    }
+
+    public static Address toAddress(AddressDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        return new Address(dto.street(), dto.number(), dto.complement(), dto.neighborhood(), dto.city(), dto.state(),
+                dto.postalCode());
+    }
+
+    private static AddressDTO toAddressDTO(Address address) {
+        if (address == null) {
+            return null;
+        }
+        return new AddressDTO(address.street(), address.number(), address.complement(), address.neighborhood(),
+                address.city(), address.state(), address.postalCode());
     }
 }

@@ -4,5 +4,5 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
 public record UpdateCustomerContactRequest(
-        @NotNull(message = "As informações de contato são obrigatórias") @Valid ContactInfoDTO contactInfo) {
+        @NotNull(message = "As informações de contato são obrigatórias") @Valid UpdateContactInfoDTO contactInfo) {
 }

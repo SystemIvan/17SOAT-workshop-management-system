@@ -1,7 +1,7 @@
 package br.com.fiap.workshop_management_system.infrastructure.web;
 
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
@@ -50,7 +50,8 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/status'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/diagnosis'].post").exists())
-                .andExpect(jsonPath("$.paths['/api/service-orders/{id}/executions/{executionId}/assign-technician'].post")
+                .andExpect(jsonPath(
+                        "$.paths['/api/service-orders/{id}/executions/{executionId}/assign-technician'].post")
                         .exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/executions/{executionId}/start'].post")
                         .exists())
@@ -59,5 +60,23 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/executions/{executionId}/complete'].post")
                         .exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/finalize'].post").exists());
+    }
+
+    @Test
+    void documentPartialCustomerContactUpdateContract() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/customers/{id}/contact-info'].patch.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/api/customers/{id}/contact-info'].patch.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/api/customers/{id}/contact-info'].patch.responses['404']").exists())
+                .andExpect(jsonPath("$.components.schemas.UpdateCustomerContactRequest.properties.contactInfo")
+                        .exists())
+                .andExpect(jsonPath("$.components.schemas.UpdateContactInfoDTO.properties.email").exists())
+                .andExpect(jsonPath("$.components.schemas.UpdateContactInfoDTO.properties.phone").exists())
+                .andExpect(jsonPath("$.components.schemas.UpdateContactInfoDTO.properties.address").exists())
+                .andExpect(jsonPath("$.components.schemas.ContactInfoDTO.properties.address").exists())
+                .andExpect(jsonPath("$.components.schemas.AddressDTO.properties.street").exists())
+                .andExpect(jsonPath("$.components.schemas.AddressDTO.properties.state").exists())
+                .andExpect(jsonPath("$.components.schemas.AddressDTO.properties.postalCode").exists());
     }
 }
