@@ -13,11 +13,11 @@ public class Vehicle {
     private final UUID id;
     private final UUID customerId;
     private final LicensePlate licensePlate;
-    private final ChassisNumber chassisNumber;
-    private final VehicleYear year;
 
+    private ChassisNumber chassisNumber;
     private String brand;
     private String model;
+    private VehicleYear year;
     private String color;
     private boolean active;
 
@@ -64,6 +64,30 @@ public class Vehicle {
         this.year = Objects.requireNonNull(year, "O ano do veículo é obrigatório");
         this.color = normalizeRequired(color, "A cor do veículo", MAX_COLOR_LENGTH);
         this.active = active;
+    }
+
+    public void updateDetails(
+            String brand,
+            String model,
+            VehicleYear year,
+            String color,
+            ChassisNumber chassisUpdate) {
+        if (!active) {
+            throw new VehicleArchivedException();
+        }
+
+        String normalizedBrand = normalizeRequired(brand, "A marca do veículo", MAX_BRAND_LENGTH);
+        String normalizedModel = normalizeRequired(model, "O modelo do veículo", MAX_MODEL_LENGTH);
+        VehicleYear validatedYear = Objects.requireNonNull(year, "O ano do veículo é obrigatório");
+        String normalizedColor = normalizeRequired(color, "A cor do veículo", MAX_COLOR_LENGTH);
+
+        this.brand = normalizedBrand;
+        this.model = normalizedModel;
+        this.year = validatedYear;
+        this.color = normalizedColor;
+        if (chassisUpdate != null) {
+            this.chassisNumber = chassisUpdate;
+        }
     }
 
     private static String normalizeRequired(String value, String fieldName, int maximumLength) {

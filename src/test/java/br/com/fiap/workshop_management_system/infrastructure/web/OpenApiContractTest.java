@@ -9,6 +9,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -38,6 +39,7 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.paths['/api/customers/{id}'].delete").exists())
                 .andExpect(jsonPath("$.paths['/api/customers/{id}/contact-info'].patch").exists())
                 .andExpect(jsonPath("$.paths['/api/vehicles'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}'].patch").exists())
                 .andExpect(jsonPath("$.paths['/api/technicians'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/technicians'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/technicians/{id}'].get").exists())
@@ -114,5 +116,27 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.components.schemas.VehicleResponse.properties.chassis.type",
                         hasItem("null")))
                 .andExpect(jsonPath("$.components.schemas.VehicleResponse.properties.active").exists());
+    }
+
+    @Test
+    void documentVehicleUpdateContract() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}'].patch.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}'].patch.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}'].patch.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}'].patch.responses['409']").exists())
+                .andExpect(jsonPath("$.components.schemas.UpdateVehicleRequest.properties.brand").exists())
+                .andExpect(jsonPath("$.components.schemas.UpdateVehicleRequest.properties.model").exists())
+                .andExpect(jsonPath("$.components.schemas.UpdateVehicleRequest.properties.year").exists())
+                .andExpect(jsonPath("$.components.schemas.UpdateVehicleRequest.properties.color").exists())
+                .andExpect(jsonPath("$.components.schemas.UpdateVehicleRequest.properties.chassis").exists())
+                .andExpect(jsonPath("$.components.schemas.UpdateVehicleRequest.properties.chassis.type",
+                        hasItem("null")))
+                .andExpect(jsonPath("$.components.schemas.UpdateVehicleRequest.required", hasItem("brand")))
+                .andExpect(jsonPath("$.components.schemas.UpdateVehicleRequest.required", hasItem("model")))
+                .andExpect(jsonPath("$.components.schemas.UpdateVehicleRequest.required", hasItem("year")))
+                .andExpect(jsonPath("$.components.schemas.UpdateVehicleRequest.required", hasItem("color")))
+                .andExpect(jsonPath("$.components.schemas.UpdateVehicleRequest.required", not(hasItem("chassis"))));
     }
 }

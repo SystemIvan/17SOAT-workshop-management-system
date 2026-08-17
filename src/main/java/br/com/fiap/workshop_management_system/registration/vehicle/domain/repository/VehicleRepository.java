@@ -4,11 +4,18 @@ import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.LicensePlate;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.Vehicle;
 
+import java.util.Optional;
+import java.util.UUID;
+
 public interface VehicleRepository {
 
     boolean existsByLicensePlate(LicensePlate licensePlate);
 
     boolean existsByChassisNumber(ChassisNumber chassisNumber);
+
+    Optional<Vehicle> findByIdForUpdate(UUID id);
+
+    boolean existsByChassisNumberAndIdNot(ChassisNumber chassisNumber, UUID id);
 
     void save(Vehicle vehicle);
 }

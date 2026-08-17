@@ -55,4 +55,63 @@ class VehicleTest {
         assertThrows(IllegalArgumentException.class,
                 () -> Vehicle.create(UUID.randomUUID(), plate, null, "Brand", "Model", year, "x".repeat(51)));
     }
+
+    @Test
+    void updatesDescriptionsAndChassisAtomically() {
+        Vehicle vehicle = vehicle(true, "9BWZZZ377VT004251");
+        ChassisNumber newChassis = new ChassisNumber("9BWZZZ377VT004252");
+
+        vehicle.updateDetails(" Fiat ", " Argo ", VehicleYear.create(2025, 2026), " Branco ", newChassis);
+
+        assertEquals("Fiat", vehicle.brand());
+        assertEquals("Argo", vehicle.model());
+        assertEquals(2025, vehicle.year().value());
+        assertEquals("Branco", vehicle.color());
+        assertEquals(newChassis, vehicle.chassisNumber().orElseThrow());
+    }
+
+    @Test
+    void preservesChassisWhenNoUpdateIsRequested() {
+        Vehicle vehicle = vehicle(true, "9BWZZZ377VT004251");
+
+        vehicle.updateDetails("Fiat", "Argo", VehicleYear.create(2025, 2026), "Branco", null);
+
+        assertEquals("9BWZZZ377VT004251", vehicle.chassisNumber().orElseThrow().value());
+    }
+
+    @Test
+    void rejectsArchivedVehicleWithoutChangingState() {
+        Vehicle vehicle = vehicle(false, "9BWZZZ377VT004251");
+
+        assertThrows(VehicleArchivedException.class,
+                () -> vehicle.updateDetails("Fiat", "Argo", VehicleYear.create(2025, 2026), "Branco",
+                        new ChassisNumber("9BWZZZ377VT004252")));
+
+        assertOriginalState(vehicle);
+    }
+
+    @Test
+    void rejectsInvalidUpdateWithoutChangingAnyField() {
+        Vehicle vehicle = vehicle(true, "9BWZZZ377VT004251");
+
+        assertThrows(IllegalArgumentException.class,
+                () -> vehicle.updateDetails("Fiat", " ", VehicleYear.create(2025, 2026), "Branco",
+                        new ChassisNumber("9BWZZZ377VT004252")));
+
+        assertOriginalState(vehicle);
+    }
+
+    private static Vehicle vehicle(boolean active, String chassis) {
+        ChassisNumber chassisNumber = chassis == null ? null : new ChassisNumber(chassis);
+        return Vehicle.reconstitute(UUID.randomUUID(), UUID.randomUUID(), new LicensePlate("ABC1234"), chassisNumber,
+                "Volkswagen", "Gol", VehicleYear.create(2026, 2026), "Prata", active);
+    }
+
+    private static void assertOriginalState(Vehicle vehicle) {
+        assertEquals("Volkswagen", vehicle.brand());
+        assertEquals("Gol", vehicle.model());
+        assertEquals(2026, vehicle.year().value());
+        assertEquals("Prata", vehicle.color());
+        assertEquals("9BWZZZ377VT004251", vehicle.chassisNumber().orElseThrow().value());
+    }
 }

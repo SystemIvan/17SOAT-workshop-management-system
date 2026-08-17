@@ -103,6 +103,36 @@
                 "body": { "mode": "raw", "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"licensePlate\": \"BRA2E19\",\n  \"brand\": \"Fiat\",\n  \"model\": \"Argo\",\n  \"year\": 2025,\n  \"color\": \"Branco\"\n}" },
                 "url": "{{baseUrl}}/api/vehicles"
               }
+            },
+            {
+              "name": "Atualizar veículo preservando chassi",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"brand\": \"Volkswagen\",\n  \"model\": \"Polo\",\n  \"year\": 2026,\n  \"color\": \"Azul\"\n}" },
+                "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
+                "description": "Atualiza os dados descritivos. Chassi omitido, nulo, vazio ou em branco preserva o valor atual."
+              }
+            },
+            {
+              "name": "Atualizar veículo incluindo chassi",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"brand\": \"Fiat\",\n  \"model\": \"Argo\",\n  \"year\": 2025,\n  \"color\": \"Branco\",\n  \"chassis\": \"9BD17164G72999999\"\n}" },
+                "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
+                "description": "Inclui um chassi válido quando o veículo ainda não possui esse dado."
+              }
+            },
+            {
+              "name": "Atualizar veículo substituindo chassi",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"brand\": \"Honda\",\n  \"model\": \"City\",\n  \"year\": 2024,\n  \"color\": \"Cinza\",\n  \"chassis\": \"93HGM2630DZ999999\"\n}" },
+                "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
+                "description": "Substitui o chassi atual quando o novo valor é válido e não pertence a outro veículo."
+              }
             }
           ]
         }

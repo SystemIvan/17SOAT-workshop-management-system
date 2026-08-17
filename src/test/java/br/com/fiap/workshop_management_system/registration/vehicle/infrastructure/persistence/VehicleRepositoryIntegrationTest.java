@@ -17,11 +17,21 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -42,6 +52,9 @@ class VehicleRepositoryIntegrationTest {
 
     @Autowired
     private VehiclePersistenceMapper mapper;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Test
     void persistsAndRestoresVehicleWithOptionalChassis() {
@@ -92,6 +105,83 @@ class VehicleRepositoryIntegrationTest {
         assertThrows(DataIntegrityViolationException.class, () -> vehicleRepository.save(vehicle));
     }
 
+    @Test
+    @Transactional
+    void locksAndUpdatesVehicleWhileExcludingItsOwnChassisFromConflicts() {
+        Customer customer = persistCustomer();
+        String originalChassis = "9BWZZZ377VT004253";
+        String replacementChassis = "9BWZZZ377VT004254";
+        Vehicle original = vehicle(customer.id(), "UPD1A01", originalChassis);
+        vehicleRepository.save(original);
+
+        Vehicle locked = vehicleRepository.findByIdForUpdate(original.id()).orElseThrow();
+        assertFalse(vehicleRepository.existsByChassisNumberAndIdNot(
+                new ChassisNumber(originalChassis), original.id()));
+
+        locked.updateDetails(" Fiat ", " Argo ", VehicleYear.create(2025, 2026), " Branco ",
+                new ChassisNumber(replacementChassis));
+        vehicleRepository.save(locked);
+
+        VehicleJpaEntity stored = jpaRepository.findById(original.id()).orElseThrow();
+        assertEquals("Fiat", stored.getBrand());
+        assertEquals("Argo", stored.getModel());
+        assertEquals(2025, stored.getModelYear());
+        assertEquals("Branco", stored.getColor());
+        assertEquals(replacementChassis, stored.getChassisNumber());
+        assertFalse(vehicleRepository.existsByChassisNumber(new ChassisNumber(originalChassis)));
+    }
+
+    @Test
+    void detectsChassisOwnedByAnotherVehicle() {
+        Customer customer = persistCustomer();
+        String chassis = "9BWZZZ377VT004255";
+        Vehicle owner = vehicle(customer.id(), "UPD1A02", chassis);
+        Vehicle candidate = vehicle(customer.id(), "UPD1A03", null);
+        vehicleRepository.save(owner);
+        vehicleRepository.save(candidate);
+
+        assertTrue(vehicleRepository.existsByChassisNumberAndIdNot(new ChassisNumber(chassis), candidate.id()));
+    }
+
+    @Test
+    void serializesConcurrentUpdatesForTheSameVehicle() throws Exception {
+        Customer customer = persistCustomer();
+        Vehicle original = vehicle(customer.id(), "LCK1A01", null);
+        vehicleRepository.save(original);
+        CountDownLatch firstLockAcquired = new CountDownLatch(1);
+        CountDownLatch releaseFirstUpdate = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<?> firstUpdate = executor.submit(() -> inTransaction(() -> {
+                Vehicle locked = vehicleRepository.findByIdForUpdate(original.id()).orElseThrow();
+                firstLockAcquired.countDown();
+                await(releaseFirstUpdate);
+                locked.updateDetails("Fiat", "Argo", VehicleYear.create(2025, 2026), "Branco", null);
+                vehicleRepository.save(locked);
+            }));
+            assertTrue(firstLockAcquired.await(5, TimeUnit.SECONDS));
+
+            Future<?> secondUpdate = executor.submit(() -> inTransaction(() -> {
+                Vehicle locked = vehicleRepository.findByIdForUpdate(original.id()).orElseThrow();
+                locked.updateDetails("Honda", "City", VehicleYear.create(2024, 2026), "Cinza", null);
+                vehicleRepository.save(locked);
+            }));
+
+            assertThrows(TimeoutException.class, () -> secondUpdate.get(250, TimeUnit.MILLISECONDS));
+            releaseFirstUpdate.countDown();
+            firstUpdate.get(5, TimeUnit.SECONDS);
+            secondUpdate.get(5, TimeUnit.SECONDS);
+
+            VehicleJpaEntity stored = jpaRepository.findById(original.id()).orElseThrow();
+            assertEquals("Honda", stored.getBrand());
+            assertEquals("City", stored.getModel());
+        } finally {
+            releaseFirstUpdate.countDown();
+            executor.shutdownNow();
+        }
+    }
+
     private Customer persistCustomer() {
         Customer customer = Customer.create("Cliente Vehicle", new TaxId(nextValidCpf()),
                 new ContactInfo("vehicle@example.test", "+5511999999999"));
@@ -103,6 +193,21 @@ class VehicleRepositoryIntegrationTest {
         ChassisNumber chassisNumber = chassis == null ? null : new ChassisNumber(chassis);
         return Vehicle.create(customerId, new LicensePlate(licensePlate), chassisNumber,
                 "Volkswagen", "Gol", VehicleYear.create(2026, 2026), "Prata");
+    }
+
+    private void inTransaction(Runnable action) {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> action.run());
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+                throw new AssertionError("Tempo excedido aguardando liberação do update concorrente");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Update concorrente interrompido", exception);
+        }
     }
 
     private static String nextValidCpf() {
