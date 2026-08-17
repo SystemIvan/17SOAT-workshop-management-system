@@ -15,6 +15,8 @@ public interface CustomerRepository {
 
     Optional<Customer> findById(UUID id);
 
+    Optional<Customer> findByIdForUpdate(UUID id);
+
     Optional<Customer> findActiveByTaxId(TaxId taxId);
 
     boolean existsByTaxId(TaxId taxId);

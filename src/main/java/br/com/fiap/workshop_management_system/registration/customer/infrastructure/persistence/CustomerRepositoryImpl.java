@@ -33,6 +33,11 @@ public class CustomerRepositoryImpl implements CustomerRepository {
     }
 
     @Override
+    public Optional<Customer> findByIdForUpdate(UUID id) {
+        return jpaRepository.findByIdForUpdate(id).map(mapper::toDomain);
+    }
+
+    @Override
     public Optional<Customer> findActiveByTaxId(TaxId taxId) {
         return jpaRepository.findByDocumentAndActiveTrue(taxId.value()).map(mapper::toDomain);
     }

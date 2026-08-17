@@ -113,6 +113,11 @@ class CustomerLifecycleUseCaseTest {
         }
 
         @Override
+        public Optional<Customer> findByIdForUpdate(UUID id) {
+            return findById(id);
+        }
+
+        @Override
         public Optional<Customer> findActiveByTaxId(TaxId taxId) {
             return customers.stream()
                     .filter(Customer::active)
