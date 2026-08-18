@@ -31,7 +31,8 @@ module. Introduce a consumer-owned port only when a real use case needs delivery
 - Put aggregate roots, entities and value objects in `domain/model`; repository contracts belong to `domain/repository`.
 - Application use cases orchestrate domain behavior and define transaction boundaries.
 - Infrastructure contains persistence adapters, HTTP controllers and external integrations.
-- Never expose domain or JPA entities as HTTP contracts. Use request/response records and Bean Validation at the boundary.
+- Never expose domain or JPA entities as HTTP contracts. Use request/response records and Bean Validation at the
+  boundary.
 - Prefer constructor injection. Do not use field injection.
 - Change aggregate state through intention-revealing business methods, not public setters.
 - Use `BigDecimal` for monetary values and validate invariants when value objects are created.
@@ -44,13 +45,25 @@ module. Introduce a consumer-owned port only when a real use case needs delivery
 
 Every non-trivial feature starts in `docs/features/<feature-slug>/`, copied from `docs/features/_template/`.
 
-1. Write `functional-spec.md` with the problem, behaviors, rules, exclusions and acceptance criteria.
-2. Write `technical-spec.md` with context impact, contracts, persistence, failures, security and test strategy.
-3. Write `implementation-plan.md` with ordered checkpoints and verification evidence.
-4. Mark the functional and technical specs `Approved` before implementation.
-5. Implement checkpoint by checkpoint and keep the plan status current.
-6. Run tests, perform the security review and update API/database documentation.
-7. Mark the feature `Implemented` only after all completion gates pass.
+Write SDD documents (`functional-spec.md`, `technical-spec.md` and `implementation-plan.md`) in Brazilian Portuguese.
+Keep code identifiers, file names, endpoint paths and the allowed status values in their canonical form when translating
+them would reduce technical precision.
+
+An agent must never infer approval or approve a specification on behalf of a human reviewer. Record the approver and
+approval date in the document. Follow these gates in order:
+
+1. Write only `functional-spec.md`, with the problem, behaviors, rules, exclusions and acceptance criteria.
+2. Obtain explicit human approval of the functional spec and mark it `Approved` before creating `technical-spec.md`.
+3. Write `technical-spec.md` with context impact, contracts, persistence, failures, security and test strategy.
+4. Obtain explicit human approval of the technical spec and mark it `Approved` before creating
+   `implementation-plan.md`.
+5. Write `implementation-plan.md` with ordered checkpoints and verification evidence.
+6. Implement checkpoint by checkpoint and keep the plan status current.
+7. Run tests, perform the security review and update API/database documentation.
+8. Mark the feature `Implemented` only after all completion gates pass.
+
+If an approved upstream spec changes materially, return it to `Draft`. Any downstream spec or plan becomes stale and
+must not be used until the upstream document is explicitly reapproved and the downstream document is reviewed again.
 
 Small typo-only or documentation-only changes may use a single concise plan, but must still satisfy relevant checks.
 
@@ -67,7 +80,11 @@ Rules:
 
 - Flyway is the only schema and mandatory reference-data mechanism.
 - Production uses `spring.jpa.hibernate.ddl-auto=validate`; never restore `update` or `create`.
-- Versioned migrations live in `src/main/resources/db/migration` and are immutable after merge.
+- Versioned migrations live in `src/main/resources/db/migration` and use the Flyway-compatible format
+  `VyyyyMMddHHmmss__nome_da_migration_em_lowercase.sql`, with a UTC timestamp and a lowercase `snake_case` name.
+- A migration is immutable after it has become part of an operational baseline or has been applied to a shared
+  environment. Before the first operational baseline, an approved technical spec may explicitly authorize replacing a
+  scaffolding migration when every affected environment can be rebuilt from an empty database.
 - `scripts/` is reserved for container bootstrap and operational scripts, not application schema evolution.
 - Business examples such as customers and stock items must never be inserted automatically in production.
 - Demonstration seeders require both the `dev` profile and `app.seed.enabled=true`.
@@ -95,7 +112,8 @@ Rules:
 - Cover business-rule failures and end-to-end use-case flows when they are changed.
 - `ModuleStructureTest` must remain green.
 - Run `make test` while developing and `make verify` before completion.
-- `make coverage` generates the JaCoCo report. The project target is at least 80%; do not reduce coverage of changed code.
+- `make coverage` generates the JaCoCo report. The project target is at least 80%; do not reduce coverage of changed
+  code.
 - Do not disable, ignore or weaken tests merely to make a build pass.
 
 ## Security review

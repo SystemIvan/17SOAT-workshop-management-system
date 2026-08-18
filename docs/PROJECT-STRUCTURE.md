@@ -16,7 +16,7 @@ br.com.fiap.workshop_management_system
 │   ├── estimate                 # Planned aggregate
 │   └── technician               # Supporting capability for assignment/execution
 └── stockprocurement
-    ├── stock                    # Implemented with the current Part model
+    ├── stock                    # Implemented StockItem catalog
     └── purchaseorder            # Planned aggregate
 ```
 
@@ -29,7 +29,7 @@ parts of their owning bounded context.
 |---|---|---|
 | Registrations | Identify and register customers and vehicles; maintain the service catalog | Customer implemented |
 | Service Lifecycle | Create, diagnose, estimate, authorize and execute service orders | Service Order and Technician implemented |
-| Stock & Procurement | Track stock, reserve items and procure unavailable items | Part/stock implemented |
+| Stock & Procurement | Maintain the StockItem catalog; inventory, reservations and procurement are future work | StockItem catalog implemented |
 
 Registrations provides stable customer/vehicle identities to Service Lifecycle. Service Lifecycle stores snapshots where
 historical service-order data must not change with later registration edits. Stock & Procurement owns inventory and future

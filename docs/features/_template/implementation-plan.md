@@ -1,26 +1,26 @@
-# Implementation Plan: <feature name>
+# Plano de Implementação: <nome da feature>
 
-| Field | Value |
+| Campo | Valor |
 |---|---|
 | Feature | `<feature-slug>` |
 | Status | Draft |
-| Owner | `<owner>` |
-| Updated at | `<YYYY-MM-DD>` |
-| Technical spec | `./technical-spec.md` |
+| Responsável | `<responsável>` |
+| Atualizado em | `<AAAA-MM-DD>` |
+| Especificação técnica | `./technical-spec.md` |
 
 ## Checkpoints
 
-- [ ] Architecture and contracts implemented without boundary violations.
-- [ ] Persistence/migrations and seed classification completed.
-- [ ] Domain and application behavior implemented.
-- [ ] Automated tests and `make verify` pass.
-- [ ] Security review completed; findings and mitigations recorded.
-- [ ] OpenAPI, Postman and project documentation updated.
+- [ ] Arquitetura e contratos implementados sem violação de fronteiras.
+- [ ] Persistência, migrations e classificação de seeds concluídas.
+- [ ] Comportamento de domínio e aplicação implementado.
+- [ ] Testes automatizados e `make verify` aprovados.
+- [ ] Revisão de segurança concluída, com achados e mitigações registrados.
+- [ ] OpenAPI, Postman e documentação do projeto atualizados.
 
-## Verification evidence
+## Evidências de verificação
 
-Record commands, results and relevant manual checks.
+Registre comandos, resultados e verificações manuais relevantes.
 
-## Rollback or recovery
+## Rollback ou recuperação
 
-Describe how to recover from deployment or migration failure, or justify `N/A`.
+Descreva como recuperar uma falha de deploy ou migration, ou justifique `N/A`.

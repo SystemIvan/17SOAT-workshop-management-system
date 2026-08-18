@@ -1,29 +1,32 @@
-# Technical Specification: <feature name>
+# Especificação Técnica: <nome da feature>
 
-| Field | Value |
+| Campo | Valor |
 |---|---|
 | Feature | `<feature-slug>` |
 | Status | Draft |
-| Owner | `<owner>` |
-| Updated at | `<YYYY-MM-DD>` |
-| Functional spec | `./functional-spec.md` |
+| Responsável | `<responsável>` |
+| Atualizado em | `<AAAA-MM-DD>` |
+| Aprovado por | — |
+| Aprovado em | — |
+| Especificação funcional | `./functional-spec.md` |
 
-## Context and design
+## Contexto e desenho
 
-Describe affected bounded contexts, ownership and communication between modules.
+Descreva os bounded contexts afetados, responsabilidades e comunicação entre módulos.
 
-## Interfaces and data flow
+## Interfaces e fluxo de dados
 
-Describe API contracts, domain/application interfaces, events and failure mapping.
+Descreva contratos de API, interfaces de domínio/aplicação, eventos e tradução de falhas.
 
-## Persistence and bootstrap data
+## Persistência e dados de bootstrap
 
-Describe schema changes and classify data as: none, mandatory reference data, development seed or test fixture.
+Descreva mudanças de schema e classifique os dados como: nenhum, referência obrigatória, seed de desenvolvimento ou
+fixture de teste.
 
-## Security and operations
+## Segurança e operação
 
-Describe authorization, sensitive data, validation, secrets, logging, rollout and recovery concerns.
+Descreva autorização, dados sensíveis, validação, segredos, logs, rollout e recuperação.
 
-## Test strategy
+## Estratégia de testes
 
-Define domain, application, HTTP, persistence and module-boundary coverage.
+Defina a cobertura de domínio, aplicação, HTTP, persistência e fronteiras de módulos.
