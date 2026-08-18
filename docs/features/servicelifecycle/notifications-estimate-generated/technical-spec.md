@@ -40,18 +40,19 @@ Isso satisfaz de forma nativa a regra de negócio "falha de notificação nunca 
 (`functional-spec.md`, Cenário 3) — não é preciso um `try/catch` ao redor de uma chamada síncrona como nas
 stories #1/#7, porque o listener já roda fora e depois da transação de origem.
 
-### Risco e pendência — confirmar mecanismo real de publicação do evento
+### Risco e pendência — confirmar mecanismo real de publicação do evento (resolvido em 2026-08-18)
 
-Esta feature assume que, quando `feat/servicelifecycle-estimate-generation` mergear, o use case de geração de
-Estimate publicará o evento via `ApplicationEventPublisher.publishEvent(...)` (mecanismo padrão que
-`@ApplicationModuleListener` exige para disparar) — é o único jeito de um listener deste tipo ser acionado.
-**Isso ainda não foi confirmado com o Matheus** (o que foi confirmado até aqui é apenas o contrato de campos do
-evento, não o mecanismo de publicação). Se o módulo `estimate` publicar o evento por outro caminho (ex.:
-chamada direta a um port, fila externa, ou nenhum evento de aplicação de fato), o listener desta feature nunca
-dispara e a notificação nunca é enviada, mesmo com todo o resto implementado e testado. **Ação pendente, fora
-desta implementação:** confirmar explicitamente com o Matheus, antes do merge da branch dele, que o use case de
-geração de Estimate publica o evento via `ApplicationEventPublisher`. Se ele preferir outro mecanismo, o design
-de escuta (mas não o port/adapter/regra de negócio) desta feature precisa ser revisto.
+Esta feature assumia que, quando `feat/servicelifecycle-estimate-generation` mergear, o use case de geração de
+Estimate publicaria o evento via `ApplicationEventPublisher.publishEvent(...)` (mecanismo padrão que
+`@ApplicationModuleListener` exige para disparar) — é o único jeito de um listener deste tipo ser acionado. Até
+aqui só o contrato de campos do evento havia sido confirmado com o Matheus, não o mecanismo de publicação.
+
+**Confirmado em 2026-08-18:** o Matheus Campagnone confirmou que o use case de geração de Estimate publicará o
+evento via `ApplicationEventPublisher`. A premissa arquitetural que motivou a decisão por
+`@ApplicationModuleListener` está validada — nenhum ajuste de design é necessário. A reconciliação do mock local
+(`EstimateGeneratedEvent` desta feature) pelo evento real publicado por `servicelifecycle.estimate` continua
+sendo um passo separado, a ser feito após o merge de `feat/servicelifecycle-estimate-generation` em `dev` (ver
+`functional-spec.md`, Fora de escopo).
 
 ## Interfaces e fluxo de dados
 
@@ -156,8 +157,8 @@ aqui como uma limitação operacional explícita, não uma omissão.
   existente.
 - **Confiabilidade de entrega:** ver "Persistência e dados de bootstrap" — sem registro de publicação
   persistido, não há garantia de entrega nem retry; risco aceito conforme a spec funcional.
-- **Pendência de integração:** ver "Risco e pendência" acima — o mecanismo de publicação do evento pelo módulo
-  `estimate` ainda não foi confirmado com o Matheus.
+- **Pendência de integração:** resolvida em 2026-08-18 — ver "Risco e pendência" acima. O mecanismo de
+  publicação do evento pelo módulo `estimate` (`ApplicationEventPublisher`) foi confirmado com o Matheus.
 - **Rollout/recuperação:** aditivo e retrocompatível; nenhuma migration. Rollback é um `git revert` simples,
   já que nenhum estado persistido ou externo é criado.
 

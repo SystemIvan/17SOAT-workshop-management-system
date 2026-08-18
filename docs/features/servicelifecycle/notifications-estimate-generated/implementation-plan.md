@@ -3,9 +3,9 @@
 | Campo | Valor |
 |---|---|
 | Feature | `notifications-estimate-generated` |
-| Status | In Progress |
+| Status | Implemented |
 | Responsável | `Leandro Nascimento` |
-| Atualizado em | `2026-08-17` |
+| Atualizado em | `2026-08-18` |
 | Especificação técnica | `./technical-spec.md` |
 
 ## Checkpoints
@@ -35,11 +35,14 @@
 - [x] Revisão de segurança registrada com os achados já identificados em `technical-spec.md`: mascaramento de
       e-mail confirmado por teste (log nunca contém e-mail/nome em claro), ausência de registro de publicação de
       eventos (sem retry/garantia de entrega — risco aceito).
-- [ ] Confirmar com o Matheus Campagnone, antes desta feature ser considerada integrável, que o use case de
+- [x] Confirmar com o Matheus Campagnone, antes desta feature ser considerada integrável, que o use case de
       geração de Estimate publicará o evento via `ApplicationEventPublisher` — registrar a confirmação (ou o
       ajuste de design necessário, se a resposta for diferente) neste documento antes de marcar a feature
-      `Implemented`. **Em aberto** — é o único checkpoint pendente; a feature fica em `In Progress` até essa
-      confirmação, mesmo com todo o código implementado e testado.
+      `Implemented`. **Confirmado em 2026-08-18** — Matheus Campagnone confirmou que o use case de geração de
+      Estimate publicará o evento via `ApplicationEventPublisher`, validando a premissa arquitetural do
+      `@ApplicationModuleListener` registrada em `technical-spec.md`. Reconciliar o mock local pelo evento real,
+      após o merge de `feat/servicelifecycle-estimate-generation` em `dev`, continua sendo um passo separado e
+      fora do escopo desta feature (ver `functional-spec.md`, Fora de escopo).
 - [x] OpenAPI, Postman e documentação do projeto — N/A (nenhum endpoint HTTP novo ou alterado).
 
 ## Evidências de verificação
