@@ -137,6 +137,11 @@ public class ServiceOrderController {
 
     @PostMapping("/{id}/executions/{executionId}/complete")
     @Operation(summary = "Complete a service execution")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Service execution completed"),
+            @ApiResponse(responseCode = "404", description = "Service order or service execution not found"),
+            @ApiResponse(responseCode = "409", description = "Service execution is not in the in-progress status")
+    })
     public ResponseEntity<ServiceOrderResponse> completeExecution(
             @PathVariable UUID id, @PathVariable UUID executionId) {
         return ResponseEntity.ok(completeExecutionUseCase.execute(id, executionId));
