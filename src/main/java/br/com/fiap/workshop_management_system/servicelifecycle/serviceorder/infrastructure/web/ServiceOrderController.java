@@ -157,6 +157,11 @@ public class ServiceOrderController {
 
     @PostMapping("/{id}/finalize")
     @Operation(summary = "Finalize a service order")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Service order finalized"),
+            @ApiResponse(responseCode = "404", description = "Service order not found"),
+            @ApiResponse(responseCode = "409", description = "Service order is not completed or the vehicle was not delivered")
+    })
     public ResponseEntity<ServiceOrderResponse> finalize(
             @PathVariable UUID id, @Valid @RequestBody FinalizeServiceOrderRequest request) {
         return ResponseEntity.ok(finalizeServiceOrderUseCase.execute(id, request));
