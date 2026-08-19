@@ -124,6 +124,12 @@ public class ServiceOrderController {
 
     @PatchMapping("/{id}/executions/{executionId}/progress")
     @Operation(summary = "Update service execution progress")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Service execution progress updated"),
+            @ApiResponse(responseCode = "400", description = "Invalid or missing note"),
+            @ApiResponse(responseCode = "404", description = "Service order or service execution not found"),
+            @ApiResponse(responseCode = "409", description = "Service execution is not in the in-progress status")
+    })
     public ResponseEntity<ServiceOrderResponse> updateExecutionProgress(
             @PathVariable UUID id, @PathVariable UUID executionId, @Valid @RequestBody UpdateExecutionProgressRequest request) {
         return ResponseEntity.ok(updateExecutionProgressUseCase.execute(id, executionId, request));
