@@ -112,6 +112,11 @@ public class ServiceOrderController {
 
     @PostMapping("/{id}/executions/{executionId}/start")
     @Operation(summary = "Start a service execution")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Service execution started"),
+            @ApiResponse(responseCode = "404", description = "Service order or service execution not found"),
+            @ApiResponse(responseCode = "409", description = "Service execution is not in the ready status")
+    })
     public ResponseEntity<ServiceOrderResponse> startExecution(
             @PathVariable UUID id, @PathVariable UUID executionId) {
         return ResponseEntity.ok(startExecutionUseCase.execute(id, executionId));
