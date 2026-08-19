@@ -58,4 +58,35 @@ class ServiceExecutionTest {
 
         assertThrows(IllegalStateException.class, () -> serviceOrder.completeExecution(executionId));
     }
+
+    @Test
+    void canUpdateProgressOfAnInProgressExecution() {
+        ServiceOrder serviceOrder = serviceOrderWithOneExecution();
+        UUID executionId = serviceOrder.serviceExecutions().get(0).id();
+        serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+        serviceOrder.startExecution(executionId);
+
+        serviceOrder.updateExecutionProgress(executionId, "Peça trocada, aguardando teste");
+
+        assertEquals(ServiceExecutionStatus.IN_PROGRESS, serviceOrder.serviceExecutions().get(0).status());
+    }
+
+    @Test
+    void cannotUpdateProgressOfAnExecutionThatHasNotStarted() {
+        ServiceOrder serviceOrder = serviceOrderWithOneExecution();
+        UUID executionId = serviceOrder.serviceExecutions().get(0).id();
+
+        assertThrows(IllegalStateException.class,
+                () -> serviceOrder.updateExecutionProgress(executionId, "nota"));
+    }
+
+    @Test
+    void cannotUpdateProgressOfAReadyExecutionThatHasNotStartedYet() {
+        ServiceOrder serviceOrder = serviceOrderWithOneExecution();
+        UUID executionId = serviceOrder.serviceExecutions().get(0).id();
+        serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+
+        assertThrows(IllegalStateException.class,
+                () -> serviceOrder.updateExecutionProgress(executionId, "nota"));
+    }
 }
