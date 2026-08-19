@@ -78,12 +78,20 @@ public class ServiceOrderController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get a service order by ID")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Service order found"),
+            @ApiResponse(responseCode = "404", description = "Service order not found")
+    })
     public ResponseEntity<ServiceOrderResponse> get(@PathVariable UUID id) {
         return ResponseEntity.ok(getServiceOrderUseCase.execute(id));
     }
 
     @GetMapping("/{id}/status")
     @Operation(summary = "Get the current service order status")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Service order status found"),
+            @ApiResponse(responseCode = "404", description = "Service order not found")
+    })
     public ResponseEntity<ServiceOrderStatusResponse> getStatus(@PathVariable UUID id) {
         return ResponseEntity.ok(getServiceOrderStatusUseCase.execute(id));
     }
