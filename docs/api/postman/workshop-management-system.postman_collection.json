@@ -230,6 +230,15 @@
                 "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/assign-technician"
               }
             },
+            {
+              "name": "Attach stock requirement",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"stockItemId\": \"{{stockItemId}}\",\n  \"type\": \"PART\",\n  \"quantity\": 1,\n  \"nameSnapshot\": \"Oil filter\",\n  \"priceSnapshot\": { \"value\": 45.90, \"currency\": \"BRL\" }\n}" },
+                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/stock-requirements"
+              }
+            },
             { "name": "Start execution", "request": { "method": "POST", "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/start" } },
             {
               "name": "Update execution progress",

@@ -113,6 +113,7 @@ public class ServiceOrder {
 
     public void attachStockRequirement(UUID serviceExecutionId, StockRequirement requirement) {
         findExecution(serviceExecutionId).attachStockRequirement(requirement);
+        recomputeStatusSnapshot(false);
     }
 
     /**

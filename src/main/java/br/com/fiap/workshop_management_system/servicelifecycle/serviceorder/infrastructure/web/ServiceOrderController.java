@@ -7,8 +7,10 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.PerformDiagnosisRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderResponse;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderStatusResponse;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.StockRequirementRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.UpdateExecutionProgressRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.AssignTechnicianUseCase;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.AttachStockRequirementUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.ChangeServiceOrderPriorityUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.CompleteExecutionUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.CreateServiceOrderUseCase;
@@ -50,6 +52,7 @@ public class ServiceOrderController {
     private final UpdateExecutionProgressUseCase updateExecutionProgressUseCase;
     private final CompleteExecutionUseCase completeExecutionUseCase;
     private final FinalizeServiceOrderUseCase finalizeServiceOrderUseCase;
+    private final AttachStockRequirementUseCase attachStockRequirementUseCase;
 
     public ServiceOrderController(
             CreateServiceOrderUseCase createServiceOrderUseCase,
@@ -61,7 +64,8 @@ public class ServiceOrderController {
             StartExecutionUseCase startExecutionUseCase,
             UpdateExecutionProgressUseCase updateExecutionProgressUseCase,
             CompleteExecutionUseCase completeExecutionUseCase,
-            FinalizeServiceOrderUseCase finalizeServiceOrderUseCase) {
+            FinalizeServiceOrderUseCase finalizeServiceOrderUseCase,
+            AttachStockRequirementUseCase attachStockRequirementUseCase) {
         this.createServiceOrderUseCase = createServiceOrderUseCase;
         this.getServiceOrderUseCase = getServiceOrderUseCase;
         this.getServiceOrderStatusUseCase = getServiceOrderStatusUseCase;
@@ -72,6 +76,7 @@ public class ServiceOrderController {
         this.updateExecutionProgressUseCase = updateExecutionProgressUseCase;
         this.completeExecutionUseCase = completeExecutionUseCase;
         this.finalizeServiceOrderUseCase = finalizeServiceOrderUseCase;
+        this.attachStockRequirementUseCase = attachStockRequirementUseCase;
     }
 
     @PostMapping
@@ -171,6 +176,19 @@ public class ServiceOrderController {
     public ResponseEntity<ServiceOrderResponse> completeExecution(
             @PathVariable UUID id, @PathVariable UUID executionId) {
         return ResponseEntity.ok(completeExecutionUseCase.execute(id, executionId));
+    }
+
+    @PostMapping("/{id}/executions/{executionId}/stock-requirements")
+    @Operation(summary = "Attach a stock requirement to a service execution")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Stock requirement attached"),
+            @ApiResponse(responseCode = "400", description = "Invalid or missing stock requirement fields"),
+            @ApiResponse(responseCode = "404", description = "Service order or service execution not found"),
+            @ApiResponse(responseCode = "409", description = "Service execution is completed or rejected")
+    })
+    public ResponseEntity<ServiceOrderResponse> attachStockRequirement(
+            @PathVariable UUID id, @PathVariable UUID executionId, @Valid @RequestBody StockRequirementRequest request) {
+        return ResponseEntity.ok(attachStockRequirementUseCase.execute(id, executionId, request));
     }
 
     @PostMapping("/{id}/finalize")

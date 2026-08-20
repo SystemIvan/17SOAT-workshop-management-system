@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -207,5 +208,31 @@ class ServiceOrderTest {
 
         assertEquals(ServiceExecutionStatus.AWAITING_PART, serviceOrder.serviceExecutions().get(0).status());
         assertEquals(ServiceOrderStatus.AWAITING_PART, serviceOrder.status());
+    }
+
+    @Test
+    void rf12_attachingStockRequirementRecomputesTheServiceOrderStatusSnapshot() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        UUID executionId = diagnoseWithOneExecution(serviceOrder);
+        authorizeExecution(serviceOrder, executionId);
+        assertEquals(ServiceExecutionStatus.READY, serviceOrder.serviceExecutions().get(0).status());
+
+        StockRequirement pendingPart = new StockRequirement(
+                UUID.randomUUID(), StockItemType.PART, 1, "Correia dentada", Money.brl(BigDecimal.TEN), false);
+        serviceOrder.attachStockRequirement(executionId, pendingPart);
+
+        assertEquals(ServiceExecutionStatus.AWAITING_PART, serviceOrder.serviceExecutions().get(0).status());
+        assertEquals(ServiceOrderStatus.AWAITING_PART, serviceOrder.status());
+    }
+
+    @Test
+    void rf12_attachingStockRequirementToAnUnknownExecutionThrows() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        diagnoseWithOneExecution(serviceOrder);
+        StockRequirement pendingPart = new StockRequirement(
+                UUID.randomUUID(), StockItemType.PART, 1, "Correia dentada", Money.brl(BigDecimal.TEN), false);
+
+        assertThrows(NoSuchElementException.class,
+                () -> serviceOrder.attachStockRequirement(UUID.randomUUID(), pendingPart));
     }
 }
