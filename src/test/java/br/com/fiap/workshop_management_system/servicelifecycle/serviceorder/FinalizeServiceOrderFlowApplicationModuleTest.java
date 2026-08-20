@@ -2,6 +2,7 @@ package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder;
 
 import br.com.fiap.workshop_management_system.registration.customer.domain.model.ContactInfo;
 import br.com.fiap.workshop_management_system.registration.customer.domain.model.Customer;
+import br.com.fiap.workshop_management_system.registration.customer.domain.model.TaxId;
 import br.com.fiap.workshop_management_system.registration.customer.domain.repository.CustomerRepository;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.FinalizeServiceOrderRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderResponse;
@@ -43,7 +44,7 @@ class FinalizeServiceOrderFlowApplicationModuleTest {
     @Test
     @Transactional
     void finalizingAServiceOrderResolvesTheRealCustomerAcrossModuleBoundaries() {
-        Customer customer = Customer.create("Jane Doe", "12345678900",
+        Customer customer = Customer.create("Jane Doe", new TaxId(randomValidCpf()),
                 new ContactInfo("jane.doe@example.com", "11999999999"));
         customerRepository.save(customer);
 
@@ -61,5 +62,27 @@ class FinalizeServiceOrderFlowApplicationModuleTest {
                 serviceOrder.id(), new FinalizeServiceOrderRequest(true));
 
         assertEquals(ServiceOrderStatus.DELIVERED, response.status());
+    }
+
+    /**
+     * Generates a fresh, checksum-valid CPF per invocation so this test never collides with a
+     * TaxId already committed (uncommitted-rollback) by another test sharing the same H2 instance
+     * within the same JVM fork - e.g. CustomerRepositoryIntegrationTest, which is a plain
+     * @SpringBootTest with no @Transactional rollback.
+     */
+    private static String randomValidCpf() {
+        String base = "%09d".formatted(Math.floorMod(UUID.randomUUID().getMostSignificantBits(), 1_000_000_000L));
+        int firstCheckDigit = calculateCpfCheckDigit(base);
+        String partialCpf = base + firstCheckDigit;
+        return partialCpf + calculateCpfCheckDigit(partialCpf);
+    }
+
+    private static int calculateCpfCheckDigit(String digits) {
+        int sum = 0;
+        for (int index = 0; index < digits.length(); index++) {
+            sum += (digits.charAt(index) - '0') * (digits.length() + 1 - index);
+        }
+        int remainder = sum % 11;
+        return remainder < 2 ? 0 : 11 - remainder;
     }
 }

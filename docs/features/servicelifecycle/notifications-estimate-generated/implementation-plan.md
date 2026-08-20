@@ -64,3 +64,26 @@
 
 Mudança puramente aditiva, sem migration Flyway e sem estado persistido novo (`technical-spec.md`, Persistência
 e dados de bootstrap). Rollback é um `git revert` do commit/PR — não há dado externo ou schema para recuperar.
+
+## Reconciliação (2026-08-20)
+
+`feat/servicelifecycle-estimate-generation` (Matheus) mergeou em `dev` em 2026-08-20. Contrato do evento real
+(`servicelifecycle.estimate.domain.event.EstimateGenerated`) bateu 100% com o mock desta feature — mesmos 7
+campos, mesmos tipos. Executado em branch separada
+(`feat/servicelifecycle-publish-estimate-generated-event`, PR pendente de review do Matheus):
+
+- `EstimateGeneratedNotificationListener` passou a escutar `EstimateGenerated` real; o mock local
+  (`notification.event.EstimateGeneratedEvent`) foi apagado.
+- **Achado crítico:** apesar da confirmação do Matheus, `GenerateEstimateUseCase.execute()` construía o evento
+  mas nunca chamava `ApplicationEventPublisher.publishEvent(...)` — `EstimateController` descartava
+  `result.event()`. Sem esse fix, o listener nunca dispararia em produção. Adicionada a publicação dentro do
+  método `@Transactional` (não no controller — `@ApplicationModuleListener` usa
+  `@TransactionalEventListener(phase = AFTER_COMMIT)`, que descarta eventos publicados fora de uma transação
+  ativa).
+- Mudança em `GenerateEstimateUseCase` é aditiva: novo construtor `@Autowired` com `ApplicationEventPublisher`;
+  o construtor de teste de 3 args usado pelos 4 testes existentes do Matheus continua compilando sem alteração
+  (delega para um publisher no-op).
+- `EstimateGeneratedNotificationApplicationModuleTest` reescrito para chamar `GenerateEstimateUseCase.execute()`
+  de verdade via `Scenario.stimulate(...)`, em vez de publicar um evento construído à mão — prova a pipeline
+  real ponta a ponta.
+- `./mvnw clean verify`: 214/214 testes, `BUILD SUCCESS`.

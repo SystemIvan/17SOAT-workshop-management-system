@@ -1,7 +1,7 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.estimate.notification.application;
 
+import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.event.EstimateGenerated;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.notification.application.port.CustomerEstimateNotificationPort;
-import br.com.fiap.workshop_management_system.servicelifecycle.estimate.notification.event.EstimateGeneratedEvent;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -26,7 +26,7 @@ class EstimateGeneratedNotificationListenerTest {
         UUID diagnosisId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
         Instant expiresAt = Instant.now().plus(24, ChronoUnit.HOURS);
-        EstimateGeneratedEvent event = new EstimateGeneratedEvent(
+        EstimateGenerated event = new EstimateGenerated(
                 UUID.randomUUID(), Instant.now(), estimateId, serviceOrderId, diagnosisId, customerId, expiresAt);
 
         listener.on(event);
@@ -38,7 +38,7 @@ class EstimateGeneratedNotificationListenerTest {
     void doesNotPropagateAnExceptionThrownByThePort() {
         UUID customerId = UUID.randomUUID();
         Instant expiresAt = Instant.now().plus(24, ChronoUnit.HOURS);
-        EstimateGeneratedEvent event = new EstimateGeneratedEvent(
+        EstimateGenerated event = new EstimateGenerated(
                 UUID.randomUUID(), Instant.now(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 customerId, expiresAt);
         doThrow(new RuntimeException("delivery failed"))

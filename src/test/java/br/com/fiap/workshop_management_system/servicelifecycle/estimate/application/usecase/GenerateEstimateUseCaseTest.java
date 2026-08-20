@@ -5,6 +5,7 @@ import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.r
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.*;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -17,6 +18,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class GenerateEstimateUseCaseTest {
 
@@ -99,6 +102,27 @@ class GenerateEstimateUseCaseTest {
 
         // Gerar orçamento não significa aprovação do cliente.
         assertEquals(diagnosisId, serviceOrder.openDiagnosisId());
+    }
+
+    @Test
+    void publishesEstimateGeneratedEventOnSuccess() {
+        ServiceOrder serviceOrder = diagnosedServiceOrder();
+        UUID diagnosisId = serviceOrder.openDiagnosisId();
+
+        ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+
+        GenerateEstimateUseCase useCase =
+                new GenerateEstimateUseCase(
+                        new InMemoryServiceOrderRepository(serviceOrder),
+                        new InMemoryEstimateRepository(),
+                        Clock.fixed(NOW, ZoneOffset.UTC),
+                        eventPublisher
+                );
+
+        GenerateEstimateUseCase.Result result =
+                useCase.execute(serviceOrder.id(), diagnosisId);
+
+        verify(eventPublisher).publishEvent(result.event());
     }
 
     @Test
