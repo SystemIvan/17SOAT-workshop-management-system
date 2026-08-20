@@ -1,6 +1,7 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.infrastructure.web;
 
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.AssignTechnicianRequest;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ChangeServiceOrderPriorityRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.CreateServiceOrderRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.FinalizeServiceOrderRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.PerformDiagnosisRequest;
@@ -8,6 +9,7 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderStatusResponse;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.UpdateExecutionProgressRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.AssignTechnicianUseCase;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.ChangeServiceOrderPriorityUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.CompleteExecutionUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.CreateServiceOrderUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.FinalizeServiceOrderUseCase;
@@ -42,6 +44,7 @@ public class ServiceOrderController {
     private final GetServiceOrderUseCase getServiceOrderUseCase;
     private final GetServiceOrderStatusUseCase getServiceOrderStatusUseCase;
     private final PerformDiagnosisUseCase performDiagnosisUseCase;
+    private final ChangeServiceOrderPriorityUseCase changeServiceOrderPriorityUseCase;
     private final AssignTechnicianUseCase assignTechnicianUseCase;
     private final StartExecutionUseCase startExecutionUseCase;
     private final UpdateExecutionProgressUseCase updateExecutionProgressUseCase;
@@ -53,6 +56,7 @@ public class ServiceOrderController {
             GetServiceOrderUseCase getServiceOrderUseCase,
             GetServiceOrderStatusUseCase getServiceOrderStatusUseCase,
             PerformDiagnosisUseCase performDiagnosisUseCase,
+            ChangeServiceOrderPriorityUseCase changeServiceOrderPriorityUseCase,
             AssignTechnicianUseCase assignTechnicianUseCase,
             StartExecutionUseCase startExecutionUseCase,
             UpdateExecutionProgressUseCase updateExecutionProgressUseCase,
@@ -62,6 +66,7 @@ public class ServiceOrderController {
         this.getServiceOrderUseCase = getServiceOrderUseCase;
         this.getServiceOrderStatusUseCase = getServiceOrderStatusUseCase;
         this.performDiagnosisUseCase = performDiagnosisUseCase;
+        this.changeServiceOrderPriorityUseCase = changeServiceOrderPriorityUseCase;
         this.assignTechnicianUseCase = assignTechnicianUseCase;
         this.startExecutionUseCase = startExecutionUseCase;
         this.updateExecutionProgressUseCase = updateExecutionProgressUseCase;
@@ -101,6 +106,19 @@ public class ServiceOrderController {
     public ResponseEntity<ServiceOrderResponse> performDiagnosis(
             @PathVariable UUID id, @Valid @RequestBody PerformDiagnosisRequest request) {
         return ResponseEntity.ok(performDiagnosisUseCase.execute(id, request));
+    }
+
+    @PatchMapping("/{id}/priority")
+    @Operation(summary = "Change the priority of a service order")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Priority changed"),
+            @ApiResponse(responseCode = "400", description = "Invalid or missing priority"),
+            @ApiResponse(responseCode = "404", description = "Service order not found"),
+            @ApiResponse(responseCode = "409", description = "Service order is completed or delivered")
+    })
+    public ResponseEntity<ServiceOrderResponse> changePriority(
+            @PathVariable UUID id, @Valid @RequestBody ChangeServiceOrderPriorityRequest request) {
+        return ResponseEntity.ok(changeServiceOrderPriorityUseCase.execute(id, request));
     }
 
     @PostMapping("/{id}/executions/{executionId}/assign-technician")

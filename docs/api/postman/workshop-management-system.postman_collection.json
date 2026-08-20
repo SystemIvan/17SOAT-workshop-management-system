@@ -213,6 +213,15 @@
               }
             },
             {
+              "name": "Change service order priority",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"priority\": \"HIGH\"\n}" },
+                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/priority"
+              }
+            },
+            {
               "name": "Assign technician",
               "request": {
                 "method": "POST",
