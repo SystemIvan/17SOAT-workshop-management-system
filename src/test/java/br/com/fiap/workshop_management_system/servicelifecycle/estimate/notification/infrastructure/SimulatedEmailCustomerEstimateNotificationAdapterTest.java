@@ -57,8 +57,7 @@ class SimulatedEmailCustomerEstimateNotificationAdapterTest {
         UUID serviceOrderId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
         Instant expiresAt = Instant.now().plus(24, ChronoUnit.HOURS);
-        Customer customer = Customer.create(
-                RAW_NAME, new TaxId("52998224725"), new ContactInfo(RAW_EMAIL, "11999999999"));
+        Customer customer = Customer.create(RAW_NAME, new TaxId("52998224725"), new ContactInfo(RAW_EMAIL, "11999999999"));
         when(customerRepository.findById(customerId)).thenReturn(Optional.of(customer));
 
         adapter.notifyEstimateGenerated(estimateId, serviceOrderId, customerId, expiresAt);

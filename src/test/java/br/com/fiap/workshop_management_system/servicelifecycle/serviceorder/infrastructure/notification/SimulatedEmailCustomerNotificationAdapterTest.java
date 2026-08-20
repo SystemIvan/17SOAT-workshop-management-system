@@ -53,8 +53,7 @@ class SimulatedEmailCustomerNotificationAdapterTest {
     void logsSimulatedEmailWithoutRawContactDataWhenCustomerIsFound() {
         UUID serviceOrderId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
-        Customer customer = Customer.create(
-                RAW_NAME, new TaxId("52998224725"), new ContactInfo(RAW_EMAIL, "11999999999"));
+        Customer customer = Customer.create(RAW_NAME, new TaxId("52998224725"), new ContactInfo(RAW_EMAIL, "11999999999"));
         when(customerRepository.findById(customerId)).thenReturn(Optional.of(customer));
 
         adapter.notifyServiceOrderFinalized(serviceOrderId, customerId);
