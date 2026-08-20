@@ -162,6 +162,38 @@ class ServiceOrderTest {
     }
 
     @Test
+    void rf10_definePriorityChangesThePriorityWhenNotCompletedOrDelivered() {
+        ServiceOrder serviceOrder = newServiceOrder();
+
+        serviceOrder.definePriority(Priority.URGENT);
+
+        assertEquals(Priority.URGENT, serviceOrder.priority());
+    }
+
+    @Test
+    void rf10_definePriorityIsRejectedWhenServiceOrderIsCompleted() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        UUID executionId = diagnoseWithOneExecution(serviceOrder);
+        authorizeExecution(serviceOrder, executionId);
+        serviceOrder.startExecution(executionId);
+        serviceOrder.completeExecution(executionId);
+
+        assertThrows(IllegalStateException.class, () -> serviceOrder.definePriority(Priority.URGENT));
+    }
+
+    @Test
+    void rf10_definePriorityIsRejectedWhenServiceOrderIsDelivered() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        UUID executionId = diagnoseWithOneExecution(serviceOrder);
+        authorizeExecution(serviceOrder, executionId);
+        serviceOrder.startExecution(executionId);
+        serviceOrder.completeExecution(executionId);
+        serviceOrder.finalize(true);
+
+        assertThrows(IllegalStateException.class, () -> serviceOrder.definePriority(Priority.URGENT));
+    }
+
+    @Test
     void awaitingPartTakesPrecedenceOverAwaitingApproval() {
         ServiceOrder serviceOrder = newServiceOrder();
         StockRequirement pendingPart = new StockRequirement(
