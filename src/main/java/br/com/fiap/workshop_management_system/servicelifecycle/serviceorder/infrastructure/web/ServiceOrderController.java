@@ -18,6 +18,8 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.UpdateExecutionProgressUseCase;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -76,12 +78,20 @@ public class ServiceOrderController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get a service order by ID")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Service order found"),
+            @ApiResponse(responseCode = "404", description = "Service order not found")
+    })
     public ResponseEntity<ServiceOrderResponse> get(@PathVariable UUID id) {
         return ResponseEntity.ok(getServiceOrderUseCase.execute(id));
     }
 
     @GetMapping("/{id}/status")
     @Operation(summary = "Get the current service order status")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Service order status found"),
+            @ApiResponse(responseCode = "404", description = "Service order not found")
+    })
     public ResponseEntity<ServiceOrderStatusResponse> getStatus(@PathVariable UUID id) {
         return ResponseEntity.ok(getServiceOrderStatusUseCase.execute(id));
     }
@@ -95,6 +105,14 @@ public class ServiceOrderController {
 
     @PostMapping("/{id}/executions/{executionId}/assign-technician")
     @Operation(summary = "Assign a technician to a service execution")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Technician assigned"),
+            @ApiResponse(responseCode = "400", description = "Invalid or missing technicianId"),
+            @ApiResponse(responseCode = "404",
+                    description = "Service order, service execution or technician not found"),
+            @ApiResponse(responseCode = "409",
+                    description = "Service execution is completed or rejected")
+    })
     public ResponseEntity<ServiceOrderResponse> assignTechnician(
             @PathVariable UUID id, @PathVariable UUID executionId, @Valid @RequestBody AssignTechnicianRequest request) {
         return ResponseEntity.ok(assignTechnicianUseCase.execute(id, executionId, request));
@@ -102,6 +120,11 @@ public class ServiceOrderController {
 
     @PostMapping("/{id}/executions/{executionId}/start")
     @Operation(summary = "Start a service execution")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Service execution started"),
+            @ApiResponse(responseCode = "404", description = "Service order or service execution not found"),
+            @ApiResponse(responseCode = "409", description = "Service execution is not in the ready status")
+    })
     public ResponseEntity<ServiceOrderResponse> startExecution(
             @PathVariable UUID id, @PathVariable UUID executionId) {
         return ResponseEntity.ok(startExecutionUseCase.execute(id, executionId));
@@ -109,6 +132,12 @@ public class ServiceOrderController {
 
     @PatchMapping("/{id}/executions/{executionId}/progress")
     @Operation(summary = "Update service execution progress")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Service execution progress updated"),
+            @ApiResponse(responseCode = "400", description = "Invalid or missing note"),
+            @ApiResponse(responseCode = "404", description = "Service order or service execution not found"),
+            @ApiResponse(responseCode = "409", description = "Service execution is not in the in-progress status")
+    })
     public ResponseEntity<ServiceOrderResponse> updateExecutionProgress(
             @PathVariable UUID id, @PathVariable UUID executionId, @Valid @RequestBody UpdateExecutionProgressRequest request) {
         return ResponseEntity.ok(updateExecutionProgressUseCase.execute(id, executionId, request));
@@ -116,6 +145,11 @@ public class ServiceOrderController {
 
     @PostMapping("/{id}/executions/{executionId}/complete")
     @Operation(summary = "Complete a service execution")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Service execution completed"),
+            @ApiResponse(responseCode = "404", description = "Service order or service execution not found"),
+            @ApiResponse(responseCode = "409", description = "Service execution is not in the in-progress status")
+    })
     public ResponseEntity<ServiceOrderResponse> completeExecution(
             @PathVariable UUID id, @PathVariable UUID executionId) {
         return ResponseEntity.ok(completeExecutionUseCase.execute(id, executionId));
@@ -123,6 +157,11 @@ public class ServiceOrderController {
 
     @PostMapping("/{id}/finalize")
     @Operation(summary = "Finalize a service order")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Service order finalized"),
+            @ApiResponse(responseCode = "404", description = "Service order not found"),
+            @ApiResponse(responseCode = "409", description = "Service order is not completed or the vehicle was not delivered")
+    })
     public ResponseEntity<ServiceOrderResponse> finalize(
             @PathVariable UUID id, @Valid @RequestBody FinalizeServiceOrderRequest request) {
         return ResponseEntity.ok(finalizeServiceOrderUseCase.execute(id, request));

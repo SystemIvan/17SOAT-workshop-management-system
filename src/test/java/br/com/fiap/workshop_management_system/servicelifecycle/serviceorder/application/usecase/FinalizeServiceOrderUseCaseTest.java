@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -63,6 +64,29 @@ class FinalizeServiceOrderUseCaseTest {
 
         assertThrows(IllegalStateException.class,
                 () -> useCase.execute(serviceOrder.id(), new FinalizeServiceOrderRequest(true)));
+
+        verifyNoInteractions(customerNotificationPort);
+    }
+
+    @Test
+    void rejectsFinalizingWhenVehicleWasNotDelivered() {
+        UUID customerId = UUID.randomUUID();
+        ServiceOrder serviceOrder = completedServiceOrder(customerId);
+        when(repository.findById(serviceOrder.id())).thenReturn(Optional.of(serviceOrder));
+
+        assertThrows(IllegalStateException.class,
+                () -> useCase.execute(serviceOrder.id(), new FinalizeServiceOrderRequest(false)));
+
+        verifyNoInteractions(customerNotificationPort);
+    }
+
+    @Test
+    void rejectsFinalizingWhenServiceOrderDoesNotExist() {
+        UUID serviceOrderId = UUID.randomUUID();
+        when(repository.findById(serviceOrderId)).thenReturn(Optional.empty());
+
+        assertThrows(NoSuchElementException.class,
+                () -> useCase.execute(serviceOrderId, new FinalizeServiceOrderRequest(true)));
 
         verifyNoInteractions(customerNotificationPort);
     }
