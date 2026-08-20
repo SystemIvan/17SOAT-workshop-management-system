@@ -10,6 +10,22 @@
 | Aprovado em | 2026-08-20 |
 | Referências | `docs/Architecture.md` §2.3 (RF09–RF18); `docs/Architecture-Decisions.md` AD-008; features `estimate-generation`, `perform-diagnosis` |
 
+## Rastreabilidade: cobre RF15 e RF16
+
+Esta feature implementa, no mesmo endpoint (`POST /api/estimates/{estimateId}/decisions`), tanto a
+**RF15** ("Aprovar uma ou mais ServiceExecutions de uma Estimate — decisão por linha") quanto a
+**RF16** ("Reprovar uma ou mais ServiceExecutions de uma Estimate — execuções reprovadas ficam com
+status terminal `rejected`"). Não há separação de endpoint entre aprovar e rejeitar: `decision` aceita
+`APPROVED` ou `REJECTED` por linha na mesma requisição em lote (ver "Regras de negócio" abaixo), e
+ambas as decisões já usam o mesmo caso de uso (`DecideEstimateLinesUseCase`) e os mesmos métodos de
+domínio (`ServiceOrder.authorizeExecutionFromEstimate`/`rejectExecutionFromEstimate`).
+
+O caráter terminal de `REJECTED` exigido pela RF16 já é garantido pelo domínio existente
+(`ServiceExecution.reject`/guardas de status) e coberto por teste: uma `ServiceExecution` já `REJECTED`
+não pode ser decidida de novo (nem `APPROVED` nem `REJECTED`) — `IllegalStateException` →
+`409/INVALID_STATE_TRANSITION`, sem persistir nenhuma decisão da chamada
+(`DecideEstimateLinesUseCaseTest#rejectsWhenServiceExecutionIsNotPendingAndAppliesNoDecision`).
+
 ## Nota sobre AD-008
 
 `docs/Architecture-Decisions.md` lista **AD-008** (granularidade de aprovação da Estimate) como
