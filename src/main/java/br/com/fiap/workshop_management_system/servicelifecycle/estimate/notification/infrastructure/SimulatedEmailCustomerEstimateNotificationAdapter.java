@@ -37,7 +37,7 @@ public class SimulatedEmailCustomerEstimateNotificationAdapter implements Custom
 
     private void logSimulatedEmail(
             UUID estimateId, UUID serviceOrderId, UUID customerId, Instant expiresAt, Customer customer) {
-        String maskedEmail = maskEmail(customer.contactInfo().email());
+        String maskedEmail = maskEmail(customer.contactInfo().email().value());
         log.info("Simulated e-mail sent | to={} | customerId={} | subject=\"Your estimate is awaiting approval\" "
                         + "| estimateId={} | serviceOrderId={} | expiresAt={}",
                 maskedEmail, customerId, estimateId, serviceOrderId, expiresAt);

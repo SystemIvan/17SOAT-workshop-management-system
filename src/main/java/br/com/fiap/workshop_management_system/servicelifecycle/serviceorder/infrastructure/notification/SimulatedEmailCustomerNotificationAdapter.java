@@ -16,7 +16,9 @@ import java.util.UUID;
  * masked e-mail for demo traceability.
  */
 @Component
-public class SimulatedEmailCustomerNotificationAdapter implements CustomerNotificationPort {
+public class
+
+SimulatedEmailCustomerNotificationAdapter implements CustomerNotificationPort {
 
     private static final Logger log = LoggerFactory.getLogger(SimulatedEmailCustomerNotificationAdapter.class);
 
@@ -35,7 +37,7 @@ public class SimulatedEmailCustomerNotificationAdapter implements CustomerNotifi
     }
 
     private void logSimulatedEmail(UUID serviceOrderId, UUID customerId, Customer customer) {
-        String maskedEmail = maskEmail(customer.contactInfo().email());
+        String maskedEmail = maskEmail(customer.contactInfo().email().value());
         log.info("Simulated e-mail sent | to={} | customerId={} | subject=\"Your vehicle is ready for pickup\" "
                         + "| serviceOrderId={}",
                 maskedEmail, customerId, serviceOrderId);

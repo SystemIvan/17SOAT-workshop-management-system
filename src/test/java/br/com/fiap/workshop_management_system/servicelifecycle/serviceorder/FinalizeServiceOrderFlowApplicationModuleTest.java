@@ -2,6 +2,7 @@ package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder;
 
 import br.com.fiap.workshop_management_system.registration.customer.domain.model.ContactInfo;
 import br.com.fiap.workshop_management_system.registration.customer.domain.model.Customer;
+import br.com.fiap.workshop_management_system.registration.customer.domain.model.TaxId;
 import br.com.fiap.workshop_management_system.registration.customer.domain.repository.CustomerRepository;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.FinalizeServiceOrderRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderResponse;
@@ -43,7 +44,7 @@ class FinalizeServiceOrderFlowApplicationModuleTest {
     @Test
     @Transactional
     void finalizingAServiceOrderResolvesTheRealCustomerAcrossModuleBoundaries() {
-        Customer customer = Customer.create("Jane Doe", "12345678900",
+        Customer customer = Customer.create("Jane Doe", new TaxId("98765432100"),
                 new ContactInfo("jane.doe@example.com", "11999999999"));
         customerRepository.save(customer);
 
