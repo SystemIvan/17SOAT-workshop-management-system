@@ -1,5 +1,2 @@
-/**
- * Reserved package for the Vehicle aggregate defined by the Registrations context map.
- * Business behavior will be introduced only by a dedicated feature specification.
- */
+/** Vehicle aggregate implementation inside the Registrations bounded context. */
 package br.com.fiap.workshop_management_system.registration.vehicle;

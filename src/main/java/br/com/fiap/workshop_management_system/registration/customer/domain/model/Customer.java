@@ -3,56 +3,67 @@ package br.com.fiap.workshop_management_system.registration.customer.domain.mode
 import java.util.UUID;
 
 /**
- * Aggregate Root. The only entry point for changing a Customer's data.
+ * Raiz do agregado e único ponto de entrada para alterar os dados de um Customer.
  */
 public class Customer {
 
     private final UUID id;
-    private final String document;
+    private final TaxId taxId;
 
     private String name;
     private ContactInfo contactInfo;
+    private boolean active;
 
-    public static Customer create(String name, String document, ContactInfo contactInfo) {
+    public static Customer create(String name, TaxId taxId, ContactInfo contactInfo) {
         if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("Customer name must not be blank");
+            throw new IllegalArgumentException("O nome do cliente não pode estar em branco");
         }
-        if (document == null || document.isBlank()) {
-            throw new IllegalArgumentException("Customer document must not be blank");
+        if (taxId == null) {
+            throw new IllegalArgumentException("O CPF/CNPJ do cliente não pode ser nulo");
         }
         if (contactInfo == null) {
-            throw new IllegalArgumentException("Customer contact info must not be null");
+            throw new IllegalArgumentException("As informações de contato do cliente não podem ser nulas");
         }
-        return new Customer(UUID.randomUUID(), name, document, contactInfo);
+        return new Customer(UUID.randomUUID(), name, taxId, contactInfo, true);
     }
 
-    private Customer(UUID id, String name, String document, ContactInfo contactInfo) {
+    private Customer(UUID id, String name, TaxId taxId, ContactInfo contactInfo, boolean active) {
         this.id = id;
         this.name = name;
-        this.document = document;
+        this.taxId = taxId;
         this.contactInfo = contactInfo;
+        this.active = active;
     }
 
     /**
-     * Rebuilds a Customer from previously persisted state. Used exclusively by the
-     * persistence adapter - unlike {@link #create}, it does not run creation rules.
+     * Reconstrói um Customer a partir do estado persistido. Uso exclusivo do adapter
+     * de persistência; diferentemente de {@link #create}, não executa as regras de criação.
      */
-    public static Customer reconstitute(UUID id, String name, String document, ContactInfo contactInfo) {
-        return new Customer(id, name, document, contactInfo);
+    public static Customer reconstitute(UUID id, String name, TaxId taxId, ContactInfo contactInfo, boolean active) {
+        return new Customer(id, name, taxId, contactInfo, active);
     }
 
     public void rename(String newName) {
+        ensureActive();
         if (newName == null || newName.isBlank()) {
-            throw new IllegalArgumentException("Customer name must not be blank");
+            throw new IllegalArgumentException("O nome do cliente não pode estar em branco");
         }
         this.name = newName;
     }
 
-    public void updateContactInfo(ContactInfo newContactInfo) {
-        if (newContactInfo == null) {
-            throw new IllegalArgumentException("Customer contact info must not be null");
+    public void updateContactInfo(Email email, Phone phone, Address address) {
+        ensureActive();
+        this.contactInfo = contactInfo.withUpdates(email, phone, address);
+    }
+
+    public void archive() {
+        active = false;
+    }
+
+    private void ensureActive() {
+        if (!active) {
+            throw new CustomerArchivedException();
         }
-        this.contactInfo = newContactInfo;
     }
 
     public UUID id() {
@@ -63,11 +74,15 @@ public class Customer {
         return name;
     }
 
-    public String document() {
-        return document;
+    public TaxId taxId() {
+        return taxId;
     }
 
     public ContactInfo contactInfo() {
         return contactInfo;
+    }
+
+    public boolean active() {
+        return active;
     }
 }

@@ -39,6 +39,6 @@ public class GlobalExceptionHandler {
             jakarta.validation.ConstraintViolationException.class,
             org.springframework.http.converter.HttpMessageNotReadableException.class})
     public ResponseEntity<ErrorResponse> handleInvalidContract(Exception ex) {
-        return ResponseEntity.badRequest().body(new ErrorResponse("VALIDATION_ERROR", "Invalid request"));
+        return ResponseEntity.badRequest().body(new ErrorResponse("VALIDATION_ERROR", "Requisição inválida"));
     }
 }

@@ -3,7 +3,10 @@ package br.com.fiap.workshop_management_system.registration.customer.application
 import br.com.fiap.workshop_management_system.registration.customer.application.dto.CreateCustomerRequest;
 import br.com.fiap.workshop_management_system.registration.customer.application.dto.CustomerMapper;
 import br.com.fiap.workshop_management_system.registration.customer.application.dto.CustomerResponse;
+import br.com.fiap.workshop_management_system.registration.customer.application.exception
+        .CustomerTaxIdAlreadyExistsException;
 import br.com.fiap.workshop_management_system.registration.customer.domain.model.Customer;
+import br.com.fiap.workshop_management_system.registration.customer.domain.model.TaxId;
 import br.com.fiap.workshop_management_system.registration.customer.domain.repository.CustomerRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,7 +22,12 @@ public class CreateCustomerUseCase {
 
     @Transactional
     public CustomerResponse execute(CreateCustomerRequest request) {
-        Customer customer = Customer.create(request.name(), request.document(), CustomerMapper.toContactInfo(request.contactInfo()));
+        TaxId taxId = new TaxId(request.document());
+        if (repository.existsByTaxId(taxId)) {
+            throw new CustomerTaxIdAlreadyExistsException();
+        }
+        Customer customer = Customer.create(request.name(), taxId,
+                CustomerMapper.toContactInfo(request.contactInfo()));
         repository.save(customer);
         return CustomerMapper.toResponse(customer);
     }
