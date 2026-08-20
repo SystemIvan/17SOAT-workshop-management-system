@@ -285,6 +285,15 @@
             "method": "GET",
             "url": "{{baseUrl}}/api/estimates/{{estimateId}}"
           }
+        },
+        {
+          "name": "Decide estimate lines",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"decisions\": [\n    { \"serviceExecutionId\": \"{{executionId}}\", \"decision\": \"APPROVED\" }\n  ]\n}" },
+            "url": "{{baseUrl}}/api/estimates/{{estimateId}}/decisions"
+          }
         }
       ]
     },
