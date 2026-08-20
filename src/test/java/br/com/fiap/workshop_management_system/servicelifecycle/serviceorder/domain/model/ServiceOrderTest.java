@@ -8,6 +8,7 @@ import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ServiceOrderTest {
@@ -234,5 +235,30 @@ class ServiceOrderTest {
 
         assertThrows(NoSuchElementException.class,
                 () -> serviceOrder.attachStockRequirement(UUID.randomUUID(), pendingPart));
+    }
+
+    /**
+     * RF18 - registrar um novo diagnóstico (reparo adicional) durante a execução: já funciona hoje
+     * com o código existente de performDiagnosis/RF11 - não olha o status das ServiceExecution de
+     * lotes anteriores, apenas se o diagnóstico anterior já foi totalmente decidido (openDiagnosisId
+     * volta a null).
+     */
+    @Test
+    void rf18_canRegisterANewDiagnosisWhileAnEarlierExecutionIsInProgress() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        UUID firstExecutionId = diagnoseWithOneExecution(serviceOrder);
+        authorizeExecution(serviceOrder, firstExecutionId);
+        serviceOrder.startExecution(firstExecutionId);
+        assertEquals(ServiceExecutionStatus.IN_PROGRESS, serviceOrder.serviceExecutions().get(0).status());
+        assertNull(serviceOrder.openDiagnosisId());
+
+        DiagnosisItem additionalRepair = new DiagnosisItem(
+                UUID.randomUUID(), "Reparo adicional", Money.brl(BigDecimal.TEN), List.of());
+        UUID secondDiagnosisId = serviceOrder.performDiagnosis(List.of(additionalRepair));
+
+        assertEquals(secondDiagnosisId, serviceOrder.openDiagnosisId());
+        assertEquals(2, serviceOrder.serviceExecutions().size());
+        assertEquals(ServiceExecutionStatus.PENDING, serviceOrder.serviceExecutions().get(1).status());
+        assertEquals(ServiceOrderStatus.IN_PROGRESS, serviceOrder.status());
     }
 }

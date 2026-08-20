@@ -74,6 +74,19 @@ Ao final do registro de diagnóstico:
 
 - Registrar um diagnóstico move o status derivado da Service Order para `IN_DIAGNOSIS`.
 
+## Rastreabilidade: cobre também RF18
+
+Registrar um segundo (ou N-ésimo) lote de diagnóstico para a mesma Service Order — o cenário da
+**RF18** ("Registrar novo diagnóstico/reparo adicional durante a execução") — já funciona com este
+mesmo `performDiagnosis`/`POST /api/service-orders/{id}/diagnosis`, sem nenhuma mudança de código.
+A guarda de "diagnóstico único aberto por vez" (ver "Um diagnóstico aberto por vez" abaixo) verifica
+apenas `openDiagnosisId`, não o status das `ServiceExecution` de lotes anteriores. Assim que o
+diagnóstico anterior é totalmente decidido (todas as suas `ServiceExecution` aprovadas/rejeitadas via
+`decide-estimate-lines`, RF15/RF16), `openDiagnosisId` volta a `null` — mesmo que uma execução aprovada
+já esteja `IN_PROGRESS` ou `COMPLETED` — e um novo diagnóstico pode ser registrado, coexistindo com as
+execuções em andamento de lotes anteriores. Coberto por
+`ServiceOrderTest#rf18_canRegisterANewDiagnosisWhileAnEarlierExecutionIsInProgress`.
+
 ## Fora de escopo
 
 - geração do Estimate a partir do diagnóstico (feature `estimate-generation`, já especificada
