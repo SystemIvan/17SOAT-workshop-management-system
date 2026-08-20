@@ -16,9 +16,7 @@ import java.util.UUID;
  * masked e-mail for demo traceability.
  */
 @Component
-public class
-
-SimulatedEmailCustomerNotificationAdapter implements CustomerNotificationPort {
+public class SimulatedEmailCustomerNotificationAdapter implements CustomerNotificationPort {
 
     private static final Logger log = LoggerFactory.getLogger(SimulatedEmailCustomerNotificationAdapter.class);
 
