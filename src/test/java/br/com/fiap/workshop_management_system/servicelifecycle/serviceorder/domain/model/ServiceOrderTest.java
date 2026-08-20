@@ -4,9 +4,11 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ServiceOrderTest {
@@ -162,6 +164,38 @@ class ServiceOrderTest {
     }
 
     @Test
+    void rf10_definePriorityChangesThePriorityWhenNotCompletedOrDelivered() {
+        ServiceOrder serviceOrder = newServiceOrder();
+
+        serviceOrder.definePriority(Priority.URGENT);
+
+        assertEquals(Priority.URGENT, serviceOrder.priority());
+    }
+
+    @Test
+    void rf10_definePriorityIsRejectedWhenServiceOrderIsCompleted() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        UUID executionId = diagnoseWithOneExecution(serviceOrder);
+        authorizeExecution(serviceOrder, executionId);
+        serviceOrder.startExecution(executionId);
+        serviceOrder.completeExecution(executionId);
+
+        assertThrows(IllegalStateException.class, () -> serviceOrder.definePriority(Priority.URGENT));
+    }
+
+    @Test
+    void rf10_definePriorityIsRejectedWhenServiceOrderIsDelivered() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        UUID executionId = diagnoseWithOneExecution(serviceOrder);
+        authorizeExecution(serviceOrder, executionId);
+        serviceOrder.startExecution(executionId);
+        serviceOrder.completeExecution(executionId);
+        serviceOrder.finalize(true);
+
+        assertThrows(IllegalStateException.class, () -> serviceOrder.definePriority(Priority.URGENT));
+    }
+
+    @Test
     void awaitingPartTakesPrecedenceOverAwaitingApproval() {
         ServiceOrder serviceOrder = newServiceOrder();
         StockRequirement pendingPart = new StockRequirement(
@@ -175,5 +209,56 @@ class ServiceOrderTest {
 
         assertEquals(ServiceExecutionStatus.AWAITING_PART, serviceOrder.serviceExecutions().get(0).status());
         assertEquals(ServiceOrderStatus.AWAITING_PART, serviceOrder.status());
+    }
+
+    @Test
+    void rf12_attachingStockRequirementRecomputesTheServiceOrderStatusSnapshot() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        UUID executionId = diagnoseWithOneExecution(serviceOrder);
+        authorizeExecution(serviceOrder, executionId);
+        assertEquals(ServiceExecutionStatus.READY, serviceOrder.serviceExecutions().get(0).status());
+
+        StockRequirement pendingPart = new StockRequirement(
+                UUID.randomUUID(), StockItemType.PART, 1, "Correia dentada", Money.brl(BigDecimal.TEN), false);
+        serviceOrder.attachStockRequirement(executionId, pendingPart);
+
+        assertEquals(ServiceExecutionStatus.AWAITING_PART, serviceOrder.serviceExecutions().get(0).status());
+        assertEquals(ServiceOrderStatus.AWAITING_PART, serviceOrder.status());
+    }
+
+    @Test
+    void rf12_attachingStockRequirementToAnUnknownExecutionThrows() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        diagnoseWithOneExecution(serviceOrder);
+        StockRequirement pendingPart = new StockRequirement(
+                UUID.randomUUID(), StockItemType.PART, 1, "Correia dentada", Money.brl(BigDecimal.TEN), false);
+
+        assertThrows(NoSuchElementException.class,
+                () -> serviceOrder.attachStockRequirement(UUID.randomUUID(), pendingPart));
+    }
+
+    /**
+     * RF18 - registrar um novo diagnóstico (reparo adicional) durante a execução: já funciona hoje
+     * com o código existente de performDiagnosis/RF11 - não olha o status das ServiceExecution de
+     * lotes anteriores, apenas se o diagnóstico anterior já foi totalmente decidido (openDiagnosisId
+     * volta a null).
+     */
+    @Test
+    void rf18_canRegisterANewDiagnosisWhileAnEarlierExecutionIsInProgress() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        UUID firstExecutionId = diagnoseWithOneExecution(serviceOrder);
+        authorizeExecution(serviceOrder, firstExecutionId);
+        serviceOrder.startExecution(firstExecutionId);
+        assertEquals(ServiceExecutionStatus.IN_PROGRESS, serviceOrder.serviceExecutions().get(0).status());
+        assertNull(serviceOrder.openDiagnosisId());
+
+        DiagnosisItem additionalRepair = new DiagnosisItem(
+                UUID.randomUUID(), "Reparo adicional", Money.brl(BigDecimal.TEN), List.of());
+        UUID secondDiagnosisId = serviceOrder.performDiagnosis(List.of(additionalRepair));
+
+        assertEquals(secondDiagnosisId, serviceOrder.openDiagnosisId());
+        assertEquals(2, serviceOrder.serviceExecutions().size());
+        assertEquals(ServiceExecutionStatus.PENDING, serviceOrder.serviceExecutions().get(1).status());
+        assertEquals(ServiceOrderStatus.IN_PROGRESS, serviceOrder.status());
     }
 }

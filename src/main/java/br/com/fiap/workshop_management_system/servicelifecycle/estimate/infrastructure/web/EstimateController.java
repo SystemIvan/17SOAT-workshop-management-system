@@ -1,10 +1,15 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.estimate.infrastructure.web;
 
+import br.com.fiap.workshop_management_system.servicelifecycle.estimate.application.dto.DecideEstimateLinesRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.application.dto.EstimateResponse;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.application.dto.GenerateEstimateRequest;
+import br.com.fiap.workshop_management_system.servicelifecycle.estimate.application.usecase.DecideEstimateLinesUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.application.usecase.GenerateEstimateUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.application.usecase.GetEstimateUseCase;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
@@ -27,12 +32,15 @@ public class EstimateController {
 
     private final GenerateEstimateUseCase generateEstimateUseCase;
     private final GetEstimateUseCase getEstimateUseCase;
+    private final DecideEstimateLinesUseCase decideEstimateLinesUseCase;
 
     public EstimateController(
             GenerateEstimateUseCase generateEstimateUseCase,
-            GetEstimateUseCase getEstimateUseCase) {
+            GetEstimateUseCase getEstimateUseCase,
+            DecideEstimateLinesUseCase decideEstimateLinesUseCase) {
         this.generateEstimateUseCase = generateEstimateUseCase;
         this.getEstimateUseCase = getEstimateUseCase;
+        this.decideEstimateLinesUseCase = decideEstimateLinesUseCase;
     }
 
     @PostMapping("/service-orders/{serviceOrderId}/estimates")
@@ -68,5 +76,18 @@ public class EstimateController {
                         getEstimateUseCase.execute(estimateId)
                 )
         );
+    }
+
+    @PostMapping("/estimates/{estimateId}/decisions")
+    @Operation(summary = "Decide one or more estimate lines (approve or reject the underlying service execution)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Decisions applied"),
+            @ApiResponse(responseCode = "400", description = "Invalid, missing or duplicated decision fields"),
+            @ApiResponse(responseCode = "404", description = "Estimate not found or service execution not part of it"),
+            @ApiResponse(responseCode = "409", description = "A service execution is not pending")
+    })
+    public ResponseEntity<ServiceOrderResponse> decide(
+            @PathVariable UUID estimateId, @Valid @RequestBody DecideEstimateLinesRequest request) {
+        return ResponseEntity.ok(decideEstimateLinesUseCase.execute(estimateId, request));
     }
 }

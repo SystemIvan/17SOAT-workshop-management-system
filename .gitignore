@@ -33,5 +33,9 @@ build/
 .vscode/
 
 .env
-.claude/
 rascunho/
+
+### Claude Code local context (Santiago / Épico 3) ###
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
