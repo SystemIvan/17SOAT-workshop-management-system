@@ -64,7 +64,9 @@ class OpenApiContractTest {
                         .exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/executions/{executionId}/complete'].post")
                         .exists())
-                .andExpect(jsonPath("$.paths['/api/service-orders/{id}/finalize'].post").exists());
+                .andExpect(jsonPath("$.paths['/api/service-orders/{id}/finalize'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/service-orders/{serviceOrderId}/estimates'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/estimates/{estimateId}'].get").exists());
     }
 
     @Test
