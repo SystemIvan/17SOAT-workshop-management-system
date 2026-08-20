@@ -75,7 +75,14 @@ public class ServiceOrder {
         return serviceOrder;
     }
 
+    /**
+     * RF10 - alterar a prioridade de uma Service Order já existente.
+     */
     public void definePriority(Priority newPriority) {
+        if (statusSnapshot == ServiceOrderStatus.COMPLETED || statusSnapshot == ServiceOrderStatus.DELIVERED) {
+            throw new IllegalStateException(
+                    "Priority cannot be changed when the ServiceOrder is COMPLETED or DELIVERED");
+        }
         this.priority = newPriority;
     }
 
@@ -106,6 +113,7 @@ public class ServiceOrder {
 
     public void attachStockRequirement(UUID serviceExecutionId, StockRequirement requirement) {
         findExecution(serviceExecutionId).attachStockRequirement(requirement);
+        recomputeStatusSnapshot(false);
     }
 
     /**

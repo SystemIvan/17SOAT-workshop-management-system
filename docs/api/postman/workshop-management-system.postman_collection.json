@@ -213,12 +213,30 @@
               }
             },
             {
+              "name": "Change service order priority",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"priority\": \"HIGH\"\n}" },
+                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/priority"
+              }
+            },
+            {
               "name": "Assign technician",
               "request": {
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
                 "body": { "mode": "raw", "raw": "{\n  \"technicianId\": \"{{technicianId}}\"\n}" },
                 "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/assign-technician"
+              }
+            },
+            {
+              "name": "Attach stock requirement",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"stockItemId\": \"{{stockItemId}}\",\n  \"type\": \"PART\",\n  \"quantity\": 1,\n  \"nameSnapshot\": \"Oil filter\",\n  \"priceSnapshot\": { \"value\": 45.90, \"currency\": \"BRL\" }\n}" },
+                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/stock-requirements"
               }
             },
             { "name": "Start execution", "request": { "method": "POST", "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/start" } },
@@ -266,6 +284,15 @@
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/estimates/{{estimateId}}"
+          }
+        },
+        {
+          "name": "Decide estimate lines",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"decisions\": [\n    { \"serviceExecutionId\": \"{{executionId}}\", \"decision\": \"APPROVED\" }\n  ]\n}" },
+            "url": "{{baseUrl}}/api/estimates/{{estimateId}}/decisions"
           }
         }
       ]

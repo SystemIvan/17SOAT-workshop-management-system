@@ -57,7 +57,12 @@ public class ServiceExecution {
     }
 
     void attachStockRequirement(StockRequirement requirement) {
+        if (status == ServiceExecutionStatus.COMPLETED || status == ServiceExecutionStatus.REJECTED) {
+            throw new IllegalStateException(
+                    "Cannot attach a stock requirement to a ServiceExecution in status " + status);
+        }
         stockRequirements.add(requirement);
+        recomputeReadiness();
     }
 
     void authorize(UUID estimateId) {
@@ -118,7 +123,9 @@ public class ServiceExecution {
     }
 
     private void recomputeReadiness() {
-        if (status != ServiceExecutionStatus.AUTHORIZED && status != ServiceExecutionStatus.AWAITING_PART) {
+        if (status != ServiceExecutionStatus.AUTHORIZED
+                && status != ServiceExecutionStatus.AWAITING_PART
+                && status != ServiceExecutionStatus.READY) {
             return;
         }
         boolean allReserved = stockRequirements.stream().allMatch(StockRequirement::reserved);

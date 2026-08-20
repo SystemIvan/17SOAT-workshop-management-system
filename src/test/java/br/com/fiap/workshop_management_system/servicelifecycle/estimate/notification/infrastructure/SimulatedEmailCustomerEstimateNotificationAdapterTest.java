@@ -2,6 +2,7 @@ package br.com.fiap.workshop_management_system.servicelifecycle.estimate.notific
 
 import br.com.fiap.workshop_management_system.registration.customer.domain.model.ContactInfo;
 import br.com.fiap.workshop_management_system.registration.customer.domain.model.Customer;
+import br.com.fiap.workshop_management_system.registration.customer.domain.model.TaxId;
 import br.com.fiap.workshop_management_system.registration.customer.domain.repository.CustomerRepository;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -56,7 +57,7 @@ class SimulatedEmailCustomerEstimateNotificationAdapterTest {
         UUID serviceOrderId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
         Instant expiresAt = Instant.now().plus(24, ChronoUnit.HOURS);
-        Customer customer = Customer.create(RAW_NAME, "12345678900", new ContactInfo(RAW_EMAIL, "11999999999"));
+        Customer customer = Customer.create(RAW_NAME, new TaxId("52998224725"), new ContactInfo(RAW_EMAIL, "11999999999"));
         when(customerRepository.findById(customerId)).thenReturn(Optional.of(customer));
 
         adapter.notifyEstimateGenerated(estimateId, serviceOrderId, customerId, expiresAt);

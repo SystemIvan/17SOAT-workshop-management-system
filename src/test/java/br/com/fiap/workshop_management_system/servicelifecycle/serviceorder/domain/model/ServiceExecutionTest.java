@@ -89,4 +89,65 @@ class ServiceExecutionTest {
         assertThrows(IllegalStateException.class,
                 () -> serviceOrder.updateExecutionProgress(executionId, "nota"));
     }
+
+    private StockRequirement newStockRequirement() {
+        return new StockRequirement(
+                UUID.randomUUID(), StockItemType.PART, 1, "Correia dentada", Money.brl(BigDecimal.TEN), false);
+    }
+
+    @Test
+    void rf12_cannotAttachStockRequirementToACompletedExecution() {
+        ServiceOrder serviceOrder = serviceOrderWithOneExecution();
+        UUID executionId = serviceOrder.serviceExecutions().get(0).id();
+        serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+        serviceOrder.startExecution(executionId);
+        serviceOrder.completeExecution(executionId);
+
+        assertThrows(IllegalStateException.class,
+                () -> serviceOrder.attachStockRequirement(executionId, newStockRequirement()));
+    }
+
+    @Test
+    void rf12_cannotAttachStockRequirementToARejectedExecution() {
+        ServiceOrder serviceOrder = serviceOrderWithOneExecution();
+        UUID executionId = serviceOrder.serviceExecutions().get(0).id();
+        serviceOrder.rejectExecutionFromEstimate(UUID.randomUUID(), executionId);
+
+        assertThrows(IllegalStateException.class,
+                () -> serviceOrder.attachStockRequirement(executionId, newStockRequirement()));
+    }
+
+    @Test
+    void rf12_attachingAnUnreservedStockRequirementDowngradesAReadyExecutionToAwaitingPart() {
+        ServiceOrder serviceOrder = serviceOrderWithOneExecution();
+        UUID executionId = serviceOrder.serviceExecutions().get(0).id();
+        serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+        assertEquals(ServiceExecutionStatus.READY, serviceOrder.serviceExecutions().get(0).status());
+
+        serviceOrder.attachStockRequirement(executionId, newStockRequirement());
+
+        assertEquals(ServiceExecutionStatus.AWAITING_PART, serviceOrder.serviceExecutions().get(0).status());
+    }
+
+    @Test
+    void rf12_attachingStockRequirementDoesNotChangeStatusOfAPendingExecution() {
+        ServiceOrder serviceOrder = serviceOrderWithOneExecution();
+        UUID executionId = serviceOrder.serviceExecutions().get(0).id();
+
+        serviceOrder.attachStockRequirement(executionId, newStockRequirement());
+
+        assertEquals(ServiceExecutionStatus.PENDING, serviceOrder.serviceExecutions().get(0).status());
+    }
+
+    @Test
+    void rf12_attachingStockRequirementDoesNotChangeStatusOfAnInProgressExecution() {
+        ServiceOrder serviceOrder = serviceOrderWithOneExecution();
+        UUID executionId = serviceOrder.serviceExecutions().get(0).id();
+        serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+        serviceOrder.startExecution(executionId);
+
+        serviceOrder.attachStockRequirement(executionId, newStockRequirement());
+
+        assertEquals(ServiceExecutionStatus.IN_PROGRESS, serviceOrder.serviceExecutions().get(0).status());
+    }
 }
