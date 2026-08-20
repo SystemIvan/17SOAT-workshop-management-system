@@ -19,6 +19,6 @@ public class ListCustomersUseCase {
 
     @Transactional(readOnly = true)
     public List<CustomerResponse> execute() {
-        return repository.findAll().stream().map(CustomerMapper::toResponse).toList();
+        return repository.findAllActive().stream().map(CustomerMapper::toResponse).toList();
     }
 }
