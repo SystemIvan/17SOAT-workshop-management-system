@@ -19,4 +19,9 @@ final class ServiceOrderFinder {
         return repository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("ServiceOrder not found: " + id));
     }
+
+    static ServiceOrder getOrThrowForUpdate(ServiceOrderRepository repository, UUID id) {
+        return repository.findByIdForUpdate(id)
+                .orElseThrow(() -> new NoSuchElementException("ServiceOrder not found: " + id));
+    }
 }

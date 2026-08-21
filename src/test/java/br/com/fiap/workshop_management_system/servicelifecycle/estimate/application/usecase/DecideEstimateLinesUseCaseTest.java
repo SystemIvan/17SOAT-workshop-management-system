@@ -10,8 +10,14 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.doma
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Money;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceExecutionStatus;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockItemType;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockRequirement;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.VehicleSnapshot;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
+import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.ReservationAttemptOutcome;
+import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.ReserveStockItemsCommand;
+import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.ReserveStockItemsResult;
+import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.StockReservationApi;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -24,6 +30,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class DecideEstimateLinesUseCaseTest {
@@ -59,7 +67,8 @@ class DecideEstimateLinesUseCaseTest {
         InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository(serviceOrder);
         Estimate estimate = estimateFor(serviceOrder);
         InMemoryEstimateRepository estimates = new InMemoryEstimateRepository(estimate);
-        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(estimates, serviceOrders);
+        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(
+                estimates, serviceOrders, commands -> List.of());
 
         ServiceOrderResponse response = useCase.execute(estimate.id(),
                 new DecideEstimateLinesRequest(List.of(
@@ -77,7 +86,8 @@ class DecideEstimateLinesUseCaseTest {
         InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository(serviceOrder);
         Estimate estimate = estimateFor(serviceOrder);
         InMemoryEstimateRepository estimates = new InMemoryEstimateRepository(estimate);
-        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(estimates, serviceOrders);
+        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(
+                estimates, serviceOrders, commands -> List.of());
 
         ServiceOrderResponse response = useCase.execute(estimate.id(),
                 new DecideEstimateLinesRequest(List.of(
@@ -94,7 +104,8 @@ class DecideEstimateLinesUseCaseTest {
         InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository(serviceOrder);
         Estimate estimate = estimateFor(serviceOrder);
         InMemoryEstimateRepository estimates = new InMemoryEstimateRepository(estimate);
-        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(estimates, serviceOrders);
+        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(
+                estimates, serviceOrders, commands -> List.of());
 
         ServiceOrderResponse response = useCase.execute(estimate.id(),
                 new DecideEstimateLinesRequest(List.of(
@@ -109,7 +120,8 @@ class DecideEstimateLinesUseCaseTest {
     void rejectsUnknownEstimate() {
         InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository();
         InMemoryEstimateRepository estimates = new InMemoryEstimateRepository();
-        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(estimates, serviceOrders);
+        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(
+                estimates, serviceOrders, commands -> List.of());
 
         assertThrows(NoSuchElementException.class, () -> useCase.execute(UUID.randomUUID(),
                 new DecideEstimateLinesRequest(List.of(
@@ -129,7 +141,8 @@ class DecideEstimateLinesUseCaseTest {
                 List.of(new br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateLine(
                         inEstimateId, "Troca de óleo", Money.brl(BigDecimal.TEN), List.of())));
         InMemoryEstimateRepository estimates = new InMemoryEstimateRepository(estimate);
-        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(estimates, serviceOrders);
+        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(
+                estimates, serviceOrders, commands -> List.of());
 
         assertThrows(NoSuchElementException.class, () -> useCase.execute(estimate.id(),
                 new DecideEstimateLinesRequest(List.of(
@@ -147,7 +160,8 @@ class DecideEstimateLinesUseCaseTest {
         InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository(serviceOrder);
         Estimate estimate = estimateFor(serviceOrder);
         InMemoryEstimateRepository estimates = new InMemoryEstimateRepository(estimate);
-        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(estimates, serviceOrders);
+        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(
+                estimates, serviceOrders, commands -> List.of());
 
         assertThrows(IllegalArgumentException.class, () -> useCase.execute(estimate.id(),
                 new DecideEstimateLinesRequest(List.of(
@@ -171,7 +185,8 @@ class DecideEstimateLinesUseCaseTest {
                         new br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateLine(
                                 pendingId, "Alinhamento", Money.brl(BigDecimal.TEN), List.of())));
         InMemoryEstimateRepository estimates = new InMemoryEstimateRepository(estimate);
-        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(estimates, serviceOrders);
+        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(
+                estimates, serviceOrders, commands -> List.of());
 
         assertThrows(IllegalStateException.class, () -> useCase.execute(estimate.id(),
                 new DecideEstimateLinesRequest(List.of(
@@ -182,6 +197,144 @@ class DecideEstimateLinesUseCaseTest {
         // means nothing from this call is persisted, even though the in-memory ServiceOrder instance
         // (mutated in place, same reference the repository holds) already reflects the earlier decision.
         assertEquals(0, serviceOrders.saveCount);
+    }
+
+    @Test
+    void reservesApprovedExecutionWithFrozenStockRequirements() {
+        UUID stockItemId = UUID.randomUUID();
+        UUID reservationId = UUID.randomUUID();
+        ServiceOrder serviceOrder = serviceOrderWithStockRequirement(stockItemId);
+        UUID diagnosisId = serviceOrder.openDiagnosisId();
+        UUID executionId = serviceOrder.serviceExecutions().getFirst().id();
+        serviceOrder.freezeStockRequirements(diagnosisId);
+        InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository(serviceOrder);
+        Estimate estimate = estimateFor(serviceOrder);
+        InMemoryEstimateRepository estimates = new InMemoryEstimateRepository(estimate);
+        List<ReserveStockItemsCommand> receivedCommands = new java.util.ArrayList<>();
+        StockReservationApi stockReservationApi = commands -> {
+            receivedCommands.addAll(commands);
+            ReserveStockItemsCommand command = commands.getFirst();
+            return List.of(new ReserveStockItemsResult(
+                    command.serviceExecutionId(),
+                    ReservationAttemptOutcome.RESERVED,
+                    reservationId,
+                    true,
+                    command.items(),
+                    List.of()));
+        };
+        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(
+                estimates, serviceOrders, stockReservationApi);
+
+        ServiceOrderResponse response = useCase.execute(estimate.id(),
+                new DecideEstimateLinesRequest(List.of(
+                        new LineDecisionRequest(executionId, EstimateLineDecision.APPROVED))));
+
+        assertEquals(ServiceExecutionStatus.READY, response.executions().getFirst().status());
+        assertEquals(reservationId, response.executions().getFirst().stockReservationId());
+        assertTrue(response.executions().getFirst().stockRequirements().getFirst().reserved());
+        assertEquals(1, receivedCommands.size());
+        assertEquals(stockItemId, receivedCommands.getFirst().items().getFirst().stockItemId());
+        assertEquals(2, receivedCommands.getFirst().items().getFirst().quantity());
+    }
+
+    @Test
+    void preservesApprovalWhenStockCannotBeReserved() {
+        UUID stockItemId = UUID.randomUUID();
+        ServiceOrder serviceOrder = serviceOrderWithStockRequirement(stockItemId);
+        UUID diagnosisId = serviceOrder.openDiagnosisId();
+        UUID executionId = serviceOrder.serviceExecutions().getFirst().id();
+        serviceOrder.freezeStockRequirements(diagnosisId);
+        InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository(serviceOrder);
+        Estimate estimate = estimateFor(serviceOrder);
+        InMemoryEstimateRepository estimates = new InMemoryEstimateRepository(estimate);
+        StockReservationApi stockReservationApi = commands -> {
+            ReserveStockItemsCommand command = commands.getFirst();
+            return List.of(new ReserveStockItemsResult(
+                    command.serviceExecutionId(),
+                    ReservationAttemptOutcome.NOT_RESERVED,
+                    null,
+                    false,
+                    command.items(),
+                    List.of()));
+        };
+        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(
+                estimates, serviceOrders, stockReservationApi);
+
+        ServiceOrderResponse response = useCase.execute(estimate.id(),
+                new DecideEstimateLinesRequest(List.of(
+                        new LineDecisionRequest(executionId, EstimateLineDecision.APPROVED))));
+
+        assertEquals(ServiceExecutionStatus.AWAITING_ITEMS, response.executions().getFirst().status());
+        assertEquals(null, response.executions().getFirst().stockReservationId());
+        assertFalse(response.executions().getFirst().stockRequirements().getFirst().reserved());
+        assertTrue(serviceOrder.approvedEstimateIds().contains(estimate.id()));
+    }
+
+    @Test
+    void keepsIndependentResultsWhenOneApprovedExecutionCannotBeReserved() {
+        UUID availableStockItemId = UUID.randomUUID();
+        UUID unavailableStockItemId = UUID.randomUUID();
+        UUID reservationId = UUID.randomUUID();
+        ServiceOrder serviceOrder = serviceOrderWithStockRequirements(availableStockItemId, unavailableStockItemId);
+        UUID diagnosisId = serviceOrder.openDiagnosisId();
+        UUID availableExecutionId = serviceOrder.serviceExecutions().get(0).id();
+        UUID unavailableExecutionId = serviceOrder.serviceExecutions().get(1).id();
+        serviceOrder.freezeStockRequirements(diagnosisId);
+        InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository(serviceOrder);
+        Estimate estimate = estimateFor(serviceOrder);
+        InMemoryEstimateRepository estimates = new InMemoryEstimateRepository(estimate);
+        StockReservationApi stockReservationApi = commands -> commands.stream()
+                .map(command -> command.serviceExecutionId().equals(availableExecutionId)
+                        ? new ReserveStockItemsResult(
+                                command.serviceExecutionId(),
+                                ReservationAttemptOutcome.RESERVED,
+                                reservationId,
+                                true,
+                                command.items(),
+                                List.of())
+                        : new ReserveStockItemsResult(
+                                command.serviceExecutionId(),
+                                ReservationAttemptOutcome.NOT_RESERVED,
+                                null,
+                                false,
+                                command.items(),
+                                List.of()))
+                .toList();
+        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(
+                estimates, serviceOrders, stockReservationApi);
+
+        ServiceOrderResponse response = useCase.execute(estimate.id(),
+                new DecideEstimateLinesRequest(List.of(
+                        new LineDecisionRequest(availableExecutionId, EstimateLineDecision.APPROVED),
+                        new LineDecisionRequest(unavailableExecutionId, EstimateLineDecision.APPROVED))));
+
+        assertEquals(ServiceExecutionStatus.READY, response.executions().get(0).status());
+        assertEquals(reservationId, response.executions().get(0).stockReservationId());
+        assertEquals(ServiceExecutionStatus.AWAITING_ITEMS, response.executions().get(1).status());
+        assertEquals(null, response.executions().get(1).stockReservationId());
+    }
+
+    private ServiceOrder serviceOrderWithStockRequirement(UUID stockItemId) {
+        return serviceOrderWithStockRequirements(stockItemId);
+    }
+
+    private ServiceOrder serviceOrderWithStockRequirements(UUID... stockItemIds) {
+        ServiceOrder serviceOrder = ServiceOrder.create(UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot);
+        List<DiagnosisItem> diagnosisItems = java.util.Arrays.stream(stockItemIds)
+                .map(stockItemId -> new DiagnosisItem(
+                        UUID.randomUUID(),
+                        "Oil change",
+                        Money.brl(BigDecimal.TEN),
+                        List.of(new StockRequirement(
+                                stockItemId,
+                                StockItemType.PART,
+                                2,
+                                "Oil filter",
+                                Money.brl(BigDecimal.TEN),
+                                false))))
+                .toList();
+        serviceOrder.performDiagnosis(diagnosisItems);
+        return serviceOrder;
     }
 
     private static final class InMemoryServiceOrderRepository implements ServiceOrderRepository {
