@@ -3,10 +3,15 @@ package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.app
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.AssignTechnicianRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderMapper;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderResponse;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.event.TechnicianMaterialsReservedEvent;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceExecution;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceExecutionStatus;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
 import br.com.fiap.workshop_management_system.servicelifecycle.technician.domain.repository.TechnicianRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.NoSuchElementException;
@@ -20,10 +25,21 @@ public class AssignTechnicianUseCase {
 
     private final ServiceOrderRepository repository;
     private final TechnicianRepository technicianRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public AssignTechnicianUseCase(ServiceOrderRepository repository, TechnicianRepository technicianRepository) {
+    @Autowired
+    public AssignTechnicianUseCase(
+            ServiceOrderRepository repository,
+            TechnicianRepository technicianRepository,
+            ApplicationEventPublisher eventPublisher) {
         this.repository = repository;
         this.technicianRepository = technicianRepository;
+        this.eventPublisher = eventPublisher;
+    }
+
+    AssignTechnicianUseCase(ServiceOrderRepository repository, TechnicianRepository technicianRepository) {
+        this(repository, technicianRepository, event -> {
+        });
     }
 
     @Transactional
@@ -34,6 +50,22 @@ public class AssignTechnicianUseCase {
                 .orElseThrow(() -> new NoSuchElementException("Technician not found: " + technicianId));
         serviceOrder.confirmTechnicianAssignment(serviceExecutionId, technicianId);
         repository.save(serviceOrder);
+        publishMaterialsReservedNotification(serviceOrder, serviceExecutionId, technicianId);
         return ServiceOrderMapper.toResponse(serviceOrder);
+    }
+
+    private void publishMaterialsReservedNotification(
+            ServiceOrder serviceOrder,
+            UUID serviceExecutionId,
+            UUID technicianId) {
+        ServiceExecution execution = serviceOrder.serviceExecutions().stream()
+                .filter(candidate -> candidate.id().equals(serviceExecutionId))
+                .findFirst()
+                .orElseThrow(() -> new NoSuchElementException(
+                        "ServiceExecution not found: " + serviceExecutionId));
+        if (execution.status() == ServiceExecutionStatus.READY && execution.stockReservationId() != null) {
+            eventPublisher.publishEvent(new TechnicianMaterialsReservedEvent(
+                    serviceOrder.id(), execution.id(), technicianId, execution.stockReservationId()));
+        }
     }
 }

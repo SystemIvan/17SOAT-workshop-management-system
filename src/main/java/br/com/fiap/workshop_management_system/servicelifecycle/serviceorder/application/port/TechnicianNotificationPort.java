@@ -10,4 +10,10 @@ import java.util.UUID;
 public interface TechnicianNotificationPort {
 
     void notifyServiceOrderCreated(UUID serviceOrderId, UUID technicianId);
+
+    void notifyMaterialsReserved(
+            UUID serviceOrderId,
+            UUID serviceExecutionId,
+            UUID technicianId,
+            UUID stockReservationId);
 }
