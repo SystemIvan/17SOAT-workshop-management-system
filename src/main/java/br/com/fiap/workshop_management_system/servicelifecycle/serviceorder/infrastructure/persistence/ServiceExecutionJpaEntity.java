@@ -48,6 +48,8 @@ public class ServiceExecutionJpaEntity {
 
     private UUID authorizedByEstimateId;
     private UUID assignedTechnicianId;
+    private boolean stockRequirementsFrozen;
+    private UUID stockReservationId;
 
     @ElementCollection
     @CollectionTable(name = "service_execution_stock_requirements", joinColumns = @JoinColumn(name = "service_execution_id"))
@@ -67,6 +69,8 @@ public class ServiceExecutionJpaEntity {
             ServiceExecutionStatus status,
             UUID authorizedByEstimateId,
             UUID assignedTechnicianId,
+            boolean stockRequirementsFrozen,
+            UUID stockReservationId,
             List<StockRequirementEmbeddable> stockRequirements) {
         this.id = id;
         this.serviceOrder = serviceOrder;
@@ -78,6 +82,8 @@ public class ServiceExecutionJpaEntity {
         this.status = status;
         this.authorizedByEstimateId = authorizedByEstimateId;
         this.assignedTechnicianId = assignedTechnicianId;
+        this.stockRequirementsFrozen = stockRequirementsFrozen;
+        this.stockReservationId = stockReservationId;
         this.stockRequirements = stockRequirements;
     }
 
@@ -119,6 +125,14 @@ public class ServiceExecutionJpaEntity {
 
     public UUID getAssignedTechnicianId() {
         return assignedTechnicianId;
+    }
+
+    public boolean isStockRequirementsFrozen() {
+        return stockRequirementsFrozen;
+    }
+
+    public UUID getStockReservationId() {
+        return stockReservationId;
     }
 
     public List<StockRequirementEmbeddable> getStockRequirements() {

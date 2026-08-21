@@ -7,7 +7,7 @@ public class StockItem {
     private final UUID id;
     private final Sku sku;
     private final StockItemType type;
-    private final Quantity availableQuantity;
+    private Quantity availableQuantity;
     private String name;
     private Price price;
     private boolean active;
@@ -53,6 +53,40 @@ public class StockItem {
 
     public boolean hasAvailableQuantity() {
         return availableQuantity.value() > 0;
+    }
+
+    /**
+     * Evaluates a reservation without changing the available balance.
+     */
+    public StockItemReservationAssessment assessReservation(Quantity requestedQuantity) {
+        validateReservationQuantity(requestedQuantity);
+        if (!active) {
+            return new StockItemReservationAssessment(
+                    StockItemReservationEligibility.INACTIVE, availableQuantity);
+        }
+        if (availableQuantity.value() < requestedQuantity.value()) {
+            return new StockItemReservationAssessment(
+                    StockItemReservationEligibility.INSUFFICIENT_QUANTITY, availableQuantity);
+        }
+        return new StockItemReservationAssessment(StockItemReservationEligibility.ELIGIBLE, availableQuantity);
+    }
+
+    /**
+     * Commits a previously validated reservation without ever making the balance negative.
+     */
+    public void reserve(Quantity requestedQuantity) {
+        StockItemReservationAssessment assessment = assessReservation(requestedQuantity);
+        if (!assessment.eligible()) {
+            throw new IllegalStateException("Stock item cannot satisfy the requested reservation: "
+                    + assessment.eligibility());
+        }
+        this.availableQuantity = new Quantity(availableQuantity.value() - requestedQuantity.value());
+    }
+
+    private static void validateReservationQuantity(Quantity requestedQuantity) {
+        if (requestedQuantity == null || requestedQuantity.value() <= 0) {
+            throw new IllegalArgumentException("Reserved quantity must be greater than zero");
+        }
     }
 
     private static String validateName(String value) {

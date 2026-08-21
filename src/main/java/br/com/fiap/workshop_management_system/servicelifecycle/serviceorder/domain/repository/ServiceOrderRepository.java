@@ -13,5 +13,9 @@ public interface ServiceOrderRepository {
 
     Optional<ServiceOrder> findById(UUID id);
 
+    default Optional<ServiceOrder> findByIdForUpdate(UUID id) {
+        return findById(id);
+    }
+
     void save(ServiceOrder serviceOrder);
 }
