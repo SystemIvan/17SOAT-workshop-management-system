@@ -12,8 +12,10 @@
     { "key": "vehicleId", "value": "22222222-2222-2222-2222-222222222222" },
     { "key": "technicianId", "value": "33333333-3333-3333-3333-333333333333" },
     { "key": "stockItemId", "value": "44444444-4444-4444-4444-444444444444" },
+    { "key": "stockReservationId", "value": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" },
     { "key": "serviceOrderId", "value": "55555555-5555-5555-5555-555555555555" },
     { "key": "executionId", "value": "66666666-6666-6666-6666-666666666666" },
+    { "key": "serviceExecutionId", "value": "66666666-6666-6666-6666-666666666666" },
     { "key": "catalogServiceId", "value": "77777777-7777-7777-7777-777777777777" },
     { "key": "diagnosisId", "value": "88888888-8888-8888-8888-888888888888" },
     { "key": "estimateId", "value": "99999999-9999-9999-9999-999999999999" }
@@ -203,7 +205,7 @@
               "name": "Perform diagnosis",
               "event": [{
                 "listen": "test",
-                "script": { "exec": ["if (pm.response.code === 200 && pm.response.json().executions.length > 0) { pm.collectionVariables.set('executionId', pm.response.json().executions[0].id); }"] }
+                "script": { "exec": ["if (pm.response.code === 200 && pm.response.json().executions.length > 0) { pm.collectionVariables.set('executionId', pm.response.json().executions[0].id); pm.collectionVariables.set('serviceExecutionId', pm.response.json().executions[0].id); }"] }
               }],
               "request": {
                 "method": "POST",
@@ -238,6 +240,38 @@
                 "body": { "mode": "raw", "raw": "{\n  \"stockItemId\": \"{{stockItemId}}\",\n  \"type\": \"PART\",\n  \"quantity\": 1,\n  \"nameSnapshot\": \"Oil filter\",\n  \"priceSnapshot\": { \"value\": 45.90, \"currency\": \"BRL\" }\n}" },
                 "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/stock-requirements"
               }
+            },
+            {
+              "name": "Retry stock reservation",
+              "event": [{
+                "listen": "test",
+                "script": { "exec": ["if (pm.response.code === 200 && pm.response.json().reservationId) { pm.collectionVariables.set('stockReservationId', pm.response.json().reservationId); }"] }
+              }],
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{serviceExecutionId}}/stock-reservation",
+                "description": "Repete a tentativa sobre os requirements congelados. Não aceita linhas no corpo da requisição."
+              },
+              "response": [
+                {
+                  "name": "Reserved",
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [],
+                  "cookie": [],
+                  "body": "{\n  \"serviceExecutionId\": \"66666666-6666-6666-6666-666666666666\",\n  \"outcome\": \"RESERVED\",\n  \"reservationId\": \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\n  \"issues\": []\n}"
+                },
+                {
+                  "name": "Not reserved",
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [],
+                  "cookie": [],
+                  "body": "{\n  \"serviceExecutionId\": \"66666666-6666-6666-6666-666666666666\",\n  \"outcome\": \"NOT_RESERVED\",\n  \"reservationId\": null,\n  \"issues\": [{\n    \"stockItemId\": \"44444444-4444-4444-4444-444444444444\",\n    \"reason\": \"INSUFFICIENT_QUANTITY\",\n    \"requestedQuantity\": 2,\n    \"availableQuantity\": 1\n  }]\n}"
+                }
+              ]
             },
             { "name": "Start execution", "request": { "method": "POST", "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/start" } },
             {
@@ -330,6 +364,46 @@
             "method": "DELETE",
             "url": "{{baseUrl}}/api/stock-items/{{stockItemId}}"
           }
+        },
+        {
+          "name": "Get stock reservation",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/stock-reservations/{{stockReservationId}}"
+          },
+          "response": [{
+            "name": "Active reservation",
+            "status": "OK",
+            "code": 200,
+            "_postman_previewlanguage": "json",
+            "header": [],
+            "cookie": [],
+            "body": "{\n  \"id\": \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\n  \"serviceExecutionId\": \"66666666-6666-6666-6666-666666666666\",\n  \"status\": \"ACTIVE\",\n  \"lines\": [{\n    \"stockItemId\": \"44444444-4444-4444-4444-444444444444\",\n    \"quantity\": 2\n  }],\n  \"createdAt\": \"2026-08-20T12:00:00Z\",\n  \"consumedAt\": null\n}"
+          }]
+        },
+        {
+          "name": "Get stock reservation by service execution",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/stock-reservations/by-service-execution/{{serviceExecutionId}}"
+          }
+        },
+        {
+          "name": "Consume stock reservation",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/stock-reservations/{{stockReservationId}}/consume",
+            "description": "Consome a reserva integralmente. Repetições são idempotentes e retornam a mesma reserva consumida."
+          },
+          "response": [{
+            "name": "Consumed reservation",
+            "status": "OK",
+            "code": 200,
+            "_postman_previewlanguage": "json",
+            "header": [],
+            "cookie": [],
+            "body": "{\n  \"id\": \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\n  \"serviceExecutionId\": \"66666666-6666-6666-6666-666666666666\",\n  \"status\": \"CONSUMED\",\n  \"lines\": [{\n    \"stockItemId\": \"44444444-4444-4444-4444-444444444444\",\n    \"quantity\": 2\n  }],\n  \"createdAt\": \"2026-08-20T12:00:00Z\",\n  \"consumedAt\": \"2026-08-20T14:30:00Z\"\n}"
+          }]
         }
       ]
     }
