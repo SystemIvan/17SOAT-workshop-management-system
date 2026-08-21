@@ -5,11 +5,14 @@
 | Campo | Valor |
 |---|---|
 | Feature | `start-execution` |
-| Status | Implemented |
+| Status | Stale |
 | Responsável | Santiago Silvestre |
 | Atualizado em | 2026-08-18 |
 | Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-18) |
 | Especificação técnica | `./technical-spec.md` (`Approved` em 2026-08-18) |
+
+> Stale desde 2026-08-20: a especificação funcional foi devolvida a `Draft` pela feature
+> `stock-item-reservation`. O plano histórico não deve ser usado para nova implementação até nova revisão do SDD.
 
 ## Objetivo da execução
 

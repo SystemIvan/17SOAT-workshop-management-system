@@ -5,10 +5,27 @@
 | Feature | `estimate-generation` |
 | Status | Approved |
 | Responsável | Matheus Campagnone |
-| Atualizado em | 2026-08-16 |
-| Aprovado por | Matheus Campagnone |
-| Aprovado em | 2026-08-16 |
+| Atualizado em | 2026-08-20 |
+| Aprovado por | Matheus Apostulo |
+| Aprovado em | 2026-08-20 |
 | Especificação funcional | `docs/features/servicelifecycle/estimate-generation/functional-spec.md` |
+
+## Revisão proposta por `stock-item-reservation`
+
+Esta revisão substitui a afirmação de que a criação da Estimate não modifica a Service Order. Em uma única
+transação de escrita, `GenerateEstimateUseCase` deve carregar a Service Order com lock, validar e persistir
+a Estimate e chamar `serviceOrder.freezeStockRequirements(diagnosisId)` para todas as Service Executions
+apresentadas. A falha técnica em qualquer etapa faz rollback de ambos os aggregates.
+
+O congelamento é idempotente, não cria `StockReservation`, não consulta Stock & Procurement e não muda
+preço, disponibilidade ou status de execução. Ele persiste `stockRequirementsFrozen = true` em cada
+execução do Diagnosis e impede anexo, remoção ou alteração posterior de requirement. Necessidade posterior
+exige novo Diagnosis, Service Execution e Estimate. A migration e o mapeamento JPA desse campo pertencem
+ao plano `stock-item-reservation`, que executará o delta sem reabrir checkpoints históricos.
+
+Além dos testes existentes, a revisão exige cobertura de persistência atômica Estimate + congelamento e da
+serialização entre geração e `AttachStockRequirementUseCase`; a primeira deve vencer ou o anexo deve
+ocorrer integralmente antes do congelamento, nunca depois dele.
 
 ## Objetivo técnico
 
@@ -311,5 +328,3 @@ Antes do PR:
 - [x] Postman atualizado;
 - [x] evento `EstimateGenerated` testado;
 - [x] nenhuma fronteira do Spring Modulith violada.
-
-

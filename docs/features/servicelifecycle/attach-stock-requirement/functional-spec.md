@@ -6,9 +6,16 @@
 | Status | Approved |
 | Responsável | Santiago Silvestre |
 | Atualizado em | 2026-08-20 |
-| Aprovado por | Santiago Silvestre |
+| Aprovado por | Matheus Apostulo |
 | Aprovado em | 2026-08-20 |
 | Referências | `docs/Architecture.md` §2.3 (RF09–RF18); feature `perform-diagnosis` (RF11) |
+
+## Delta proposto por `stock-item-reservation`
+
+Um `StockRequirement` pode ser anexado somente a uma `ServiceExecution` `PENDING` cujo conjunto ainda
+não esteja congelado. A geração da Estimate congela o conjunto apresentado comercialmente; necessidades
+descobertas depois seguem o fluxo de reparo adicional, com novo Diagnosis, nova Service Execution e nova
+Estimate. Não haverá regressão de `READY` nem alteração de uma reserva existente.
 
 ## Problema e resultado esperado
 
@@ -25,13 +32,9 @@ mas nenhum caso de uso ou endpoint HTTP o expõe hoje — este é exatamente o g
 
 Ao final da operação:
 
-- o `ServiceExecution` alvo passa a ter mais um `StockRequirement` na sua lista, com `reserved = false`
-  (a reserva em si é efeito de um fluxo do `stockprocurement`, fora do escopo desta feature);
-- se o `ServiceExecution` estava com status `READY` (todas as peças já reservadas), o novo item, ainda
-  não reservado, faz o status recuar para `AWAITING_PART` — a leitura de "pronto para iniciar" não pode
-  ficar desatualizada;
-- o status derivado da Service Order (`statusSnapshot`) é recalculado, podendo passar a `AWAITING_PART`
-  pelo mesmo motivo.
+- o `ServiceExecution` alvo passa a ter mais um `StockRequirement` na sua lista, com `reserved = false`;
+- a operação ocorre somente antes do congelamento comercial e não altera a prontidão, uma reserva
+  existente ou o `statusSnapshot` por anexos posteriores à Estimate.
 
 ## Atores e cenários
 
@@ -57,12 +60,11 @@ Mesmo contrato já usado em `perform-diagnosis` (`StockRequirementRequest`):
 - O novo `StockRequirement` sempre começa com `reserved = false`; não é possível anexar um item já
   marcado como reservado por esta operação — reserva é um efeito de outro fluxo (`applyStockReservation`).
 
-### ServiceExecution deve estar em status compatível
+### ServiceExecution deve estar em status compatível e sem conjunto congelado
 
-- Permitido para `ServiceExecution` nos status `PENDING`, `AUTHORIZED`, `READY`, `AWAITING_PART` e
-  `IN_PROGRESS`.
-- Rejeitado para `COMPLETED` e `REJECTED` (estados terminais) — não faz sentido declarar uma nova
-  necessidade de peça para um serviço já concluído ou rejeitado.
+- Permitido somente para `ServiceExecution` em `PENDING` com `stockRequirementsFrozen = false`.
+- Rejeitado para `AUTHORIZED`, `AWAITING_ITEMS`, `READY`, `IN_PROGRESS`, `COMPLETED` e `REJECTED`, assim
+  como para qualquer execução cujo conjunto tenha sido congelado pela Estimate.
 
 ### Múltiplas necessidades para o mesmo item de estoque
 
@@ -73,16 +75,13 @@ Mesmo contrato já usado em `perform-diagnosis` (`StockRequirementRequest`):
 
 ### Efeito no status do ServiceExecution e da Service Order
 
-- Anexar um `StockRequirement` recalcula a prontidão do `ServiceExecution`: se o status era `READY`, o
-  novo item não reservado faz o status recuar para `AWAITING_PART`. Para os demais status permitidos
-  (`PENDING`, `AUTHORIZED`, `AWAITING_PART`, `IN_PROGRESS`), anexar não altera o status do
-  `ServiceExecution` em si.
-- Em seguida, o `statusSnapshot` da Service Order é recalculado (mesmo padrão de todo comando que afeta
-  um `ServiceExecution`).
+- Anexar um `StockRequirement` durante `PENDING` não altera o status do `ServiceExecution`.
+- Depois da geração da Estimate, não há anexo, regressão de `READY` nem alteração de reserva para essa
+  execução; a necessidade adicional deve seguir o fluxo de reparo adicional.
 
 ## Fora de escopo
 
-- reserva do item de estoque (`applyStockReservation`) — feature separada, fluxo do `stockprocurement`;
+- reserva do item de estoque — feature `stock-item-reservation`, fluxo de `stockprocurement`;
 - validação de existência do `stockItemId` no módulo `stockprocurement` no momento do anexo (mesmo
   padrão de "referência por ID sem leitura viva" já aceito para `catalogServiceId` no diagnóstico);
 - remoção ou edição de um `StockRequirement` já anexado;
@@ -92,12 +91,12 @@ Mesmo contrato já usado em `perform-diagnosis` (`StockRequirementRequest`):
 
 ## Critérios de aceite
 
-- [ ] Um `StockRequirement` válido pode ser anexado a um `ServiceExecution` existente em status
-      `PENDING`, `AUTHORIZED`, `READY`, `AWAITING_PART` ou `IN_PROGRESS`.
+- [ ] Um `StockRequirement` válido pode ser anexado somente a um `ServiceExecution` `PENDING` cujo
+      conjunto ainda não esteja congelado.
 - [ ] O `StockRequirement` anexado começa sempre com `reserved = false`.
-- [ ] Anexar a um `ServiceExecution` em `COMPLETED` ou `REJECTED` é rejeitado.
-- [ ] Anexar a um `ServiceExecution` em `READY` faz seu status recuar para `AWAITING_PART`.
-- [ ] O `statusSnapshot` da Service Order é recalculado após o anexo.
+- [ ] Anexar a um `ServiceExecution` em qualquer status diferente de `PENDING`, ou a um conjunto
+      congelado, é rejeitado.
+- [ ] Anexar após a geração da Estimate não altera uma reserva nem faz a execução regredir de `READY`.
 - [ ] Anexar a uma Service Order ou `ServiceExecution` inexistente resulta em erro de "não encontrado".
 - [ ] `quantity <= 0` ou campos obrigatórios ausentes são rejeitados como erro de validação.
 - [ ] Anexar um segundo `StockRequirement` com o mesmo `stockItemId` de um já existente cria uma nova

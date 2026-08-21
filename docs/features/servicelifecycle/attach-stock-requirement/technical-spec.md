@@ -6,9 +6,27 @@
 | Status | Approved |
 | Responsável | Santiago Silvestre |
 | Atualizado em | 2026-08-20 |
-| Aprovado por | Santiago Silvestre |
+| Aprovado por | Matheus Apostulo |
 | Aprovado em | 2026-08-20 |
 | Especificação funcional | `docs/features/servicelifecycle/attach-stock-requirement/functional-spec.md` |
+
+## Revisão proposta por `stock-item-reservation`
+
+Esta revisão substitui toda regra incompatível desta especificação sobre estados permitidos, prontidão e
+persistência. O endpoint continuará com o mesmo path e request, porém o caso de uso carregará a
+`ServiceOrder` com lock de escrita e só poderá anexar quando a Service Execution estiver `PENDING` e
+`stockRequirementsFrozen = false`. Qualquer outro estado ou conjunto congelado retorna `409
+INVALID_STATE_TRANSITION`, sem modificar requirements, reserva ou status.
+
+`GenerateEstimateUseCase` passa a congelar requirements na mesma transação da Estimate; portanto, geração
+e anexo concorrentes são serializados pelo mesmo lock. O anexo durante `PENDING` não recalcula prontidão
+nem `statusSnapshot`. Os campos `stockRequirementsFrozen` e `stockReservationId`, a renomeação para
+`AWAITING_ITEMS` e a migração correspondente serão implementados exclusivamente pelo plano
+`stock-item-reservation`; este plano histórico permanece `Stale`.
+
+Os testes revisados devem cobrir anexo válido em `PENDING`, rejeição em conjunto congelado e em cada
+estado incompatível, além da corrida entre anexo e geração da Estimate. Não haverá teste que aceite anexo
+em `AUTHORIZED`, `AWAITING_ITEMS`, `READY` ou `IN_PROGRESS`, nem que espere regressão de `READY`.
 
 ## Objetivo técnico
 
