@@ -478,4 +478,4 @@ Evidências de implementação registradas em 2026-08-21: `ReserveStockItemsUseC
 `StockReservationConcurrencyIntegrationTest`, `DecideEstimateLinesUseCaseTest`,
 `RetryStockReservationUseCaseTest`, `StockReservationControllerTest`,
 `StockReservationNotificationAfterCommitTest` e `StockReservationApiApplicationModuleTest`. A conclusão formal da
-feature continua condicionada ao Checkpoint 1 do plano, que depende da inspeção dos dois widgets restantes no Miro.
+feature foi registrada após a criação e releitura dos cinco widgets sucessores previstos no Checkpoint 1 do plano.

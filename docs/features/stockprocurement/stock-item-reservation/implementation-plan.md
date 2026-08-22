@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Feature | `stock-item-reservation` |
-| Status | Ready |
+| Status | Implemented |
 | Responsável | Matheus Apostulo |
 | Atualizado em | 2026-08-21 |
 | Branch | `feat/stockprocurement-stock-item-reservation` |
@@ -52,7 +52,7 @@ contornar uma dificuldade de implementação.
 | Ordem | Checkpoint | Status |
 |---:|---|---|
 | 0 | Reconciliar o SDD afetado em Service Lifecycle | Completed |
-| 1 | Atualizar o Miro por widgets novos e imutáveis | Pending |
+| 1 | Atualizar o Miro por widgets novos e imutáveis | Completed |
 | 2 | Implementar os modelos de domínio e suas invariantes | Completed |
 | 3 | Implementar migration, projeções e locks de persistência | Completed |
 | 4 | Implementar casos de uso e named interface de Stock Reservation | Completed |
@@ -61,7 +61,7 @@ contornar uma dificuldade de implementação.
 | 7 | Implementar notificações consumidoras after-commit | Completed |
 | 8 | Validar concorrência, transações e fronteiras Modulith | Completed |
 | 9 | Atualizar OpenAPI, Postman e documentação do projeto | Completed |
-| 10 | Concluir segurança, cobertura e gates finais | In Progress |
+| 10 | Concluir segurança, cobertura e gates finais | Completed |
 
 ## Checkpoint 0 — Reconciliar o SDD afetado em Service Lifecycle
 
@@ -177,8 +177,14 @@ decisão.
 - Se o conector não permitir criação segura, manter o checkpoint `Pending`, registrar o bloqueio e continuar somente
   com trabalho local reversível. A feature não pode ser marcada `Implemented` enquanto este checkpoint estiver pendente.
 
-Evidência parcial em 2026-08-20:
+Evidência concluída em 2026-08-21:
 
+- `3458764678560725831` →
+  [3458764681445773180](https://miro.com/app/board/uXjVH9faCu4=/?moveToWidget=3458764681445773180)
+  (Story de Stock); conteúdo relido pelo conector;
+- `3458764678817744720` →
+  [3458764681445773210](https://miro.com/app/board/uXjVH9faCu4=/?moveToWidget=3458764681445773210)
+  (Pivotal Events); conteúdo relido pelo conector;
 - `3458764679721508363` →
   [3458764681353461731](https://miro.com/app/board/uXjVH9faCu4=/?moveToWidget=3458764681353461731)
   (Requisitos e Refinamento); conteúdo relido pelo conector;
@@ -189,10 +195,10 @@ Evidência parcial em 2026-08-20:
   [3458764681353503955](https://miro.com/app/board/uXjVH9faCu4=/?moveToWidget=3458764681353503955)
   (Aggregates); conteúdo relido pelo conector.
 
-Os widgets de Story (`3458764678560725831`) e Pivotal Events (`3458764678817744720`) não puderam ser
-inspecionados: o conector retornou limite de créditos de Miro AI e a leitura direta falhou. Nenhum sucessor
-foi criado sem confirmar divergência. O conector também não expõe `modifiedAt`; não foram chamadas de edição,
-movimentação ou remoção dos widgets antigos. O checkpoint permanece `Pending` até nova inspeção.
+Os cinco widgets antigos foram inspecionados. Story e Pivotal Events divergiam do fluxo aprovado e receberam documentos
+sucessores autocontidos, versionados e posicionados ao lado das áreas correspondentes. Os outros três sucessores já
+existentes foram preservados e relidos. O conector não expõe `modifiedAt`; nenhuma ferramenta de edição, movimentação
+ou remoção foi chamada para os widgets antigos.
 
 ## Checkpoint 2 — Implementar os modelos de domínio e suas invariantes
 
@@ -590,7 +596,7 @@ Preencher durante a execução:
 | Flyway + Hibernate `validate` | Passou em H2 vazio e em MySQL 8 isolado, com 7 migrations. |
 | Concorrência em H2 e MySQL 8 | Passou: cinco cenários com transações reais; schema temporário MySQL removido. |
 | OpenAPI e Postman | Atualizados; OpenAPI testado e Postman JSON válido. |
-| Widgets sucessores no Miro | Parcial: três sucessores registrados; Story e Pivotal Events aguardam inspeção por limite de créditos. |
+| Widgets sucessores no Miro | Concluído: cinco pares; sucessores relidos pelo conector. |
 | Revisão de segurança | Concluída, sem achado crítico ou alto; limitação de autenticação aceita e pré-existente. |
 
 ## Rollback e recuperação
@@ -622,10 +628,10 @@ volume é local e não contém dados relevantes. Nunca usar reset destrutivo com
 ## Checklist de conclusão
 
 - [x] Specs desta feature permanecem aprovadas e specs afetadas de Service Lifecycle foram reconciliadas.
-- [ ] Widgets sucessores do Miro foram criados sem modificar widgets anteriores.
+- [x] Widgets sucessores do Miro foram criados sem modificar widgets anteriores.
 - [x] Aggregate, saldo atômico, consumo e integração foram implementados.
 - [x] Migration incremental, backfill e classificação sem seed foram verificados.
 - [x] OpenAPI, Postman, arquitetura e diagramas de módulo foram atualizados.
 - [x] Revisão de segurança não possui achado crítico ou alto aberto.
 - [x] `make verify` passou e a cobertura do código alterado não regrediu.
-- [ ] Critérios de aceite possuem evidências e o plano foi marcado `Implemented`.
+- [x] Critérios de aceite possuem evidências e o plano foi marcado `Implemented`.
