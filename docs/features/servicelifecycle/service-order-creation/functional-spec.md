@@ -5,15 +5,26 @@
 | Feature | `service-order-creation` |
 | Status | Approved |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-20 |
-| Aprovado por | Santiago Silvestre |
-| Aprovado em | 2026-08-20 |
-| Referências | `docs/Architecture.md` §2.3 (RF09–RF18), `EPIC2-REVIEW.md` |
+| Atualizado em | 2026-08-22 |
+| Aprovado por | Matheus Apostulo |
+| Aprovado em | 2026-08-22 |
+| Referências | `docs/Architecture.md` §2.3 (RF09–RF18), `EPIC2-REVIEW.md`, feature `service-order-initial-assessment` |
 
 > **Nota:** este documento é retroativo. A feature já está implementada em produção
 > (`ServiceOrder.create`, `CreateServiceOrderUseCase`, `POST /api/service-orders`) e foi identificada
 > sem passar pelo gate SDD do `AGENTS.md` durante a revisão do Épico 2. O texto abaixo descreve o
 > comportamento como ele existe hoje no código, não uma proposta nova.
+
+## Delta material aprovado em feature dependente — pendente de nova aprovação desta spec
+
+A feature `service-order-initial-assessment` passa a exigir `initialAssessment` não vazio em
+`POST /api/service-orders` e o expõe na resposta detalhada, podendo ser nulo somente para Service Orders legadas.
+O campo registra a triagem não técnica de entrada e não cria Diagnosis ou Service Executions. A mudança de request é
+incompatível e foi aprovada naquela feature; esta referência não duplica suas regras.
+
+Classificação: **material** — altera o request de criação, a validação e a resposta da feature. A revisão foi aprovada
+por humano em 2026-08-22. A especificação técnica revisada foi aprovada na sequência; o plano histórico permanece
+`Stale` porque não cobre a implementação deste delta, que pertence ao plano da feature dependente.
 
 ## Problema e resultado esperado
 
@@ -28,10 +39,13 @@ Ao final da criação:
 - os dados do Vehicle apresentados no momento da criação ficam congelados em um `VehicleSnapshot`,
   imune a alterações futuras no cadastro do Vehicle;
 - a Service Order tem uma prioridade definida (padrão `NORMAL` quando não informada).
+- a nova criação exige uma `initialAssessment` não vazia, conforme
+  `docs/features/servicelifecycle/service-order-initial-assessment/functional-spec.md`.
 
 ## Atores e cenários
 
-- Um atendente registra uma nova Service Order para um Customer e Vehicle já conhecidos pelo sistema.
+- Um atendente registra uma nova Service Order para um Customer e Vehicle já conhecidos pelo sistema, incluindo a
+  triagem inicial exigida.
 - O sistema cria a Service Order com status `RECEIVED`, sem nenhuma Service Execution ainda (essas só
   existem após o diagnóstico, fora do escopo desta feature).
 
@@ -59,6 +73,13 @@ Ao final da criação:
 - Alterar a prioridade após a criação é uma capacidade separada (RF10), fora do escopo deste
   documento.
 
+### Triagem inicial
+
+- `initialAssessment` é obrigatório para novas Service Orders; ausência, `null`, texto vazio ou somente espaços é
+  rejeitado sem persistência parcial.
+- A semântica completa, compatibilidade com registros legados e exclusões pertencem à feature
+  `service-order-initial-assessment`; esta spec apenas incorpora o delta no fluxo de criação.
+
 ### Status inicial
 
 - Toda Service Order criada começa com status `RECEIVED`.
@@ -83,5 +104,7 @@ Ao final da criação:
 - [x] Quando `priority` não é informado, a Service Order é criada com `NORMAL`.
 - [x] Quando `priority` é informado, a Service Order é criada com o valor informado.
 - [x] A Service Order criada começa com status `RECEIVED` e sem Service Executions.
+- [x] A criação sem `initialAssessment` válido é rejeitada com erro de validação; o delta foi implementado e
+      verificado em `service-order-initial-assessment`.
 - [x] Campos obrigatórios ausentes ou inválidos (`customerId`, `vehicleId`, campos do
   `VehicleSnapshot`) resultam em erro de validação, não em criação parcial.

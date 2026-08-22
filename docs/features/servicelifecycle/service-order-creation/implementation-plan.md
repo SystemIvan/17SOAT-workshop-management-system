@@ -3,14 +3,17 @@
 | Campo | Valor |
 |---|---|
 | Feature | `service-order-creation` |
-| Status | Implemented |
+| Status | Stale |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-20 |
+| Atualizado em | 2026-08-22 |
 | Especificação técnica | `./technical-spec.md` |
 
 > **Nota:** plano retroativo. O domínio, a persistência e o contrato HTTP já estavam implementados em
 > produção antes deste gate SDD; os checkpoints abaixo registram o que já existia e o que foi
 > adicionado especificamente por este esforço de documentação (testes HTTP e as três specs).
+
+> Está `Stale` desde 2026-08-22 porque a especificação funcional foi devolvida a `Draft` pela mudança material de
+> `service-order-initial-assessment`; este plano histórico não cobre nem autoriza a implementação daquele delta.
 
 ## Checkpoints
 

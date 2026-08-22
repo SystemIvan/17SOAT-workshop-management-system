@@ -5,9 +5,9 @@
 | Feature | `track-execution` |
 | Status | Approved |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-20 |
+| Atualizado em | 2026-08-22 |
 | Aprovado por | Matheus Apostulo |
-| Aprovado em | 2026-08-20 |
+| Aprovado em | 2026-08-22 |
 | Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-20) |
 
 ## Revisão proposta por `stock-item-reservation`
@@ -16,6 +16,19 @@ Esta revisão altera o contrato de leitura: `AWAITING_PART` é substituído por 
 `ServiceExecutionStatus`, `ServiceOrderStatus`, precedência do snapshot e OpenAPI. O response detalhado
 de Service Order ganha o campo anulável e aditivo `stockReservationId` por Service Execution. O resumo
 `GET /{id}/status` permanece limitado a `id` e `status`.
+
+> A reconciliação de 2026-08-22 foi revisada e aprovada por humano depois da aprovação da especificação funcional.
+> Este documento cobre somente o impacto técnico no SDD histórico; a implementação permanece nos planos das features
+> referenciadas pela RFC-002.
+
+## Reconciliação RFC-002
+
+`GET /api/service-orders/{id}` passa a incluir os campos aditivos `initialAssessment`, `diagnosisAssigneeId`,
+`executions[].diagnosedByTechnicianId`, `executions[].diagnosedAt` e `statusSnapshot`. `status` permanece como alias
+compatível do mesmo valor e será marcado deprecated no OpenAPI. O endpoint resumido permanece com `id` e `status`.
+As regras aprovadas de `READY → IN_PROGRESS` no snapshot e de todas as execuções terminais resultando em `COMPLETED`
+substituem a afirmação histórica de que esta feature não altera a precedência. As features da RFC-002 são fontes de
+verdade para contrato, persistência, migração, segurança e testes.
 
 O tracking não replica linhas, estado, timestamps ou preços da reserva: essas informações continuam em
 Stock & Procurement e são lidas pelos endpoints próprios de `StockReservation`. A migration e o mapeamento
@@ -81,7 +94,8 @@ GET /api/service-orders/{id}/status
 Sucesso: 200 OK com ServiceOrderStatusResponse { id, status }
 
 GET /api/service-orders/{id}
-Sucesso: 200 OK com ServiceOrderResponse completo (inclui executions[].status por ServiceExecution)
+Sucesso: 200 OK com ServiceOrderResponse completo (inclui `status`, `statusSnapshot`, campos aditivos de entrada e
+auditoria, e executions[].status por ServiceExecution)
 ```
 
 Contratos de erro (já implementados, sem mudança):

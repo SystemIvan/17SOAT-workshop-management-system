@@ -5,16 +5,29 @@
 | Feature | `track-execution` |
 | Status | Approved |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-20 |
+| Atualizado em | 2026-08-22 |
 | Aprovado por | Matheus Apostulo |
-| Aprovado em | 2026-08-20 |
-| Referências | RF23 (Miro — "Levantamento de Requisitos e Refinamento Técnico"); `docs/Architecture.md` §6.4 (Tracking), §11 (traceability — "Consulta do progresso pelo Customer via API"); `docs/features/servicelifecycle/complete-execution/functional-spec.md` (RF22); `docs/Architecture-Decisions.md` (AD-006, AD-010, AD-015, AD-016); `.claude/rules/epic-3-service-lifecycle.md`; código atual: `GetServiceOrderStatusUseCase`, `GetServiceOrderUseCase`, `ServiceOrder.status()`/`recomputeStatusSnapshot`, `ServiceOrderStatusResponse`, `ServiceOrderResponse` |
+| Aprovado em | 2026-08-22 |
+| Referências | RF23 (Miro — "Levantamento de Requisitos e Refinamento Técnico"); `docs/Architecture.md` §6.4 (Tracking), §11 (traceability — "Consulta do progresso pelo Customer via API"); `docs/features/servicelifecycle/complete-execution/functional-spec.md` (RF22); `docs/Architecture-Decisions.md` (AD-006, AD-010, AD-015, AD-016); `.claude/rules/epic-3-service-lifecycle.md`; features `service-order-initial-assessment`, `assign-diagnosis-assignee`, `diagnosis-authorship` e `service-order-status-projection` |
 
 ## Delta proposto por `stock-item-reservation`
 
 O tracking passa a expor `AWAITING_ITEMS`, em vez de `AWAITING_PART`, e o detalhe de uma
 Service Execution inclui somente o `stockReservationId` quando existente. Linhas, estado e timestamps
 da reserva permanecem propriedade de Stock & Procurement e são consultados pelos endpoints próprios.
+
+## Deltas materiais aprovados pela RFC-002 — pendentes de nova aprovação desta spec
+
+As respostas detalhadas de Service Order passam a incluir `initialAssessment`, `diagnosisAssigneeId` e, em cada
+Service Execution, `diagnosedByTechnicianId` e `diagnosedAt` (valores anuláveis apenas em registros legados). A
+projeção passa a expor `statusSnapshot` como nome canônico e mantém `status` como alias compatível e deprecated;
+`READY` mapeia para o snapshot `IN_PROGRESS`, e SOs com ao menos uma execução e todas em `COMPLETED` ou `REJECTED`
+ficam `COMPLETED`.
+
+Classificação: **material** — muda a semântica documentada da projeção e amplia o response detalhado. As quatro
+features citadas são as fontes de verdade; esta spec não duplica seus contratos, migrations ou regras. A revisão foi
+aprovada por humano em 2026-08-22 e a especificação técnica revisada foi aprovada na sequência. O plano histórico
+permanece `Stale`, pois não cobre a implementação dos deltas.
 
 ## Problema e resultado esperado
 
@@ -25,7 +38,7 @@ geral da `ServiceOrder` (`statusSnapshot`) e o status individual de cada `Servic
 Resultado esperado: dado o ID de uma `ServiceOrder`, o sistema retorna seu status derivado atual
 (`RECEIVED → IN_DIAGNOSIS → AWAITING_APPROVAL → AWAITING_ITEMS/IN_PROGRESS → COMPLETED → DELIVERED`,
 conforme a precedência de `recomputeStatusSnapshot`) e, quando o detalhe completo é pedido, o status
-de cada `ServiceExecution` associada.
+de cada `ServiceExecution` associada, a triagem, o responsável planejado e a auditoria do Diagnosis quando existirem.
 
 **Nota sobre o estado atual do código:** este comportamento já está implementado e exposto por dois
 endpoints somente-leitura:
@@ -67,13 +80,14 @@ cobertura de teste que falta — não parte do zero.
 - O `statusSnapshot` retornado é somente leitura: nenhum comando é executado por esses endpoints,
   apenas o valor já recalculado por comandos anteriores é lido (AD-010, Option B — comportamento
   preservado, decisão de time ainda pendente).
-- A precedência do `statusSnapshot` (`DELIVERED → COMPLETED → IN_PROGRESS → AWAITING_ITEMS →
-  AWAITING_APPROVAL → IN_DIAGNOSIS → RECEIVED`) é a já implementada em
-  `ServiceOrder.recomputeStatusSnapshot` — esta spec não a redefine, apenas documenta o contrato de
-  consulta sobre ela.
+- A precedência do `statusSnapshot` é `DELIVERED → COMPLETED → IN_PROGRESS → AWAITING_ITEMS →
+  AWAITING_APPROVAL → IN_DIAGNOSIS → RECEIVED`. `COMPLETED` exige ao menos uma execução e que todas estejam
+  `COMPLETED` ou `REJECTED`; `READY` ou `IN_PROGRESS` projetam `IN_PROGRESS`. A definição é da feature
+  `service-order-status-projection`.
 - `GET /{id}/status` retorna somente `id` + `status` (resumo); `GET /{id}` retorna o agregado
-  completo, incluindo `executions` com o status individual e, quando existente, `stockReservationId` de
-  cada `ServiceExecution`. Não há,
+  completo, incluindo `statusSnapshot` e `status` compatível, `initialAssessment`, `diagnosisAssigneeId`, e
+  `executions` com estado individual, autoria/instante quando existentes e, quando existente, `stockReservationId`.
+  Não há,
   hoje, um endpoint que agrupe execuções por Estimate como descrito em `Architecture.md` §6.4 — ver
   lacuna abaixo.
 - Consultar uma `ServiceOrder`/`ServiceExecution` inexistente retorna `404 NOT_FOUND`, no mesmo
@@ -105,9 +119,8 @@ cobertura de teste que falta — não parte do zero.
   fechamento de lacuna de cobertura.
 - Qualquer mecanismo de polling com cache, SSE ou WebSocket — depende de AD-015 e
   `ADR-001-realtime-updates-strategy.md`, ambos ainda pendentes de ratificação pelo time.
-- Redefinir a precedência de `recomputeStatusSnapshot` — comportamento já implementado e já coberto
-  por teste de domínio; esta feature apenas fecha a lacuna de cobertura no nível de use
-  case/HTTP e a lacuna de documentação Swagger dos dois endpoints de consulta.
+- Implementar os quatro deltas da RFC-002 — são responsabilidades das features referenciadas. Esta spec somente
+  reconcilia seu contrato de leitura com as decisões aprovadas.
 - RF24 (finalizar/entregar a `ServiceOrder`) — feature separada.
 
 ## Critérios de aceite
@@ -131,3 +144,5 @@ cobertura de teste que falta — não parte do zero.
       Evidência: `ServiceOrderController.get`/`getStatus`; `OpenApiContractTest` continua passando.
 - [ ] O tracking usa `AWAITING_ITEMS` em seus contratos e retorna somente `stockReservationId` para
       relacionar uma execução à reserva, sem replicar linhas ou estado de Stock & Procurement.
+- [ ] O response detalhado mantém `status` como alias de `statusSnapshot` e apresenta os campos aditivos aprovados;
+      a evidência será atualizada após reaprovação e implementação das features dependentes.
