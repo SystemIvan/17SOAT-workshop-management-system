@@ -19,7 +19,7 @@ operações de inventário, reserva, baixo estoque, Procurement ou integração 
 
 ## Regras de condução
 
-- Ler `AGENTS.md`, as duas specs aprovadas, `docs/RFC-001-stock-item-foundation.md` e `docs/backlog.md` antes de alterar
+- Ler `AGENTS.md`, as duas specs aprovadas, `docs/rfc/RFC-001-stock-item-foundation.md` e `docs/backlog.md` antes de alterar
   código.
 - Executar um checkpoint por vez e atualizar seu status neste documento: `Pending`, `In Progress` ou `Completed`.
 - Manter no máximo um checkpoint `In Progress`.

@@ -5,10 +5,17 @@
 | Feature | `assign-technician` |
 | Status | Approved |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-16 |
-| Aprovado por | Santiago Silvestre |
-| Aprovado em | 2026-08-16 |
+| Atualizado em | 2026-08-20 |
+| Aprovado por | Matheus Apostulo |
+| Aprovado em | 2026-08-20 |
 | Referências | RF19 (Miro — "Levantamento de Requisitos e Refinamento Técnico"); `docs/Architecture-Decisions.md` (AD-006); `.claude/rules/epic-3-service-lifecycle.md`; código atual: `AssignTechnicianUseCase`, `ServiceOrder.confirmTechnicianAssignment`, `ServiceExecution.confirmTechnicianAssignment` |
+
+## Delta proposto por `stock-item-reservation`
+
+Quando um Technician é atribuído a uma Service Execution que já está `READY` e possui
+`stockReservationId`, Service Lifecycle deve notificá-lo, depois do commit, de que os materiais estão
+reservados para retirada. A notificação é um efeito consumidor da atribuição e não altera a reserva, a
+prontidão ou a possibilidade de reatribuição.
 
 ## Problema e resultado esperado
 
@@ -43,12 +50,15 @@ identificar lacunas — não parte do zero.
 
 - Uma `ServiceExecution` pode ter seu Technician atribuído (ou reatribuído) enquanto seu status não for
   `completed` nem `rejected`. **Comportamento atual do código**, preservado por esta spec: nenhum status
-  específico (`pending`, `authorized`, `awaiting_part`, `ready`, `in_progress`) é exigido além de excluir
+  específico (`pending`, `authorized`, `awaiting_items`, `ready`, `in_progress`) é exigido além de excluir
   os dois terminais.
 - A atribuição registra apenas o `technicianId` (`UUID`) na `ServiceExecution`; não há cópia de nome ou
   outros dados do Technician (sem snapshot), consistente com a referência por ID exigida entre módulos.
 - Reatribuir um Technician diferente ao mesmo `serviceExecutionId` sobrescreve a atribuição anterior sem
   histórico. Nenhuma fonte (Miro RF19, código, testes) define um comportamento diferente.
+- A atribuição de um Technician a uma execução `READY` com `stockReservationId` produz, somente após o
+  commit, uma notificação de materiais reservados. A ausência de Technician no momento da reserva não a
+  invalida; o efeito ocorre na atribuição posterior.
 
 ### Regras que a Ubiquitous Language e o código atual NÃO definem (não inventar)
 
@@ -76,8 +86,8 @@ Estas questões ficam registradas como avaliação necessária, sem virar requis
   (Validação de existência foi implementada — ver seção acima.)
 - Qualquer mudança em `StartExecutionUseCase` para exigir atribuição prévia — é RF20, feature separada.
 - Histórico de reatribuições (quem atribuiu, quando, atribuição anterior).
-- Notificar o Technician ou o Customer sobre a atribuição (fora do escopo de Notification, RF31–RF33,
-  que hoje só cobre Estimate gerada, baixo estoque e SO finalizada).
+- Notificar o Customer sobre a atribuição. A notificação ao Technician de materiais reservados é o delta
+  integrado por `stock-item-reservation`; não cria um módulo genérico de Notification.
 - Autorização/permissão de quem pode atribuir (depende de AD-016, identidade/autorização, ainda Team
   Decision Required).
 
@@ -101,3 +111,5 @@ Estas questões ficam registradas como avaliação necessária, sem virar requis
 - [x] A decisão sobre validar disponibilidade/especialidade do Technician continua explicitamente
       pendente (AD-006) e não foi resolvida por esta implementação — apenas existência foi validada, sem
       inspecionar `status()`/`specialties()` (ver `technical-spec.md`).
+- [ ] Atribuir um Technician a uma execução `READY` com `stockReservationId` notifica os materiais
+      reservados somente depois do commit, sem alterar reserva ou status.

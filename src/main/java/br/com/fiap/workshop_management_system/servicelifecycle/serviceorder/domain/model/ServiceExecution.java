@@ -20,6 +20,8 @@ public class ServiceExecution {
     private ServiceExecutionStatus status;
     private UUID authorizedByEstimateId;
     private UUID assignedTechnicianId;
+    private boolean stockRequirementsFrozen;
+    private UUID stockReservationId;
 
     static ServiceExecution start(UUID diagnosisId, UUID catalogServiceId, String name, Money price) {
         return new ServiceExecution(UUID.randomUUID(), diagnosisId, catalogServiceId, name, price);
@@ -47,29 +49,57 @@ public class ServiceExecution {
             ServiceExecutionStatus status,
             UUID authorizedByEstimateId,
             UUID assignedTechnicianId,
+            boolean stockRequirementsFrozen,
+            UUID stockReservationId,
             List<StockRequirement> stockRequirements) {
         ServiceExecution execution = new ServiceExecution(id, diagnosisId, catalogServiceId, name, price);
         execution.status = status;
         execution.authorizedByEstimateId = authorizedByEstimateId;
         execution.assignedTechnicianId = assignedTechnicianId;
+        execution.stockRequirementsFrozen = stockRequirementsFrozen;
+        execution.stockReservationId = stockReservationId;
         execution.stockRequirements.addAll(stockRequirements);
         return execution;
     }
 
+    public static ServiceExecution reconstitute(
+            UUID id,
+            UUID diagnosisId,
+            UUID catalogServiceId,
+            String name,
+            Money price,
+            ServiceExecutionStatus status,
+            UUID authorizedByEstimateId,
+            UUID assignedTechnicianId,
+            List<StockRequirement> stockRequirements) {
+        return reconstitute(
+                id,
+                diagnosisId,
+                catalogServiceId,
+                name,
+                price,
+                status,
+                authorizedByEstimateId,
+                assignedTechnicianId,
+                false,
+                null,
+                stockRequirements);
+    }
+
     void attachStockRequirement(StockRequirement requirement) {
-        if (status == ServiceExecutionStatus.COMPLETED || status == ServiceExecutionStatus.REJECTED) {
+        if (status != ServiceExecutionStatus.PENDING || stockRequirementsFrozen) {
             throw new IllegalStateException(
                     "Cannot attach a stock requirement to a ServiceExecution in status " + status);
         }
         stockRequirements.add(requirement);
-        recomputeReadiness();
     }
 
     void authorize(UUID estimateId) {
         requireStatus(ServiceExecutionStatus.PENDING);
-        this.status = ServiceExecutionStatus.AUTHORIZED;
         this.authorizedByEstimateId = estimateId;
-        recomputeReadiness();
+        this.status = stockRequirements.isEmpty()
+                ? ServiceExecutionStatus.READY
+                : ServiceExecutionStatus.AWAITING_ITEMS;
     }
 
     void reject() {
@@ -88,14 +118,30 @@ public class ServiceExecution {
         this.assignedTechnicianId = technicianId;
     }
 
-    void markStockAsReserved(UUID stockItemId) {
+    void freezeStockRequirements() {
+        stockRequirementsFrozen = true;
+    }
+
+    void confirmStockReservation(UUID reservationId) {
+        if (reservationId == null) {
+            throw new IllegalArgumentException("Stock reservation id must not be null");
+        }
+        if (stockReservationId != null) {
+            if (stockReservationId.equals(reservationId)) {
+                return;
+            }
+            throw new IllegalStateException("A different stock reservation is already associated with this execution");
+        }
+        requireStatus(ServiceExecutionStatus.AWAITING_ITEMS);
+        if (stockRequirements.isEmpty()) {
+            throw new IllegalStateException("An execution without stock requirements cannot confirm a reservation");
+        }
         for (int i = 0; i < stockRequirements.size(); i++) {
             StockRequirement requirement = stockRequirements.get(i);
-            if (requirement.isSameItem(stockItemId)) {
-                stockRequirements.set(i, requirement.withReserved());
-            }
+            stockRequirements.set(i, requirement.withReserved());
         }
-        recomputeReadiness();
+        stockReservationId = reservationId;
+        status = ServiceExecutionStatus.READY;
     }
 
     /**
@@ -120,16 +166,6 @@ public class ServiceExecution {
     void complete() {
         requireStatus(ServiceExecutionStatus.IN_PROGRESS);
         this.status = ServiceExecutionStatus.COMPLETED;
-    }
-
-    private void recomputeReadiness() {
-        if (status != ServiceExecutionStatus.AUTHORIZED
-                && status != ServiceExecutionStatus.AWAITING_PART
-                && status != ServiceExecutionStatus.READY) {
-            return;
-        }
-        boolean allReserved = stockRequirements.stream().allMatch(StockRequirement::reserved);
-        this.status = allReserved ? ServiceExecutionStatus.READY : ServiceExecutionStatus.AWAITING_PART;
     }
 
     private void requireStatus(ServiceExecutionStatus expected) {
@@ -169,6 +205,14 @@ public class ServiceExecution {
 
     public UUID assignedTechnicianId() {
         return assignedTechnicianId;
+    }
+
+    public boolean stockRequirementsFrozen() {
+        return stockRequirementsFrozen;
+    }
+
+    public UUID stockReservationId() {
+        return stockReservationId;
     }
 
     public List<StockRequirement> stockRequirements() {

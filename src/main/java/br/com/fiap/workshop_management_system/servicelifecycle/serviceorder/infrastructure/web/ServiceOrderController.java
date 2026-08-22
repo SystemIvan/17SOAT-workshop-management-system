@@ -8,6 +8,8 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderResponse;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderStatusResponse;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.StockRequirementRequest;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.StockReservationAttemptMapper;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.StockReservationAttemptResponse;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.UpdateExecutionProgressRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.AssignTechnicianUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.AttachStockRequirementUseCase;
@@ -18,6 +20,7 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.GetServiceOrderStatusUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.GetServiceOrderUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.PerformDiagnosisUseCase;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.RetryStockReservationUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.StartExecutionUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.UpdateExecutionProgressUseCase;
 import jakarta.validation.Valid;
@@ -53,6 +56,7 @@ public class ServiceOrderController {
     private final CompleteExecutionUseCase completeExecutionUseCase;
     private final FinalizeServiceOrderUseCase finalizeServiceOrderUseCase;
     private final AttachStockRequirementUseCase attachStockRequirementUseCase;
+    private final RetryStockReservationUseCase retryStockReservationUseCase;
 
     public ServiceOrderController(
             CreateServiceOrderUseCase createServiceOrderUseCase,
@@ -65,7 +69,8 @@ public class ServiceOrderController {
             UpdateExecutionProgressUseCase updateExecutionProgressUseCase,
             CompleteExecutionUseCase completeExecutionUseCase,
             FinalizeServiceOrderUseCase finalizeServiceOrderUseCase,
-            AttachStockRequirementUseCase attachStockRequirementUseCase) {
+            AttachStockRequirementUseCase attachStockRequirementUseCase,
+            RetryStockReservationUseCase retryStockReservationUseCase) {
         this.createServiceOrderUseCase = createServiceOrderUseCase;
         this.getServiceOrderUseCase = getServiceOrderUseCase;
         this.getServiceOrderStatusUseCase = getServiceOrderStatusUseCase;
@@ -77,6 +82,7 @@ public class ServiceOrderController {
         this.completeExecutionUseCase = completeExecutionUseCase;
         this.finalizeServiceOrderUseCase = finalizeServiceOrderUseCase;
         this.attachStockRequirementUseCase = attachStockRequirementUseCase;
+        this.retryStockReservationUseCase = retryStockReservationUseCase;
     }
 
     @PostMapping
@@ -189,6 +195,19 @@ public class ServiceOrderController {
     public ResponseEntity<ServiceOrderResponse> attachStockRequirement(
             @PathVariable UUID id, @PathVariable UUID executionId, @Valid @RequestBody StockRequirementRequest request) {
         return ResponseEntity.ok(attachStockRequirementUseCase.execute(id, executionId, request));
+    }
+
+    @PostMapping("/{id}/executions/{executionId}/stock-reservation")
+    @Operation(summary = "Retry the frozen stock reservation for a service execution")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Reservation attempt completed"),
+            @ApiResponse(responseCode = "404", description = "Service order or service execution not found"),
+            @ApiResponse(responseCode = "409", description = "Service execution state cannot retry a reservation")
+    })
+    public ResponseEntity<StockReservationAttemptResponse> retryStockReservation(
+            @PathVariable UUID id, @PathVariable UUID executionId) {
+        return ResponseEntity.ok(StockReservationAttemptMapper.toResponse(
+                retryStockReservationUseCase.execute(id, executionId)));
     }
 
     @PostMapping("/{id}/finalize")

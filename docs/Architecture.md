@@ -22,6 +22,29 @@ desenho de domínio; `Architecture-Decisions.md` registra quais escolhas foram e
 única evidência de implementação. Nenhuma dessas perspectivas, isoladamente, prova que uma funcionalidade esteja
 concluída.
 
+## Atualização de implementação — 21 de agosto de 2026 (I)
+
+A feature `stock-item-reservation` introduziu a reserva atômica de materiais já aprovada nas respectivas specs. O
+estado abaixo descreve a implementação corrente; as seções históricas deste documento permanecem como registro da
+baseline consolidada em 10 de agosto.
+
+- Os módulos diretos atuais são `registration`, `servicelifecycle` e `stockprocurement`; Notification não é bounded
+  context. Cada consumidor possui sua porta outbound de notificação.
+- `StockReservation`, em `stockprocurement.stockreservation`, é um aggregate independente com linhas imutáveis,
+  estados `ACTIVE` e `CONSUMED` e, no máximo, uma reserva por `serviceExecutionId`.
+- Service Lifecycle acessa Stock & Procurement apenas pela named interface
+  `stockprocurement.stockreservation.application.api` (`stock-reservation-api`). A Service Execution conserva apenas
+  `stockReservationId`, congela seus requirements na geração da Estimate e usa `AWAITING_ITEMS` quando a aprovação
+  comercial não consegue reservar o conjunto integral.
+- A migration `V20260821014516__create_stock_reservations.sql` cria as tabelas de reserva, preserva o backfill
+  necessário e não inclui seed de negócio. A criação e o consumo usam locks de escrita para preservar saldo e
+  idempotência sob concorrência.
+- Os contratos HTTP incluem tentativa de retry da reserva pela execução, consulta por reserva ou execução e consumo
+  integral. O OpenAPI gerado pela aplicação é a fonte de verdade e a coleção Postman contém exemplos `RESERVED`,
+  `NOT_RESERVED`, `ACTIVE` e `CONSUMED`.
+- As notificações de Stock Manager e Technician são disparadas por eventos internos com
+  `@TransactionalEventListener(AFTER_COMMIT)`: falhas de entrega são registradas sem desfazer a reserva ou a decisão.
+
 ## 1. Tech Challenge overview
 
 ### 1.1 Problema oficial (A)

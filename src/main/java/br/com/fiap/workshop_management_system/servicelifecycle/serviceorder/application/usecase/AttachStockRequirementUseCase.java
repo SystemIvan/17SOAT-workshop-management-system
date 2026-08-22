@@ -25,7 +25,7 @@ public class AttachStockRequirementUseCase {
 
     @Transactional
     public ServiceOrderResponse execute(UUID serviceOrderId, UUID executionId, StockRequirementRequest request) {
-        ServiceOrder serviceOrder = ServiceOrderFinder.getOrThrow(repository, serviceOrderId);
+        ServiceOrder serviceOrder = ServiceOrderFinder.getOrThrowForUpdate(repository, serviceOrderId);
         serviceOrder.attachStockRequirement(executionId, ServiceOrderMapper.toStockRequirement(request));
         repository.save(serviceOrder);
         return ServiceOrderMapper.toResponse(serviceOrder);

@@ -14,5 +14,6 @@ public record ServiceExecutionResponse(
         ServiceExecutionStatus status,
         UUID authorizedByEstimateId,
         UUID assignedTechnicianId,
+        UUID stockReservationId,
         List<StockRequirementResponse> stockRequirements) {
 }

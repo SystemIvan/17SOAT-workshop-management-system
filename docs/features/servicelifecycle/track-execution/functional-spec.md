@@ -5,10 +5,16 @@
 | Feature | `track-execution` |
 | Status | Approved |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-19 |
-| Aprovado por | Santiago Silvestre |
-| Aprovado em | 2026-08-19 |
+| Atualizado em | 2026-08-20 |
+| Aprovado por | Matheus Apostulo |
+| Aprovado em | 2026-08-20 |
 | Referências | RF23 (Miro — "Levantamento de Requisitos e Refinamento Técnico"); `docs/Architecture.md` §6.4 (Tracking), §11 (traceability — "Consulta do progresso pelo Customer via API"); `docs/features/servicelifecycle/complete-execution/functional-spec.md` (RF22); `docs/Architecture-Decisions.md` (AD-006, AD-010, AD-015, AD-016); `.claude/rules/epic-3-service-lifecycle.md`; código atual: `GetServiceOrderStatusUseCase`, `GetServiceOrderUseCase`, `ServiceOrder.status()`/`recomputeStatusSnapshot`, `ServiceOrderStatusResponse`, `ServiceOrderResponse` |
+
+## Delta proposto por `stock-item-reservation`
+
+O tracking passa a expor `AWAITING_ITEMS`, em vez de `AWAITING_PART`, e o detalhe de uma
+Service Execution inclui somente o `stockReservationId` quando existente. Linhas, estado e timestamps
+da reserva permanecem propriedade de Stock & Procurement e são consultados pelos endpoints próprios.
 
 ## Problema e resultado esperado
 
@@ -17,7 +23,7 @@ Advisor/Manager, Technician) precisa consultar o progresso sem esperar a entrega
 geral da `ServiceOrder` (`statusSnapshot`) e o status individual de cada `ServiceExecution`.
 
 Resultado esperado: dado o ID de uma `ServiceOrder`, o sistema retorna seu status derivado atual
-(`RECEIVED → IN_DIAGNOSIS → AWAITING_APPROVAL → AWAITING_PART/IN_PROGRESS → COMPLETED → DELIVERED`,
+(`RECEIVED → IN_DIAGNOSIS → AWAITING_APPROVAL → AWAITING_ITEMS/IN_PROGRESS → COMPLETED → DELIVERED`,
 conforme a precedência de `recomputeStatusSnapshot`) e, quando o detalhe completo é pedido, o status
 de cada `ServiceExecution` associada.
 
@@ -61,12 +67,13 @@ cobertura de teste que falta — não parte do zero.
 - O `statusSnapshot` retornado é somente leitura: nenhum comando é executado por esses endpoints,
   apenas o valor já recalculado por comandos anteriores é lido (AD-010, Option B — comportamento
   preservado, decisão de time ainda pendente).
-- A precedência do `statusSnapshot` (`DELIVERED → COMPLETED → IN_PROGRESS → AWAITING_PART →
+- A precedência do `statusSnapshot` (`DELIVERED → COMPLETED → IN_PROGRESS → AWAITING_ITEMS →
   AWAITING_APPROVAL → IN_DIAGNOSIS → RECEIVED`) é a já implementada em
   `ServiceOrder.recomputeStatusSnapshot` — esta spec não a redefine, apenas documenta o contrato de
   consulta sobre ela.
 - `GET /{id}/status` retorna somente `id` + `status` (resumo); `GET /{id}` retorna o agregado
-  completo, incluindo `executions` com o status individual de cada `ServiceExecution`. Não há,
+  completo, incluindo `executions` com o status individual e, quando existente, `stockReservationId` de
+  cada `ServiceExecution`. Não há,
   hoje, um endpoint que agrupe execuções por Estimate como descrito em `Architecture.md` §6.4 — ver
   lacuna abaixo.
 - Consultar uma `ServiceOrder`/`ServiceExecution` inexistente retorna `404 NOT_FOUND`, no mesmo
@@ -122,3 +129,5 @@ cobertura de teste que falta — não parte do zero.
 - [x] Os dois endpoints passam a documentar seus códigos de resposta via `@ApiResponses`, no mesmo
       padrão de `assignTechnician`/`startExecution`/`updateExecutionProgress`/`completeExecution`.
       Evidência: `ServiceOrderController.get`/`getStatus`; `OpenApiContractTest` continua passando.
+- [ ] O tracking usa `AWAITING_ITEMS` em seus contratos e retorna somente `stockReservationId` para
+      relacionar uma execução à reserva, sem replicar linhas ou estado de Stock & Procurement.

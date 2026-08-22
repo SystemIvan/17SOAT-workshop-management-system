@@ -5,7 +5,7 @@ import java.util.UUID;
 
 /**
  * Consumer-owned outbound port for notifying a Customer that an Estimate was generated.
- * See docs/ADR-003-notifications-boundary.md: Notifications is not a bounded context,
+ * See docs/adr/ADR-003-notifications-boundary.md: Notifications is not a bounded context,
  * so servicelifecycle owns this port and its infrastructure adapter.
  */
 public interface CustomerEstimateNotificationPort {

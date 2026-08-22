@@ -6,9 +6,17 @@
 | Status | Approved |
 | Responsável | Santiago Silvestre |
 | Atualizado em | 2026-08-20 |
-| Aprovado por | Santiago Silvestre |
+| Aprovado por | Matheus Apostulo |
 | Aprovado em | 2026-08-20 |
 | Referências | `docs/Architecture.md` §2.3 (RF09–RF18); `docs/Architecture-Decisions.md` AD-008; features `estimate-generation`, `perform-diagnosis` |
+
+## Delta proposto por `stock-item-reservation`
+
+A aprovação comercial de uma linha com requirements congelados passa a solicitar automaticamente sua
+reserva integral em Stock & Procurement. A indisponibilidade não reverte a decisão do Customer: a
+execução permanece autorizada em `AWAITING_ITEMS`; o sucesso associa uma única `stockReservationId` e a
+leva a `READY`. Uma decisão em lote preserva sua validação comercial atômica, mas cada tentativa de
+reserva é independente das demais execuções aprovadas.
 
 ## Rastreabilidade: cobre RF15 e RF16
 
@@ -48,9 +56,10 @@ vez. Esta feature permite registrar essa decisão para uma ou mais linhas de uma
 
 Ao final da decisão:
 
-- cada `ServiceExecution` decidido muda de `PENDING` para `AUTHORIZED` (e, a partir daí, sua prontidão é
-  recalculada — vira `READY` ou `AWAITING_PART` conforme suas necessidades de estoque) ou para
-  `REJECTED`, conforme a decisão informada para aquela linha;
+- cada `ServiceExecution` aprovada muda de `PENDING` para `AUTHORIZED`; quando possui requirements
+  congelados, solicita automaticamente uma reserva integral e fica `READY` no sucesso ou
+  `AWAITING_ITEMS` na indisponibilidade; execuções sem requirements ficam `READY` sem reserva. Uma
+  execução rejeitada muda para `REJECTED`;
 - o `statusSnapshot` da Service Order é recalculado;
 - o diagnóstico deixa de estar "aberto" quando nenhuma `ServiceExecution` daquele lote continuar
   `PENDING` (comportamento já existente em `ServiceOrder`, não modificado por esta feature).
@@ -90,9 +99,9 @@ Ao final da decisão:
 
 ### Efeito de cada decisão
 
-- `APPROVED` chama `ServiceOrder.authorizeExecutionFromEstimate(estimateId, serviceExecutionId)`: a
-  `ServiceExecution` fica `AUTHORIZED` e, em seguida, sua prontidão é recalculada conforme suas
-  `StockRequirement` (`READY` se não houver pendência de reserva, `AWAITING_PART` caso contrário).
+- `APPROVED` autoriza a execução e, quando há requirements congelados, solicita sua reserva integral. O
+  sucesso associa um `stockReservationId` e leva a execução a `READY`; indisponibilidade preserva a
+  aprovação e a mantém em `AWAITING_ITEMS`. Execução sem requirements fica `READY` sem reserva.
 - `REJECTED` chama `ServiceOrder.rejectExecutionFromEstimate(estimateId, serviceExecutionId)`: a
   `ServiceExecution` fica `REJECTED` (estado terminal).
 - Em ambos os casos, o `statusSnapshot` da Service Order é recalculado ao final.
@@ -102,7 +111,8 @@ Ao final da decisão:
 - introduzir um campo de status na Estimate (`draft`/`sent`/`closed`/`expired` — AD-008 continua aberto);
 - fechar a Estimate automaticamente quando todas as linhas forem decididas;
 - expiração da Estimate (AD-013, feature `send-estimate`/RF14, ainda não implementada);
-- reserva de estoque (efeito de `READY` já existente, não desta feature);
+- consumo, liberação, reserva parcial ou reposição de estoque; a tentativa integral automática é o único
+  efeito de reserva incorporado por `stock-item-reservation`;
 - notificar o Customer ou qualquer outro ator sobre a decisão;
 - decisão parcial de uma linha (ex.: aprovar parte da quantidade de uma `StockRequirement`);
 - alterar o fluxo de geração da Estimate (`estimate-generation`, já especificada separadamente).
@@ -111,8 +121,10 @@ Ao final da decisão:
 
 - [ ] Uma ou mais decisões (`APPROVED`/`REJECTED`) podem ser registradas para linhas de uma Estimate
       existente em uma única chamada.
-- [ ] `APPROVED` move a `ServiceExecution` para `AUTHORIZED` e recalcula sua prontidão
-      (`READY`/`AWAITING_PART`).
+- [ ] `APPROVED` autoriza a `ServiceExecution` e solicita automaticamente a reserva integral de seus
+      requirements congelados; no sucesso associa `stockReservationId` e fica `READY`.
+- [ ] Indisponibilidade preserva a aprovação comercial, não cria reserva parcial e mantém a execução em
+      `AWAITING_ITEMS`; o resultado de outra execução aprovada no mesmo lote é independente.
 - [ ] `REJECTED` move a `ServiceExecution` para `REJECTED`.
 - [ ] O `statusSnapshot` da Service Order é recalculado após a chamada.
 - [ ] Decidir um `serviceExecutionId` que não pertence à Estimate é rejeitado como "não encontrado".

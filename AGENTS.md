@@ -23,7 +23,7 @@ repositories or tables for a placeholder without an approved feature specificati
 
 `Notifications` is not currently a bounded context. Notification delivery is an outbound effect owned by the consuming
 module. Introduce a consumer-owned port only when a real use case needs delivery. See
-`docs/ADR-002-notifications-boundary.md`.
+`docs/adr/ADR-002-notifications-boundary.md`.
 
 ## Architecture rules
 

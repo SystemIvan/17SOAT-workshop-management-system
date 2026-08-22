@@ -8,7 +8,7 @@
 | Atualizado em | 2026-08-19 |
 | Aprovado por | Santiago Silvestre |
 | Aprovado em | 2026-08-19 |
-| Referências | RF21 (Miro — "Levantamento de Requisitos e Refinamento Técnico"); `docs/features/servicelifecycle/start-execution/functional-spec.md` (RF20); `docs/Architecture-Decisions.md` (AD-006, AD-010, AD-015); `docs/ADR-001-realtime-updates-strategy.md`; `.claude/rules/epic-3-service-lifecycle.md`; código atual: `UpdateExecutionProgressUseCase`, `ServiceOrder.updateExecutionProgress`, `ServiceExecution.updateProgress` |
+| Referências | RF21 (Miro — "Levantamento de Requisitos e Refinamento Técnico"); `docs/features/servicelifecycle/start-execution/functional-spec.md` (RF20); `docs/Architecture-Decisions.md` (AD-006, AD-010, AD-015); `docs/adr/ADR-001-realtime-updates-strategy.md`; `.claude/rules/epic-3-service-lifecycle.md`; código atual: `UpdateExecutionProgressUseCase`, `ServiceOrder.updateExecutionProgress`, `ServiceExecution.updateProgress` |
 
 ## Problema e resultado esperado
 
@@ -81,7 +81,7 @@ falta — não parte do zero.
 - Qualquer alteração no `statusSnapshot` da `ServiceOrder` como efeito desta operação.
 - Autorização de quem pode registrar progresso — depende de AD-016.
 - Estratégia de tracking em tempo real (polling/cache/WebSocket) — depende de AD-015 e do
-  `ADR-001-realtime-updates-strategy.md`; esta feature não implementa notificação alguma.
+  `docs/adr/ADR-001-realtime-updates-strategy.md`; esta feature não implementa notificação alguma.
 
 ## Critérios de aceite
 

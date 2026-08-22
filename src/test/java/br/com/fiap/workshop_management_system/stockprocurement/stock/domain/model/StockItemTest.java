@@ -69,4 +69,30 @@ class StockItemTest {
         assertFalse(item.active());
         assertTrue(item.hasAvailableQuantity());
     }
+
+    @Test
+    void assessesAndReservesAvailableQuantityWithoutAllowingNegativeBalance() {
+        StockItem item = item(StockItemType.PART, 2);
+
+        StockItemReservationAssessment assessment = item.assessReservation(new Quantity(2));
+
+        assertTrue(assessment.eligible());
+        assertEquals(new Quantity(2), item.availableQuantity());
+        item.reserve(new Quantity(2));
+        assertEquals(new Quantity(0), item.availableQuantity());
+        assertEquals(StockItemReservationEligibility.INSUFFICIENT_QUANTITY,
+                item.assessReservation(new Quantity(1)).eligibility());
+        assertThrows(IllegalStateException.class, () -> item.reserve(new Quantity(1)));
+    }
+
+    @Test
+    void distinguishesInactiveItemsAndRejectsNonPositiveReservations() {
+        StockItem item = item(StockItemType.PART, 2);
+        item.deactivate();
+
+        assertEquals(StockItemReservationEligibility.INACTIVE,
+                item.assessReservation(new Quantity(1)).eligibility());
+        assertThrows(IllegalStateException.class, () -> item.reserve(new Quantity(1)));
+        assertThrows(IllegalArgumentException.class, () -> item.assessReservation(new Quantity(0)));
+    }
 }

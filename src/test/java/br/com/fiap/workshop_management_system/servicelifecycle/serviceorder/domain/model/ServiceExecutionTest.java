@@ -30,7 +30,7 @@ class ServiceExecutionTest {
     }
 
     @Test
-    void executionWithPendingStockRequirementStaysAwaitingPartUntilReserved() {
+    void executionWithPendingStockRequirementStaysAwaitingItemsUntilItsReservationIsConfirmed() {
         ServiceOrder serviceOrder = ServiceOrder.create(
                 UUID.randomUUID(), UUID.randomUUID(), new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015));
         StockRequirement pendingPart = new StockRequirement(
@@ -40,12 +40,14 @@ class ServiceExecutionTest {
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
 
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
-        assertEquals(ServiceExecutionStatus.AWAITING_PART, serviceOrder.serviceExecutions().get(0).status());
+        assertEquals(ServiceExecutionStatus.AWAITING_ITEMS, serviceOrder.serviceExecutions().get(0).status());
         assertThrows(IllegalStateException.class, () -> serviceOrder.startExecution(executionId));
 
-        serviceOrder.applyStockReservation(executionId, pendingPart.stockItemId());
+        UUID reservationId = UUID.randomUUID();
+        serviceOrder.confirmStockReservation(executionId, reservationId);
 
         assertEquals(ServiceExecutionStatus.READY, serviceOrder.serviceExecutions().get(0).status());
+        assertEquals(reservationId, serviceOrder.serviceExecutions().get(0).stockReservationId());
         serviceOrder.startExecution(executionId);
         assertEquals(ServiceExecutionStatus.IN_PROGRESS, serviceOrder.serviceExecutions().get(0).status());
     }
@@ -118,15 +120,14 @@ class ServiceExecutionTest {
     }
 
     @Test
-    void rf12_attachingAnUnreservedStockRequirementDowngradesAReadyExecutionToAwaitingPart() {
+    void cannotAttachStockRequirementAfterAuthorization() {
         ServiceOrder serviceOrder = serviceOrderWithOneExecution();
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
         assertEquals(ServiceExecutionStatus.READY, serviceOrder.serviceExecutions().get(0).status());
 
-        serviceOrder.attachStockRequirement(executionId, newStockRequirement());
-
-        assertEquals(ServiceExecutionStatus.AWAITING_PART, serviceOrder.serviceExecutions().get(0).status());
+        assertThrows(IllegalStateException.class,
+                () -> serviceOrder.attachStockRequirement(executionId, newStockRequirement()));
     }
 
     @Test
@@ -140,14 +141,35 @@ class ServiceExecutionTest {
     }
 
     @Test
-    void rf12_attachingStockRequirementDoesNotChangeStatusOfAnInProgressExecution() {
+    void cannotAttachStockRequirementToAnInProgressExecution() {
         ServiceOrder serviceOrder = serviceOrderWithOneExecution();
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
         serviceOrder.startExecution(executionId);
 
-        serviceOrder.attachStockRequirement(executionId, newStockRequirement());
+        assertThrows(IllegalStateException.class,
+                () -> serviceOrder.attachStockRequirement(executionId, newStockRequirement()));
+    }
 
-        assertEquals(ServiceExecutionStatus.IN_PROGRESS, serviceOrder.serviceExecutions().get(0).status());
+    @Test
+    void confirmsAReservationOnlyOnceAndRejectsADifferentReservationId() {
+        ServiceOrder serviceOrder = ServiceOrder.create(
+                UUID.randomUUID(), UUID.randomUUID(), new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015));
+        StockRequirement requirement = newStockRequirement();
+        serviceOrder.performDiagnosis(List.of(new DiagnosisItem(
+                UUID.randomUUID(), "Troca de correia", Money.brl(BigDecimal.TEN), List.of(requirement))));
+        UUID executionId = serviceOrder.serviceExecutions().get(0).id();
+        serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+        UUID reservationId = UUID.randomUUID();
+
+        serviceOrder.confirmStockReservation(executionId, reservationId);
+        serviceOrder.confirmStockReservation(executionId, reservationId);
+
+        ServiceExecution execution = serviceOrder.serviceExecutions().get(0);
+        assertEquals(ServiceExecutionStatus.READY, execution.status());
+        assertEquals(reservationId, execution.stockReservationId());
+        assertEquals(true, execution.stockRequirements().get(0).reserved());
+        assertThrows(IllegalStateException.class,
+                () -> serviceOrder.confirmStockReservation(executionId, UUID.randomUUID()));
     }
 }

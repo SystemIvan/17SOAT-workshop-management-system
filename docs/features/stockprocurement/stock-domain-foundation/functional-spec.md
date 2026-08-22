@@ -16,7 +16,7 @@ Referências:
 - [Bounded Contexts no Miro](https://miro.com/app/board/uXjVH9faCu4=/?moveToWidget=3458764679675285092)
 - [Modelo tático atualizado no Miro](https://miro.com/app/board/uXjVH9faCu4=/?moveToWidget=3458764680870224027)
 - [Aggregates atualizados no Miro](https://miro.com/app/board/uXjVH9faCu4=/?moveToWidget=3458764680870345674)
-- `docs/RFC-001-stock-item-foundation.md`
+- `docs/rfc/RFC-001-stock-item-foundation.md`
 - `docs/features/platform/context-alignment-and-project-standards/`
 
 ## Estado desta descoberta

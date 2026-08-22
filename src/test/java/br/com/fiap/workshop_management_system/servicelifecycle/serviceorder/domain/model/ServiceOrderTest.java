@@ -196,7 +196,7 @@ class ServiceOrderTest {
     }
 
     @Test
-    void awaitingPartTakesPrecedenceOverAwaitingApproval() {
+    void awaitingItemsTakesPrecedenceOverAwaitingApproval() {
         ServiceOrder serviceOrder = newServiceOrder();
         StockRequirement pendingPart = new StockRequirement(
                 UUID.randomUUID(), StockItemType.PART, 1, "Filtro de óleo", Money.brl(BigDecimal.TEN), false);
@@ -207,23 +207,23 @@ class ServiceOrderTest {
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
         serviceOrder.markEstimateSentWithPendingLines();
 
-        assertEquals(ServiceExecutionStatus.AWAITING_PART, serviceOrder.serviceExecutions().get(0).status());
-        assertEquals(ServiceOrderStatus.AWAITING_PART, serviceOrder.status());
+        assertEquals(ServiceExecutionStatus.AWAITING_ITEMS, serviceOrder.serviceExecutions().get(0).status());
+        assertEquals(ServiceOrderStatus.AWAITING_ITEMS, serviceOrder.status());
     }
 
     @Test
-    void rf12_attachingStockRequirementRecomputesTheServiceOrderStatusSnapshot() {
+    void stockRequirementsCanOnlyBeAttachedWhileAnExecutionIsPendingAndUnfrozen() {
         ServiceOrder serviceOrder = newServiceOrder();
         UUID executionId = diagnoseWithOneExecution(serviceOrder);
-        authorizeExecution(serviceOrder, executionId);
-        assertEquals(ServiceExecutionStatus.READY, serviceOrder.serviceExecutions().get(0).status());
-
         StockRequirement pendingPart = new StockRequirement(
                 UUID.randomUUID(), StockItemType.PART, 1, "Correia dentada", Money.brl(BigDecimal.TEN), false);
         serviceOrder.attachStockRequirement(executionId, pendingPart);
 
-        assertEquals(ServiceExecutionStatus.AWAITING_PART, serviceOrder.serviceExecutions().get(0).status());
-        assertEquals(ServiceOrderStatus.AWAITING_PART, serviceOrder.status());
+        ServiceExecution execution = serviceOrder.serviceExecutions().get(0);
+        assertEquals(ServiceExecutionStatus.PENDING, execution.status());
+        serviceOrder.freezeStockRequirements(execution.diagnosisId());
+        assertThrows(IllegalStateException.class,
+                () -> serviceOrder.attachStockRequirement(executionId, pendingPart));
     }
 
     @Test

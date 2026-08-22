@@ -5,10 +5,23 @@
 | Feature | `assign-technician` |
 | Status | Approved |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-16 |
-| Aprovado por | Santiago Silvestre |
-| Aprovado em | 2026-08-16 |
-| Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-16) |
+| Atualizado em | 2026-08-20 |
+| Aprovado por | Matheus Apostulo |
+| Aprovado em | 2026-08-20 |
+| Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-20) |
+
+## Revisão proposta por `stock-item-reservation`
+
+Esta revisão preserva as regras atuais de atribuição e acrescenta somente o efeito consumidor de materiais
+reservados. Ao atribuir ou reatribuir um Technician a uma Service Execution `READY` com
+`stockReservationId`, `AssignTechnicianUseCase` publica um evento interno dentro da transação. Um listener
+`AFTER_COMMIT` usa a extensão de `TechnicianNotificationPort` para comunicar a reserva ao Technician.
+
+Não haverá notificação antes do commit, notificação duplicada por retry idempotente de reserva, consulta a
+linhas/estado internos da Stock Reservation, módulo genérico de Notification, histórico, retry ou canal real.
+Falhas do adapter serão registradas com IDs operacionais e não causarão rollback. O listener também não
+altera `stockReservationId`, `READY` ou regras de reatribuição. Os testes devem cobrir atribuição posterior,
+falha do adapter e execução somente após commit.
 
 ## Gate de aprovação
 

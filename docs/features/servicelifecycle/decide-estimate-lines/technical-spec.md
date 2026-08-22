@@ -6,9 +6,28 @@
 | Status | Approved |
 | Responsável | Santiago Silvestre |
 | Atualizado em | 2026-08-20 |
-| Aprovado por | Santiago Silvestre |
+| Aprovado por | Matheus Apostulo |
 | Aprovado em | 2026-08-20 |
 | Especificação funcional | `docs/features/servicelifecycle/decide-estimate-lines/functional-spec.md` |
+
+## Revisão proposta por `stock-item-reservation`
+
+Esta revisão substitui a afirmação de que a decisão encerra em `AUTHORIZED`/`READY` sem integração de
+estoque. Depois de validar todo o lote comercial e carregar a Service Order com lock de escrita,
+`DecideEstimateLinesUseCase` autoriza ou rejeita as execuções e chama uma única vez a named interface
+`stockprocurement.stockreservation.application.api.StockReservationApi.reserveAll(...)` para as aprovadas
+que tenham requirements congelados.
+
+O contrato público entre módulos contém somente `serviceExecutionId`, `stockItemId` e quantidade, e
+retorna `RESERVED` ou `NOT_RESERVED`. Para `RESERVED`, a Service Execution confirma integralmente o
+`reservationId`, fica `READY` e passa a expô-lo no response. Para `NOT_RESERVED`, a aprovação comercial
+permanece, não há reserva parcial e a execução fica `AWAITING_ITEMS`. Execuções sem requirements ficam
+`READY` sem command vazio. O status `AWAITING_PART` deixa de existir em domínio, persistência e contrato.
+
+Reserva, decisão e associação do ID participam da mesma transação física `REQUIRED`, sem `REQUIRES_NEW`.
+Uma indisponibilidade é resultado de negócio e não desfaz outra reserva possível no mesmo lote; uma falha
+técnica inesperada faz rollback integral. Os testes devem cobrir resultados mistos, idempotência e rollback,
+e um `@ApplicationModuleTest` deve comprovar que somente a named interface atravessa a fronteira.
 
 ## Objetivo técnico
 

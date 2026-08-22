@@ -48,7 +48,7 @@ public class GenerateEstimateUseCase {
 
     @Transactional
     public Result execute(UUID serviceOrderId, UUID diagnosisId) {
-        ServiceOrder serviceOrder = serviceOrderRepository.findById(serviceOrderId)
+        ServiceOrder serviceOrder = serviceOrderRepository.findByIdForUpdate(serviceOrderId)
                 .orElseThrow(() -> new NoSuchElementException(
                         "ServiceOrder not found: " + serviceOrderId));
 
@@ -84,7 +84,9 @@ public class GenerateEstimateUseCase {
                 lines
         );
 
+        serviceOrder.freezeStockRequirements(diagnosisId);
         estimateRepository.save(estimate);
+        serviceOrderRepository.save(serviceOrder);
 
         EstimateGenerated event = EstimateGenerated.from(
                 estimate.id(),

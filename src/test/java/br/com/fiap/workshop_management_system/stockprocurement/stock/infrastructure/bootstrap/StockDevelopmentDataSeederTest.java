@@ -29,6 +29,10 @@ class StockDevelopmentDataSeederTest {
         public Optional<StockItem> findById(UUID id) {
             return items.stream().filter(item -> item.id().equals(id)).findFirst();
         }
+        public Optional<StockItem> findByIdForUpdate(UUID id) { return findById(id); }
+        public List<StockItem> findAllByIdForUpdate(List<UUID> ids) {
+            return items.stream().filter(item -> ids.contains(item.id())).toList();
+        }
         public boolean existsBySku(Sku sku) { return items.stream().anyMatch(item -> item.sku().equals(sku)); }
         public List<StockItem> search(StockItemSearchCriteria criteria) { return List.copyOf(items); }
         public void save(StockItem item) { items.add(item); }

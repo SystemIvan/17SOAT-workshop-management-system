@@ -12,7 +12,7 @@ public class DeactivateStockItemUseCase {
     public DeactivateStockItemUseCase(StockItemRepository repository) { this.repository = repository; }
     @Transactional
     public void execute(UUID id) {
-        var item = StockItemFinder.getOrThrow(repository, id);
+        var item = StockItemFinder.getOrThrowForUpdate(repository, id);
         item.deactivate();
         repository.save(item);
     }

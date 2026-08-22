@@ -5,10 +5,16 @@
 | Feature | `estimate-generation` |
 | Status | Approved |
 | Responsável | Matheus Campagnone |
-| Atualizado em | 2026-08-16 |
-| Aprovado por | Matheus Campagnone |
-| Aprovado em | 2026-08-16 |
+| Atualizado em | 2026-08-20 |
+| Aprovado por | Matheus Apostulo |
+| Aprovado em | 2026-08-20 |
 | Referências | `docs/Architecture.md`, `docs/Architecture-Decisions.md`, DDD/Event Storming do Miro, `stock-domain-foundation` |
+
+## Delta proposto por `stock-item-reservation`
+
+Além de congelar o snapshot comercial, a geração válida da Estimate deve congelar, na mesma transação, o
+conjunto de `StockRequirement` de cada Service Execution apresentada. A partir desse momento não se anexa,
+remove nem altera requirement nessa execução. Esse congelamento não cria reserva nem altera disponibilidade.
 
 ## Problema e resultado esperado
 
@@ -24,6 +30,8 @@ Ao final da geração:
 - a Estimate representa exatamente um ciclo de Diagnosis;
 - as Service Executions daquele Diagnosis são representadas comercialmente sem transferir a propriedade do trabalho para a Estimate;
 - os dados comerciais necessários ficam congelados como snapshot;
+- o conjunto de `StockRequirement` de cada Service Execution apresentada fica congelado para uma futura
+  tentativa de reserva;
 - é produzido o evento `EstimateGenerated`, permitindo que a capability de Notification reaja sem conhecer a implementação interna de Estimate.
 
 ## Atores e cenários
@@ -57,6 +65,10 @@ Ao final da geração:
 
 - Cada serviço incluído na Estimate deve preservar os dados comerciais apresentados ao Customer.
 - Stock Requirements são referenciados a partir das Service Executions do Diagnosis.
+- A geração válida da Estimate congela o conjunto de `StockRequirement` apresentado para cada execução,
+  no mesmo comando que persiste a Estimate.
+- Depois do congelamento, nenhum requirement daquela execução pode ser anexado, removido ou alterado;
+  uma necessidade posterior exige novo Diagnosis, nova Service Execution e nova Estimate.
 - Dados comerciais provenientes de Stock Items devem ser copiados para a Estimate quando necessários à apresentação comercial.
 - Alterações posteriores em Service Catalog ou Stock Item não podem modificar retroativamente uma Estimate já gerada.
 
@@ -93,6 +105,10 @@ Ao final da geração:
 - [x] A Estimate referencia a Service Order e o Diagnosis que a originaram.
 - [x] As Service Executions daquele Diagnosis são representadas na Estimate como snapshots comerciais.
 - [x] Dados comerciais copiados para a Estimate não dependem de leitura viva posterior do catálogo.
+- [ ] A geração válida congela o conjunto de `StockRequirement` de cada Service Execution apresentada na
+      mesma transação que cria a Estimate.
+- [ ] Um requirement não pode ser anexado, removido ou alterado depois do congelamento; necessidade
+      posterior segue novo ciclo de Diagnosis e Estimate.
 - [x] Não é possível gerar mais de uma Estimate para o mesmo ciclo de Diagnosis.
 - [x] A Service Order continua sendo a fonte de verdade das Service Executions.
 - [x] Após a criação válida da Estimate é produzido `EstimateGenerated`.
@@ -100,4 +116,3 @@ Ao final da geração:
 - [x] A geração da Estimate não aprova Service Executions nem reserva Stock.
 - [x] A feature permite representar `expiresAt` sem hard-code da duração do prazo.
 - [x] Nenhum comportamento de Notification é implementado dentro do domínio de Estimate.
-

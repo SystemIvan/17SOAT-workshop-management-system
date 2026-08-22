@@ -20,4 +20,15 @@ public class LoggedTechnicianNotificationAdapter implements TechnicianNotificati
     public void notifyServiceOrderCreated(UUID serviceOrderId, UUID technicianId) {
         log.info("New service order available | technicianId={} | serviceOrderId={}", technicianId, serviceOrderId);
     }
+
+    @Override
+    public void notifyMaterialsReserved(
+            UUID serviceOrderId,
+            UUID serviceExecutionId,
+            UUID technicianId,
+            UUID stockReservationId) {
+        log.info("Materials reserved for pickup | technicianId={} | serviceOrderId={} | serviceExecutionId={} "
+                        + "| stockReservationId={}",
+                technicianId, serviceOrderId, serviceExecutionId, stockReservationId);
+    }
 }

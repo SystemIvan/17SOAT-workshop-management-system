@@ -2,7 +2,12 @@ package br.com.fiap.workshop_management_system.servicelifecycle.estimate.applica
 
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.Estimate;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.repository.EstimateRepository;
-import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.*;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.DiagnosisItem;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Money;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockItemType;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockRequirement;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.VehicleSnapshot;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
 import org.junit.jupiter.api.Test;
 
@@ -16,7 +21,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GenerateEstimateUseCaseTest {
 
@@ -99,6 +107,7 @@ class GenerateEstimateUseCaseTest {
 
         // Gerar orçamento não significa aprovação do cliente.
         assertEquals(diagnosisId, serviceOrder.openDiagnosisId());
+        assertTrue(serviceOrder.serviceExecutions().getFirst().stockRequirementsFrozen());
     }
 
     @Test
