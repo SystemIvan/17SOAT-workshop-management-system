@@ -38,7 +38,8 @@ class GenerateEstimateUseCaseTest {
         ServiceOrder serviceOrder = ServiceOrder.create(
                 customerId,
                 UUID.randomUUID(),
-                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015)
+                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015),
+                "Initial assessment"
         );
 
         StockRequirement stock = new StockRequirement(
@@ -57,7 +58,8 @@ class GenerateEstimateUseCaseTest {
                 List.of(stock)
         );
 
-        serviceOrder.performDiagnosis(List.of(item));
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
+        serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), java.time.Instant.EPOCH);
 
         UUID diagnosisId = serviceOrder.openDiagnosisId();
 
@@ -179,7 +181,8 @@ class GenerateEstimateUseCaseTest {
         ServiceOrder serviceOrder = ServiceOrder.create(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015)
+                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015),
+                "Initial assessment"
         );
 
         DiagnosisItem item = new DiagnosisItem(
@@ -189,7 +192,8 @@ class GenerateEstimateUseCaseTest {
                 List.of()
         );
 
-        serviceOrder.performDiagnosis(List.of(item));
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
+        serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), java.time.Instant.EPOCH);
 
         return serviceOrder;
     }

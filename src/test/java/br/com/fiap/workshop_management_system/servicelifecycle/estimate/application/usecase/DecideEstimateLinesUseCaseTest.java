@@ -39,11 +39,13 @@ class DecideEstimateLinesUseCaseTest {
     private final VehicleSnapshot vehicleSnapshot = new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015);
 
     private ServiceOrder diagnosedServiceOrder(String... serviceNames) {
-        ServiceOrder serviceOrder = ServiceOrder.create(UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot);
+        ServiceOrder serviceOrder = ServiceOrder.create(
+                UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, "Initial assessment");
         List<DiagnosisItem> items = List.of(serviceNames).stream()
                 .map(name -> new DiagnosisItem(UUID.randomUUID(), name, Money.brl(BigDecimal.TEN), List.of()))
                 .toList();
-        serviceOrder.performDiagnosis(items);
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
+        serviceOrder.performDiagnosis(items, UUID.randomUUID(), java.time.Instant.EPOCH);
         return serviceOrder;
     }
 
@@ -319,7 +321,8 @@ class DecideEstimateLinesUseCaseTest {
     }
 
     private ServiceOrder serviceOrderWithStockRequirements(UUID... stockItemIds) {
-        ServiceOrder serviceOrder = ServiceOrder.create(UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot);
+        ServiceOrder serviceOrder = ServiceOrder.create(
+                UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, "Initial assessment");
         List<DiagnosisItem> diagnosisItems = java.util.Arrays.stream(stockItemIds)
                 .map(stockItemId -> new DiagnosisItem(
                         UUID.randomUUID(),
@@ -333,7 +336,8 @@ class DecideEstimateLinesUseCaseTest {
                                 Money.brl(BigDecimal.TEN),
                                 false))))
                 .toList();
-        serviceOrder.performDiagnosis(diagnosisItems);
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
+        serviceOrder.performDiagnosis(diagnosisItems, UUID.randomUUID(), java.time.Instant.EPOCH);
         return serviceOrder;
     }
 

@@ -1,6 +1,7 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model;
 
 import java.util.ArrayList;
+import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -111,13 +112,25 @@ public class ServiceOrder {
         this.priority = newPriority;
     }
 
-    public UUID performDiagnosis(List<DiagnosisItem> items) {
+    public UUID performDiagnosis(List<DiagnosisItem> items, UUID diagnosedByTechnicianId, Instant diagnosedAt) {
+        if (diagnosisAssigneeId == null) {
+            throw new IllegalStateException("A diagnosis assignee must be assigned before performing a diagnosis");
+        }
         if (openDiagnosisId != null) {
             throw new IllegalStateException("A diagnosis is already open without an Estimate generated for it");
         }
+        if (diagnosedByTechnicianId == null || diagnosedAt == null) {
+            throw new InvalidServiceOrderException("Diagnosis authorship must be informed");
+        }
         UUID diagnosisId = UUID.randomUUID();
         for (DiagnosisItem item : items) {
-            ServiceExecution execution = ServiceExecution.start(diagnosisId, item.catalogServiceId(), item.name(), item.price());
+            ServiceExecution execution = ServiceExecution.start(
+                    diagnosisId,
+                    item.catalogServiceId(),
+                    item.name(),
+                    item.price(),
+                    diagnosedByTechnicianId,
+                    diagnosedAt);
             item.stockRequirements().forEach(execution::attachStockRequirement);
             serviceExecutions.add(execution);
         }
@@ -130,7 +143,17 @@ public class ServiceOrder {
         if (openDiagnosisId == null || !openDiagnosisId.equals(diagnosisId)) {
             throw new IllegalStateException("Diagnosis " + diagnosisId + " is not open for new service executions");
         }
-        ServiceExecution execution = ServiceExecution.start(diagnosisId, catalogServiceId, name, price);
+        ServiceExecution diagnosisExecution = serviceExecutions.stream()
+                .filter(candidate -> diagnosisId.equals(candidate.diagnosisId()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Diagnosis " + diagnosisId + " has no executions"));
+        ServiceExecution execution = ServiceExecution.start(
+                diagnosisId,
+                catalogServiceId,
+                name,
+                price,
+                diagnosisExecution.diagnosedByTechnicianId(),
+                diagnosisExecution.diagnosedAt());
         serviceExecutions.add(execution);
         recomputeStatusSnapshot(false);
         return execution.id();
@@ -284,11 +307,12 @@ public class ServiceOrder {
      * and just read back by {@link #status()} on queries.
      */
     private void recomputeStatusSnapshot(boolean vehicleDelivered) {
-        if (vehicleDelivered) {
+        if (statusSnapshot == ServiceOrderStatus.DELIVERED || vehicleDelivered) {
             statusSnapshot = ServiceOrderStatus.DELIVERED;
-        } else if (allNonRejectedExecutionsCompleted()) {
+        } else if (allExecutionsAreTerminal()) {
             statusSnapshot = ServiceOrderStatus.COMPLETED;
-        } else if (anyExecutionInStatus(ServiceExecutionStatus.IN_PROGRESS)) {
+        } else if (anyExecutionInStatus(ServiceExecutionStatus.READY)
+                || anyExecutionInStatus(ServiceExecutionStatus.IN_PROGRESS)) {
             statusSnapshot = ServiceOrderStatus.IN_PROGRESS;
         } else if (anyExecutionInStatus(ServiceExecutionStatus.AWAITING_ITEMS)) {
             statusSnapshot = ServiceOrderStatus.AWAITING_ITEMS;
@@ -301,12 +325,11 @@ public class ServiceOrder {
         }
     }
 
-    private boolean allNonRejectedExecutionsCompleted() {
-        List<ServiceExecution> nonRejected = serviceExecutions.stream()
-                .filter(execution -> execution.status() != ServiceExecutionStatus.REJECTED)
-                .toList();
-        return !nonRejected.isEmpty()
-                && nonRejected.stream().allMatch(execution -> execution.status() == ServiceExecutionStatus.COMPLETED);
+    private boolean allExecutionsAreTerminal() {
+        return !serviceExecutions.isEmpty()
+                && serviceExecutions.stream().allMatch(
+                        execution -> execution.status() == ServiceExecutionStatus.COMPLETED
+                        || execution.status() == ServiceExecutionStatus.REJECTED);
     }
 
     private boolean anyExecutionInStatus(ServiceExecutionStatus status) {

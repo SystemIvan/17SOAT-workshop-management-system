@@ -49,9 +49,11 @@ class FinalizeServiceOrderFlowApplicationModuleTest {
         customerRepository.save(customer);
 
         ServiceOrder serviceOrder = ServiceOrder.create(
-                customer.id(), UUID.randomUUID(), new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015));
+                customer.id(), UUID.randomUUID(), new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015),
+                "Initial assessment");
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
         DiagnosisItem item = new DiagnosisItem(UUID.randomUUID(), "Troca de óleo", Money.brl(BigDecimal.TEN), List.of());
-        serviceOrder.performDiagnosis(List.of(item));
+        serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), java.time.Instant.EPOCH);
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
         serviceOrder.startExecution(executionId);

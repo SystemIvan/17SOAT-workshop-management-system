@@ -80,6 +80,8 @@ public class ServiceOrderPersistenceMapper {
                 execution.status(),
                 execution.authorizedByEstimateId(),
                 execution.assignedTechnicianId(),
+                execution.diagnosedByTechnicianId(),
+                execution.diagnosedAt(),
                 execution.stockRequirementsFrozen(),
                 execution.stockReservationId(),
                 stockRequirements);
@@ -98,6 +100,8 @@ public class ServiceOrderPersistenceMapper {
                 entity.getStatus(),
                 entity.getAuthorizedByEstimateId(),
                 entity.getAssignedTechnicianId(),
+                entity.getDiagnosedByTechnicianId(),
+                entity.getDiagnosedAt(),
                 entity.isStockRequirementsFrozen(),
                 entity.getStockReservationId(),
                 stockRequirements);

@@ -32,9 +32,11 @@ class AttachStockRequirementUseCaseTest {
     }
 
     private ServiceOrder serviceOrderWithOneExecution(InMemoryServiceOrderRepository serviceOrders) {
-        ServiceOrder serviceOrder = ServiceOrder.create(UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot);
+        ServiceOrder serviceOrder = ServiceOrder.create(
+                UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, "Initial assessment");
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
         DiagnosisItem item = new DiagnosisItem(UUID.randomUUID(), "Troca de óleo", Money.brl(BigDecimal.TEN), List.of());
-        serviceOrder.performDiagnosis(List.of(item));
+        serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), java.time.Instant.EPOCH);
         serviceOrders.save(serviceOrder);
         return serviceOrder;
     }

@@ -14,6 +14,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -48,6 +49,8 @@ public class ServiceExecutionJpaEntity {
 
     private UUID authorizedByEstimateId;
     private UUID assignedTechnicianId;
+    private UUID diagnosedByTechnicianId;
+    private Instant diagnosedAt;
     private boolean stockRequirementsFrozen;
     private UUID stockReservationId;
 
@@ -69,6 +72,8 @@ public class ServiceExecutionJpaEntity {
             ServiceExecutionStatus status,
             UUID authorizedByEstimateId,
             UUID assignedTechnicianId,
+            UUID diagnosedByTechnicianId,
+            Instant diagnosedAt,
             boolean stockRequirementsFrozen,
             UUID stockReservationId,
             List<StockRequirementEmbeddable> stockRequirements) {
@@ -82,6 +87,8 @@ public class ServiceExecutionJpaEntity {
         this.status = status;
         this.authorizedByEstimateId = authorizedByEstimateId;
         this.assignedTechnicianId = assignedTechnicianId;
+        this.diagnosedByTechnicianId = diagnosedByTechnicianId;
+        this.diagnosedAt = diagnosedAt;
         this.stockRequirementsFrozen = stockRequirementsFrozen;
         this.stockReservationId = stockReservationId;
         this.stockRequirements = stockRequirements;
@@ -125,6 +132,14 @@ public class ServiceExecutionJpaEntity {
 
     public UUID getAssignedTechnicianId() {
         return assignedTechnicianId;
+    }
+
+    public UUID getDiagnosedByTechnicianId() {
+        return diagnosedByTechnicianId;
+    }
+
+    public Instant getDiagnosedAt() {
+        return diagnosedAt;
     }
 
     public boolean isStockRequirementsFrozen() {

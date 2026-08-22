@@ -48,6 +48,8 @@ public final class ServiceOrderMapper {
                 execution.status(),
                 execution.authorizedByEstimateId(),
                 execution.assignedTechnicianId(),
+                execution.diagnosedByTechnicianId(),
+                execution.diagnosedAt(),
                 execution.stockReservationId(),
                 execution.stockRequirements().stream().map(ServiceOrderMapper::toStockRequirementResponse).toList());
     }
