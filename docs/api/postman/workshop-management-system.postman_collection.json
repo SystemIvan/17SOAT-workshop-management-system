@@ -214,7 +214,7 @@
               "name": "Perform diagnosis",
               "event": [{
                 "listen": "test",
-                "script": { "exec": ["if (pm.response.code === 200 && pm.response.json().executions.length > 0) { pm.collectionVariables.set('executionId', pm.response.json().executions[0].id); pm.collectionVariables.set('serviceExecutionId', pm.response.json().executions[0].id); }"] }
+                "script": { "exec": ["if (pm.response.code === 200 && pm.response.json().executions.length > 0) { const execution = pm.response.json().executions[0]; pm.collectionVariables.set('executionId', execution.id); pm.collectionVariables.set('serviceExecutionId', execution.id); pm.collectionVariables.set('diagnosisId', execution.diagnosisId); }"] }
               }],
               "request": {
                 "method": "POST",
@@ -311,10 +311,16 @@
       "item": [
         {
           "name": "Generate estimate",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('estimateId', pm.response.json().id); }"] }
-          }],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "exec": ["const diagnosisId = pm.collectionVariables.get('diagnosisId'); if (!diagnosisId) { throw new Error('Run Perform diagnosis successfully before generating an estimate.'); } pm.variables.set('diagnosisId', diagnosisId);"] }
+            },
+            {
+              "listen": "test",
+              "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('estimateId', pm.response.json().id); }"] }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
