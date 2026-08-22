@@ -6,7 +6,7 @@
 | Status | Approved |
 | Owner | `Leandro Nascimento` |
 | Updated at | `2026-08-13` |
-| References | Epic 5 plan item #1 (`docs/EPIC-5-notifications-plan-v2.md`, sections 2 and 3; no official RF), `docs/ADR-003-notifications-boundary.md`, `docs/features/notifications-so-finalized/` (pattern reference) |
+| References | Epic 5 plan item #1 (`docs/EPIC-5-notifications-plan-v2.md`, sections 2 and 3; no official RF), `docs/adr/ADR-003-notifications-boundary.md`, `docs/features/notifications-so-finalized/` (pattern reference) |
 
 ## Problem and outcome
 

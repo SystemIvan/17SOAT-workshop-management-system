@@ -32,6 +32,17 @@ public class StockItemRepositoryImpl implements StockItemRepository {
     public Optional<StockItem> findById(UUID id) {
         return jpaRepository.findById(id).map(mapper::toDomain);
     }
+
+    @Override
+    public Optional<StockItem> findByIdForUpdate(UUID id) {
+        return jpaRepository.findByIdForUpdate(id).map(mapper::toDomain);
+    }
+
+    @Override
+    public List<StockItem> findAllByIdForUpdate(List<UUID> ids) {
+        return jpaRepository.findAllByIdForUpdate(ids).stream().map(mapper::toDomain).toList();
+    }
+
     @Override
     public boolean existsBySku(Sku sku) {
         return jpaRepository.existsBySku(sku.value());

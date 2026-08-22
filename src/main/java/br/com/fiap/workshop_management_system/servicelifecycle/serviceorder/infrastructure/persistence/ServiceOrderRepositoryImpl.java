@@ -27,6 +27,11 @@ public class ServiceOrderRepositoryImpl implements ServiceOrderRepository {
     }
 
     @Override
+    public Optional<ServiceOrder> findByIdForUpdate(UUID id) {
+        return jpaRepository.findByIdForUpdate(id).map(mapper::toDomain);
+    }
+
+    @Override
     public void save(ServiceOrder serviceOrder) {
         jpaRepository.save(mapper.toEntity(serviceOrder));
     }

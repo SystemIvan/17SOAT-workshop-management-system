@@ -8,7 +8,7 @@
 | Atualizado em | `2026-08-17` |
 | Aprovado por | `Leandro Nascimento` |
 | Aprovado em | `2026-08-17` |
-| Referências | `RF31`, `docs/EPIC-5-notifications-plan-v2.md` (item #2), `docs/ADR-003-notifications-boundary.md`, contrato de evento confirmado por Matheus Campagnone (dono de `servicelifecycle.estimate`, branch `feat/servicelifecycle-estimate-generation`, ainda não mergeada em `dev`), `docs/features/servicelifecycle/notifications-so-finalized/` e `docs/features/servicelifecycle/notifications-technician-new-so/` (referência de padrão, branches ainda não mergeadas) |
+| Referências | `RF31`, `docs/EPIC-5-notifications-plan-v2.md` (item #2), `docs/adr/ADR-003-notifications-boundary.md`, contrato de evento confirmado por Matheus Campagnone (dono de `servicelifecycle.estimate`, branch `feat/servicelifecycle-estimate-generation`, ainda não mergeada em `dev`), `docs/features/servicelifecycle/notifications-so-finalized/` e `docs/features/servicelifecycle/notifications-technician-new-so/` (referência de padrão, branches ainda não mergeadas) |
 
 ## Problema e resultado esperado
 

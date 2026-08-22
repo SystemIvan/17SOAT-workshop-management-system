@@ -5,10 +5,22 @@
 | Feature | `track-execution` |
 | Status | Approved |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-19 |
-| Aprovado por | Santiago Silvestre |
-| Aprovado em | 2026-08-19 |
-| Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-19) |
+| Atualizado em | 2026-08-20 |
+| Aprovado por | Matheus Apostulo |
+| Aprovado em | 2026-08-20 |
+| Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-20) |
+
+## Revisão proposta por `stock-item-reservation`
+
+Esta revisão altera o contrato de leitura: `AWAITING_PART` é substituído por `AWAITING_ITEMS` em
+`ServiceExecutionStatus`, `ServiceOrderStatus`, precedência do snapshot e OpenAPI. O response detalhado
+de Service Order ganha o campo anulável e aditivo `stockReservationId` por Service Execution. O resumo
+`GET /{id}/status` permanece limitado a `id` e `status`.
+
+O tracking não replica linhas, estado, timestamps ou preços da reserva: essas informações continuam em
+Stock & Procurement e são lidas pelos endpoints próprios de `StockReservation`. A migration e o mapeamento
+JPA dos novos campos pertencem ao plano `stock-item-reservation`; os testes HTTP revisados devem confirmar
+o novo enum e o campo aditivo sem expor dados comerciais ou do Customer.
 
 ## Gate de aprovação
 

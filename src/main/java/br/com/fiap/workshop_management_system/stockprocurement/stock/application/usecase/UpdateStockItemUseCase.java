@@ -15,7 +15,7 @@ public class UpdateStockItemUseCase {
     public UpdateStockItemUseCase(StockItemRepository repository) { this.repository = repository; }
     @Transactional
     public StockItemResponse execute(UUID id, UpdateStockItemRequest request) {
-        var item = StockItemFinder.getOrThrow(repository, id);
+        var item = StockItemFinder.getOrThrowForUpdate(repository, id);
         item.updateDetails(request.name(), request.price() == null ? null : StockItemMapper.toPrice(request.price()));
         repository.save(item);
         return StockItemMapper.toResponse(item);

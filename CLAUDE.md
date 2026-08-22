@@ -7,8 +7,8 @@ any bounded context or epic, not tied to one contributor.
 
 ## Known documentation gap
 
-`AGENTS.md` references `docs/ADR-002-notifications-boundary.md`; the actual file is
-`docs/ADR-003-notifications-boundary.md`. Already tracked as a gap in `docs/Architecture-Decisions.md`.
+`AGENTS.md` references `docs/adr/ADR-002-notifications-boundary.md`; the actual file is
+`docs/adr/ADR-003-notifications-boundary.md`. Already tracked as a gap in `docs/Architecture-Decisions.md`.
 Do not create a duplicate `ADR-002` file to "fix" the mismatch without checking whether the numbering
 gap itself is intentional (e.g. a superseded/renumbered ADR) — read `Architecture-Decisions.md` first.
 

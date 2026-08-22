@@ -4,7 +4,7 @@ public enum ServiceExecutionStatus {
     PENDING,
     AUTHORIZED,
     REJECTED,
-    AWAITING_PART,
+    AWAITING_ITEMS,
     READY,
     IN_PROGRESS,
     COMPLETED

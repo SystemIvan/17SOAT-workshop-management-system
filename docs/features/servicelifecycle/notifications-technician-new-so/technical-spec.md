@@ -11,7 +11,7 @@
 ## Context and design
 
 **Owning module:** `servicelifecycle` (`servicelifecycle.serviceorder`), same as story #7. Per
-`docs/ADR-003-notifications-boundary.md`, `servicelifecycle` defines the outbound port in its **application
+`docs/adr/ADR-003-notifications-boundary.md`, `servicelifecycle` defines the outbound port in its **application
 layer** and the adapter in its **infrastructure layer**.
 
 **No cross-module dependency this time.** Unlike story #7 (which had to reach into `registration.customer`),

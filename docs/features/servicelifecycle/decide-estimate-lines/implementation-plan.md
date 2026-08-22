@@ -3,10 +3,13 @@
 | Campo | Valor |
 |---|---|
 | Feature | `decide-estimate-lines` |
-| Status | Implemented |
+| Status | Stale |
 | Responsável | Santiago Silvestre |
 | Atualizado em | 2026-08-20 |
 | Especificação técnica | `./technical-spec.md` |
+
+> Stale desde 2026-08-20: a especificação funcional foi devolvida a `Draft` pela feature
+> `stock-item-reservation`. O plano histórico não deve ser usado para nova implementação até nova revisão do SDD.
 
 ## Objetivo
 

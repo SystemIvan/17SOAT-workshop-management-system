@@ -3,11 +3,14 @@
 | Campo | Valor |
 |---|---|
 | Feature | `estimate-generation` |
-| Status | Approved |
+| Status | Stale |
 | Responsável | Matheus Campagnone |
 | Atualizado em | 2026-08-16 |
 | Functional Spec | `./functional-spec.md` |
 | Technical Spec | `./technical-spec.md` |
+
+> Stale desde 2026-08-20: a especificação funcional foi devolvida a `Draft` pela feature
+> `stock-item-reservation`. O plano histórico não deve ser usado para nova implementação até nova revisão do SDD.
 
 ## Objetivo
 

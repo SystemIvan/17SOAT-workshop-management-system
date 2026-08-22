@@ -11,7 +11,7 @@
 ## Context and design
 
 **Owning module:** `servicelifecycle` (specifically `servicelifecycle.serviceorder`). Per
-`docs/ADR-003-notifications-boundary.md`, Notifications is not a bounded context — `servicelifecycle` defines an
+`docs/adr/ADR-003-notifications-boundary.md`, Notifications is not a bounded context — `servicelifecycle` defines an
 outbound port in its **application layer** for this notification and an infrastructure adapter implements the
 chosen channel. No shared/generic notification module or abstraction is introduced.
 

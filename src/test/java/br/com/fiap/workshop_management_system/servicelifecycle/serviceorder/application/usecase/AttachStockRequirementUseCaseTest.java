@@ -88,6 +88,19 @@ class AttachStockRequirementUseCaseTest {
                 () -> useCase.execute(serviceOrder.id(), executionId, newRequest()));
     }
 
+    @Test
+    void rejectsAttachingAfterStockRequirementsAreFrozen() {
+        InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository();
+        AttachStockRequirementUseCase useCase = new AttachStockRequirementUseCase(serviceOrders);
+        ServiceOrder serviceOrder = serviceOrderWithOneExecution(serviceOrders);
+        UUID diagnosisId = serviceOrder.openDiagnosisId();
+        UUID executionId = serviceOrder.serviceExecutions().getFirst().id();
+        serviceOrder.freezeStockRequirements(diagnosisId);
+
+        assertThrows(IllegalStateException.class,
+                () -> useCase.execute(serviceOrder.id(), executionId, newRequest()));
+    }
+
     private static final class InMemoryServiceOrderRepository implements ServiceOrderRepository {
         private final Map<UUID, ServiceOrder> byId = new HashMap<>();
 

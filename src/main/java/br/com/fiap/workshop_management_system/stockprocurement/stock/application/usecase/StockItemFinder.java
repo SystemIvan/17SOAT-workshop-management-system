@@ -13,4 +13,8 @@ final class StockItemFinder {
     static StockItem getOrThrow(StockItemRepository repository, UUID id) {
         return repository.findById(id).orElseThrow(StockItemNotFoundException::new);
     }
+
+    static StockItem getOrThrowForUpdate(StockItemRepository repository, UUID id) {
+        return repository.findByIdForUpdate(id).orElseThrow(StockItemNotFoundException::new);
+    }
 }

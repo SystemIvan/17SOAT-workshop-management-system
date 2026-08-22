@@ -5,10 +5,16 @@
 | Feature | `start-execution` |
 | Status | Approved |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-18 |
-| Aprovado por | Santiago Silvestre |
-| Aprovado em | 2026-08-18 |
+| Atualizado em | 2026-08-20 |
+| Aprovado por | Matheus Apostulo |
+| Aprovado em | 2026-08-20 |
 | Referências | RF20 (Miro — "Levantamento de Requisitos e Refinamento Técnico"); `docs/features/servicelifecycle/assign-technician/functional-spec.md` (RF19, seção "Regras que a Ubiquitous Language e o código atual NÃO definem"); `docs/Architecture-Decisions.md` (AD-006, AD-010); `.claude/rules/epic-3-service-lifecycle.md`; código atual: `StartExecutionUseCase`, `ServiceOrder.startExecution`, `ServiceExecution.start` |
+
+## Delta proposto por `stock-item-reservation`
+
+`READY` continua sendo a única pré-condição para iniciar a execução. O estado `AWAITING_ITEMS` substitui
+`AWAITING_PART` para a espera de reserva, e atraso na separação ou retirada física jamais regride uma
+execução `READY` para `AWAITING_ITEMS`.
 
 ## Problema e resultado esperado
 
@@ -47,7 +53,7 @@ para a cobertura de teste que falta — não parte do zero.
 
 - Uma `ServiceExecution` só pode iniciar (`start`) quando seu status atual é exatamente `ready`.
   **Comportamento atual do código**, preservado por esta spec: qualquer outro status
-  (`pending`, `authorized`, `awaiting_part`, `in_progress`, `completed`, `rejected`) rejeita a
+  (`pending`, `authorized`, `awaiting_items`, `in_progress`, `completed`, `rejected`) rejeita a
   transição.
 - Iniciar a execução recalcula o `statusSnapshot` da `ServiceOrder` (AD-010, Option B: recomputado em
   comando, não em leitura — comportamento preservado, decisão de time ainda pendente).
@@ -102,3 +108,5 @@ Estas questões ficam registradas como avaliação necessária, sem virar requis
 - [x] A decisão sobre exigir Technician atribuído como pré-requisito continua explicitamente pendente e
       não foi resolvida por esta implementação — nenhuma verificação de `assignedTechnicianId` foi
       adicionada a `StartExecutionUseCase`/`ServiceExecution.start()`.
+- [ ] Atraso na separação ou retirada física dos materiais não regride uma execução `READY` para
+      `AWAITING_ITEMS` nem muda sua pré-condição de início.

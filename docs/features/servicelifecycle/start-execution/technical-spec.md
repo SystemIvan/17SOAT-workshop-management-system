@@ -5,10 +5,20 @@
 | Feature | `start-execution` |
 | Status | Approved |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-18 |
-| Aprovado por | Santiago Silvestre |
-| Aprovado em | 2026-08-18 |
-| Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-18) |
+| Atualizado em | 2026-08-20 |
+| Aprovado por | Matheus Apostulo |
+| Aprovado em | 2026-08-20 |
+| Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-20) |
+
+## Revisão proposta por `stock-item-reservation`
+
+`ServiceExecution.start()` continua a exigir exatamente `READY`. Esta revisão substitui o valor persistido
+e contratual `AWAITING_PART` por `AWAITING_ITEMS`, cuja migration, JPA, OpenAPI e Postman são executados
+pelo plano `stock-item-reservation`. Não há alias JSON para o status antigo.
+
+Separação e retirada física podem demorar, mas não mudam uma execução `READY` para `AWAITING_ITEMS`; logo,
+não introduzem condição adicional no endpoint de início. Os testes de RF20 devem cobrir `READY` estável e a
+rejeição em `AWAITING_ITEMS`, sem criar migration própria ou dependência interna de Stock & Procurement.
 
 ## Gate de aprovação
 

@@ -9,6 +9,8 @@ import java.util.UUID;
 
 public interface StockItemRepository {
     Optional<StockItem> findById(UUID id);
+    Optional<StockItem> findByIdForUpdate(UUID id);
+    List<StockItem> findAllByIdForUpdate(List<UUID> ids);
     boolean existsBySku(Sku sku);
     List<StockItem> search(StockItemSearchCriteria criteria);
     void save(StockItem stockItem);

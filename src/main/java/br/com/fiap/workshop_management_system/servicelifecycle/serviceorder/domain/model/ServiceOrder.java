@@ -113,7 +113,12 @@ public class ServiceOrder {
 
     public void attachStockRequirement(UUID serviceExecutionId, StockRequirement requirement) {
         findExecution(serviceExecutionId).attachStockRequirement(requirement);
-        recomputeStatusSnapshot(false);
+    }
+
+    public void freezeStockRequirements(UUID diagnosisId) {
+        serviceExecutions.stream()
+                .filter(execution -> execution.diagnosisId().equals(diagnosisId))
+                .forEach(ServiceExecution::freezeStockRequirements);
     }
 
     /**
@@ -138,8 +143,8 @@ public class ServiceOrder {
         recomputeStatusSnapshot(false);
     }
 
-    public void applyStockReservation(UUID serviceExecutionId, UUID stockItemId) {
-        findExecution(serviceExecutionId).markStockAsReserved(stockItemId);
+    public void confirmStockReservation(UUID serviceExecutionId, UUID stockReservationId) {
+        findExecution(serviceExecutionId).confirmStockReservation(stockReservationId);
         recomputeStatusSnapshot(false);
     }
 
@@ -235,8 +240,8 @@ public class ServiceOrder {
             statusSnapshot = ServiceOrderStatus.COMPLETED;
         } else if (anyExecutionInStatus(ServiceExecutionStatus.IN_PROGRESS)) {
             statusSnapshot = ServiceOrderStatus.IN_PROGRESS;
-        } else if (anyExecutionInStatus(ServiceExecutionStatus.AWAITING_PART)) {
-            statusSnapshot = ServiceOrderStatus.AWAITING_PART;
+        } else if (anyExecutionInStatus(ServiceExecutionStatus.AWAITING_ITEMS)) {
+            statusSnapshot = ServiceOrderStatus.AWAITING_ITEMS;
         } else if (hasSentEstimateWithPendingLines) {
             statusSnapshot = ServiceOrderStatus.AWAITING_APPROVAL;
         } else if (openDiagnosisId != null) {
