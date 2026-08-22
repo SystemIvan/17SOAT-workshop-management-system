@@ -17,6 +17,8 @@ public class ServiceOrder {
     private final UUID customerId;
     private final UUID vehicleId;
     private final VehicleSnapshot vehicleSnapshot;
+    private final String initialAssessment;
+    private UUID diagnosisAssigneeId;
     private final Set<UUID> approvedEstimateIds = new LinkedHashSet<>();
     private final List<ServiceExecution> serviceExecutions = new ArrayList<>();
 
@@ -32,22 +34,41 @@ public class ServiceOrder {
      */
     private boolean hasSentEstimateWithPendingLines;
 
-    public static ServiceOrder create(UUID customerId, UUID vehicleId, VehicleSnapshot vehicleSnapshot) {
-        return create(customerId, vehicleId, vehicleSnapshot, Priority.NORMAL);
+    public static ServiceOrder create(
+            UUID customerId, UUID vehicleId, VehicleSnapshot vehicleSnapshot, String initialAssessment) {
+        return create(customerId, vehicleId, vehicleSnapshot, Priority.NORMAL, initialAssessment);
     }
 
-    public static ServiceOrder create(UUID customerId, UUID vehicleId, VehicleSnapshot vehicleSnapshot, Priority priority) {
-        ServiceOrder serviceOrder = new ServiceOrder(UUID.randomUUID(), customerId, vehicleId, vehicleSnapshot, priority);
+    public static ServiceOrder create(
+            UUID customerId,
+            UUID vehicleId,
+            VehicleSnapshot vehicleSnapshot,
+            Priority priority,
+            String initialAssessment) {
+        ServiceOrder serviceOrder = new ServiceOrder(
+                UUID.randomUUID(),
+                customerId,
+                vehicleId,
+                vehicleSnapshot,
+                priority,
+                requireInitialAssessment(initialAssessment));
         serviceOrder.statusSnapshot = ServiceOrderStatus.RECEIVED;
         return serviceOrder;
     }
 
-    private ServiceOrder(UUID id, UUID customerId, UUID vehicleId, VehicleSnapshot vehicleSnapshot, Priority priority) {
+    private ServiceOrder(
+            UUID id,
+            UUID customerId,
+            UUID vehicleId,
+            VehicleSnapshot vehicleSnapshot,
+            Priority priority,
+            String initialAssessment) {
         this.id = id;
         this.customerId = customerId;
         this.vehicleId = vehicleId;
         this.vehicleSnapshot = vehicleSnapshot;
         this.priority = priority;
+        this.initialAssessment = initialAssessment;
     }
 
     /**
@@ -60,13 +81,17 @@ public class ServiceOrder {
             UUID customerId,
             UUID vehicleId,
             VehicleSnapshot vehicleSnapshot,
+            String initialAssessment,
+            UUID diagnosisAssigneeId,
             Priority priority,
             ServiceOrderStatus statusSnapshot,
             UUID openDiagnosisId,
             boolean hasSentEstimateWithPendingLines,
             Set<UUID> approvedEstimateIds,
             List<ServiceExecution> serviceExecutions) {
-        ServiceOrder serviceOrder = new ServiceOrder(id, customerId, vehicleId, vehicleSnapshot, priority);
+        ServiceOrder serviceOrder = new ServiceOrder(
+                id, customerId, vehicleId, vehicleSnapshot, priority, initialAssessment);
+        serviceOrder.diagnosisAssigneeId = diagnosisAssigneeId;
         serviceOrder.statusSnapshot = statusSnapshot;
         serviceOrder.openDiagnosisId = openDiagnosisId;
         serviceOrder.hasSentEstimateWithPendingLines = hasSentEstimateWithPendingLines;
@@ -208,6 +233,31 @@ public class ServiceOrder {
      */
     public ServiceOrderStatus status() {
         return statusSnapshot;
+    }
+
+    public String initialAssessment() {
+        return initialAssessment;
+    }
+
+    public void assignDiagnosisAssignee(UUID technicianId) {
+        if (technicianId == null) {
+            throw new InvalidServiceOrderException("Diagnosis assignee must not be null");
+        }
+        if (openDiagnosisId != null) {
+            throw new IllegalStateException("Diagnosis assignee cannot be changed while a diagnosis is open");
+        }
+        this.diagnosisAssigneeId = technicianId;
+    }
+
+    public UUID diagnosisAssigneeId() {
+        return diagnosisAssigneeId;
+    }
+
+    private static String requireInitialAssessment(String initialAssessment) {
+        if (initialAssessment == null || initialAssessment.isBlank()) {
+            throw new InvalidServiceOrderException("Initial assessment must not be blank");
+        }
+        return initialAssessment;
     }
 
     private void clearOpenDiagnosisIfCoveredBy(UUID diagnosisId) {

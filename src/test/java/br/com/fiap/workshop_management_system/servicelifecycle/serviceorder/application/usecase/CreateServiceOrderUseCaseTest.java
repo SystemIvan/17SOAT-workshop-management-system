@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -34,7 +35,7 @@ class CreateServiceOrderUseCaseTest {
 
     private final CreateServiceOrderRequest request = new CreateServiceOrderRequest(
             UUID.randomUUID(), UUID.randomUUID(),
-            new VehicleSnapshotRequest("ABC1D23", "Fiat", "Uno", 2015), null);
+            new VehicleSnapshotRequest("ABC1D23", "Fiat", "Uno", 2015), null, "Initial assessment");
 
     private Technician technician(String name, java.util.function.Consumer<Technician> transition) {
         Technician technician = Technician.create(name, Set.of(Specialty.MECHANICAL));
@@ -64,6 +65,7 @@ class CreateServiceOrderUseCaseTest {
         ServiceOrderResponse response = useCase.execute(request);
 
         assertNotNull(response.id());
+        assertEquals("Initial assessment", response.initialAssessment());
         verifyNoInteractions(technicianNotificationPort);
     }
 

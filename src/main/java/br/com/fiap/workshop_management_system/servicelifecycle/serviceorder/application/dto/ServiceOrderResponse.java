@@ -2,6 +2,7 @@ package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.app
 
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Priority;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrderStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 import java.util.Set;
@@ -13,7 +14,10 @@ public record ServiceOrderResponse(
         UUID vehicleId,
         VehicleSnapshotResponse vehicleSnapshot,
         Priority priority,
-        ServiceOrderStatus status,
+        @Schema(nullable = true) String initialAssessment,
+        @Schema(nullable = true) UUID diagnosisAssigneeId,
+        @Schema(deprecated = true) ServiceOrderStatus status,
+        ServiceOrderStatus statusSnapshot,
         Set<UUID> approvedEstimateIds,
         List<ServiceExecutionResponse> executions) {
 }

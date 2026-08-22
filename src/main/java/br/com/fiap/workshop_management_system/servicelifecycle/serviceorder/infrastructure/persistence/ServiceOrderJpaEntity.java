@@ -51,6 +51,12 @@ public class ServiceOrderJpaEntity implements Persistable<UUID> {
     @Column(name = "vehicle_year")
     private int vehicleYear;
 
+    @Column(name = "initial_assessment")
+    private String initialAssessment;
+
+    @Column(name = "diagnosis_assignee_id")
+    private UUID diagnosisAssigneeId;
+
     @Enumerated(EnumType.STRING)
     private Priority priority;
 
@@ -80,6 +86,8 @@ public class ServiceOrderJpaEntity implements Persistable<UUID> {
             String vehicleBrand,
             String vehicleModel,
             int vehicleYear,
+            String initialAssessment,
+            UUID diagnosisAssigneeId,
             Priority priority,
             ServiceOrderStatus statusSnapshot,
             UUID openDiagnosisId,
@@ -92,6 +100,8 @@ public class ServiceOrderJpaEntity implements Persistable<UUID> {
         this.vehicleBrand = vehicleBrand;
         this.vehicleModel = vehicleModel;
         this.vehicleYear = vehicleYear;
+        this.initialAssessment = initialAssessment;
+        this.diagnosisAssigneeId = diagnosisAssigneeId;
         this.priority = priority;
         this.statusSnapshot = statusSnapshot;
         this.openDiagnosisId = openDiagnosisId;
@@ -135,6 +145,14 @@ public class ServiceOrderJpaEntity implements Persistable<UUID> {
 
     public int getVehicleYear() {
         return vehicleYear;
+    }
+
+    public String getInitialAssessment() {
+        return initialAssessment;
+    }
+
+    public UUID getDiagnosisAssigneeId() {
+        return diagnosisAssigneeId;
     }
 
     public Priority getPriority() {

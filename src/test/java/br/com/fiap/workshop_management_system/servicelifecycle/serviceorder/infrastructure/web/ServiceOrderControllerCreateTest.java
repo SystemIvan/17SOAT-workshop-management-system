@@ -49,6 +49,7 @@ class ServiceOrderControllerCreateTest {
                 .andExpect(jsonPath("$.vehicleSnapshot.model").value("Uno"))
                 .andExpect(jsonPath("$.vehicleSnapshot.year").value(2015))
                 .andExpect(jsonPath("$.priority").value("HIGH"))
+                .andExpect(jsonPath("$.initialAssessment").value("Ruído ao frear relatado pelo cliente"))
                 .andExpect(jsonPath("$.status").value("RECEIVED"))
                 .andExpect(jsonPath("$.executions").isEmpty());
     }
@@ -59,7 +60,8 @@ class ServiceOrderControllerCreateTest {
                 {
                   "customerId": "%s",
                   "vehicleId": "%s",
-                  "vehicleSnapshot": {"licensePlate": "XYZ9A87", "brand": "Ford", "model": "Ka", "year": 2020}
+                  "vehicleSnapshot": {"licensePlate": "XYZ9A87", "brand": "Ford", "model": "Ka", "year": 2020},
+                  "initialAssessment": "Ruído ao frear relatado pelo cliente"
                 }
                 """.formatted(UUID.randomUUID(), UUID.randomUUID());
 
@@ -119,13 +121,51 @@ class ServiceOrderControllerCreateTest {
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 
+    @Test
+    void returnsValidationErrorWhenInitialAssessmentIsMissing() throws Exception {
+        String body = """
+                {
+                  "customerId": "%s",
+                  "vehicleId": "%s",
+                  "vehicleSnapshot": {"licensePlate": "ABC1D23", "brand": "Fiat", "model": "Uno", "year": 2015}
+                }
+                """.formatted(UUID.randomUUID(), UUID.randomUUID());
+
+        mockMvc.perform(post("/api/service-orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void returnsValidationErrorWhenInitialAssessmentIsNullEmptyOrBlank() throws Exception {
+        for (String initialAssessment : new String[] {"null", "\"\"", "\"   \""}) {
+            String body = """
+                    {
+                      "customerId": "%s",
+                      "vehicleId": "%s",
+                      "vehicleSnapshot": {"licensePlate": "ABC1D23", "brand": "Fiat", "model": "Uno", "year": 2015},
+                      "initialAssessment": %s
+                    }
+                    """.formatted(UUID.randomUUID(), UUID.randomUUID(), initialAssessment);
+
+            mockMvc.perform(post("/api/service-orders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        }
+    }
+
     private static String createBody(UUID customerId, UUID vehicleId, String priority) {
         return """
                 {
                   "customerId": "%s",
                   "vehicleId": "%s",
                   "vehicleSnapshot": {"licensePlate": "ABC1D23", "brand": "Fiat", "model": "Uno", "year": 2015},
-                  "priority": "%s"
+                  "priority": "%s",
+                  "initialAssessment": "Ruído ao frear relatado pelo cliente"
                 }
                 """.formatted(customerId, vehicleId, priority);
     }
