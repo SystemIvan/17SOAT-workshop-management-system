@@ -6,7 +6,7 @@
 | Status | Approved |
 | Owner | `Leandro Nascimento` |
 | Updated at | `2026-08-13` |
-| References | `RF33`, `docs/EPIC-5-notifications-plan-v2.md` (item #7), `docs/ADR-003-notifications-boundary.md` |
+| References | `RF33`, `docs/EPIC-5-notifications-plan-v2.md` (item #7), `docs/adr/ADR-003-notifications-boundary.md` |
 
 ## Problem and outcome
 

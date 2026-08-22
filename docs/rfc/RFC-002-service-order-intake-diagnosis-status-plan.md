@@ -1,7 +1,7 @@
-# Plano de consolidação: entrada, diagnóstico e status da Service Order
+# RFC-002: consolidação de entrada, diagnóstico e status da Service Order
 
 **Status:** Draft — requer validação humana
-**Natureza:** discovery; não autoriza implementação nem altera features aprovadas
+**Natureza:** RFC de discovery; não autoriza implementação nem altera features aprovadas
 
 ## Objetivo
 

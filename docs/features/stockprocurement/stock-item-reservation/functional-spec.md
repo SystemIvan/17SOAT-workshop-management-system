@@ -18,8 +18,8 @@ Referências:
 - [Modelo tático atualizado no Miro](https://miro.com/app/board/uXjVH9faCu4=/?moveToWidget=3458764680870224027)
 - [Aggregates atualizados no Miro](https://miro.com/app/board/uXjVH9faCu4=/?moveToWidget=3458764680870345674)
 - `docs/features/stockprocurement/stock-domain-foundation/functional-spec.md`
-- `docs/RFC-001-stock-item-foundation.md`
-- `docs/ADR-003-notifications-boundary.md`
+- `docs/rfc/RFC-001-stock-item-foundation.md`
+- `docs/adr/ADR-003-notifications-boundary.md`
 - `docs/backlog.md`, especialmente BL-002, BL-003 e BL-004
 
 ## Estado desta descoberta
@@ -223,7 +223,7 @@ atribuição a uma execução já `READY`; a ausência de destinatário não des
 Quando os itens estiverem indisponíveis, Stock & Procurement poderá notificar o Stock Manager para reposição e nova
 tentativa. Identificação de nível baixo e sua notificação continuam na futura feature de inventário de BL-002.
 
-Conforme `docs/ADR-003-notifications-boundary.md`, Notification não é um bounded context no MVP. Cada consumidor define
+Conforme `docs/adr/ADR-003-notifications-boundary.md`, Notification não é um bounded context no MVP. Cada consumidor define
 seu próprio outbound port quando a respectiva feature de entrega for implementada:
 
 - Service Lifecycle é dono da porta de notificação ao Technician;
