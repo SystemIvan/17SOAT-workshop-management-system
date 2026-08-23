@@ -75,7 +75,7 @@ Esta feature não implementará:
 - qualquer mecanismo de polling com cache, SSE ou WebSocket — AD-015 foi resolvida em 2026-08-23 a favor
   de polling puro (Option A), sem cache; introduzir esses mecanismos exigiria uma nova decisão do time,
   não é coberto pela ratificação atual (ver `docs/Architecture-Decisions.md` e
-  `docs/adr/ADR-001-realtime-updates-strategy.md`);
+  `../../../adr/ADR-002-realtime-updates-strategy.md`);
 - qualquer mudança na precedência de `recomputeStatusSnapshot` — já implementada e já coberta por
   teste de domínio;
 - RF24 (`FinalizeServiceOrderUseCase`) — feature separada.

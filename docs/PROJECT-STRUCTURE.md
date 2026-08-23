@@ -36,7 +36,7 @@ historical service-order data must not change with later registration edits. Sto
 purchase orders; Service Lifecycle refers to stock items by ID and snapshots. A future supplier integration belongs behind
 an anti-corruption layer owned by Stock & Procurement.
 
-Notifications is not a bounded context (see `docs/adr/ADR-003-notifications-boundary.md`): a module that needs to notify
+Notifications is not a bounded context (see `adr/ADR-004-notifications-boundary.md`): a module that needs to notify
 someone defines a consumer-owned outbound port in its own `application` layer and an adapter in its own
 `infrastructure` layer. As the first case of this, Service Lifecycle's Service-Order-finalized notification reads
 Customer contact data live from Registrations through `CustomerRepository`, published via `@NamedInterface` on

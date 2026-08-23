@@ -106,7 +106,7 @@ cobertura de teste que falta — não parte do zero.
   escopo aqui.
 - **Polling/cache/tempo real:** AD-015 foi resolvida em 2026-08-23 — o time ratificou Option A
   (polling puro, sem cache) para o MVP, conforme `docs/Architecture-Decisions.md` e
-  `docs/adr/ADR-001-realtime-updates-strategy.md`. Esta spec cobre apenas a consulta síncrona já
+  `../../../adr/ADR-002-realtime-updates-strategy.md`. Esta spec cobre apenas a consulta síncrona já
   implementada; nenhum mecanismo de push/cache é adicionado, e introduzi-lo exigiria uma nova decisão
   do time.
 - **Efeito sobre `TechnicianStatus`:** não aplicável — este RF é somente-leitura e não altera nenhum

@@ -776,7 +776,7 @@ Option B — Integrate a real email provider.
 **Decision:** Option A — plain client polling of the existing REST status endpoint for MVP, without an
 application cache layer.
 
-**Resolved on:** 23 August 2026, ratified by the team (item 1 of the `ADR-001-realtime-updates-strategy.md`
+**Resolved on:** 23 August 2026, ratified by the team (item 1 of the `ADR-002-realtime-updates-strategy.md`
 Approval Checklist, "Time concorda com Polling para MVP").
 
 **Blocking:**
@@ -794,7 +794,7 @@ mechanism beyond the REST status endpoint.
 client contract and invalidation.
 
 **Conflicting evidence (at the time the decision was open):** `AGENTS.md` declared polling with cache sufficient;
-C4 showed SimpleCache/5 s; local `ADR-001-realtime-updates-strategy.md` had no accepted status; current code
+C4 showed SimpleCache/5 s; local `ADR-002-realtime-updates-strategy.md` had no accepted status; current code
 exposes GET status but no cache.
 
 **Options:**
