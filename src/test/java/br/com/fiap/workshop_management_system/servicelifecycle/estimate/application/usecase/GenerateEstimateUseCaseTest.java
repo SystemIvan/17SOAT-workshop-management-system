@@ -1,6 +1,7 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.estimate.application.usecase;
 
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.Estimate;
+import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateStatus;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.repository.EstimateRepository;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.DiagnosisItem;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Money;
@@ -109,6 +110,7 @@ class GenerateEstimateUseCaseTest {
         assertEquals(estimate.expiresAt(), result.event().expiresAt());
 
         assertTrue(estimates.findById(estimate.id()).isPresent());
+        assertEquals(EstimateStatus.SENT, estimates.findById(estimate.id()).orElseThrow().status());
 
         // Gerar orçamento não significa aprovação do cliente.
         assertEquals(diagnosisId, serviceOrder.openDiagnosisId());

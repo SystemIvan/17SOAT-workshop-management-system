@@ -60,6 +60,65 @@ class EstimateTest {
         assertEquals(createdAt, estimate.createdAt());
         assertEquals(expiresAt, estimate.expiresAt());
         assertEquals(1, estimate.lines().size());
+        assertEquals(EstimateStatus.DRAFT, estimate.status());
+    }
+
+    @Test
+    void markSentTransitionsFromDraftToSent() {
+        Estimate estimate = Estimate.create(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), Instant.now(), null, List.of(newLine()));
+
+        estimate.markSent();
+
+        assertEquals(EstimateStatus.SENT, estimate.status());
+    }
+
+    @Test
+    void markSentFailsWhenNotDraft() {
+        Estimate estimate = Estimate.create(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), Instant.now(), null, List.of(newLine()));
+        estimate.markSent();
+
+        assertThrows(IllegalStateException.class, estimate::markSent);
+    }
+
+    @Test
+    void closeTransitionsFromSentToClosed() {
+        Estimate estimate = Estimate.create(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), Instant.now(), null, List.of(newLine()));
+        estimate.markSent();
+
+        estimate.close();
+
+        assertEquals(EstimateStatus.CLOSED, estimate.status());
+    }
+
+    @Test
+    void closeFailsWhenNotSent() {
+        Estimate draft = Estimate.create(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), Instant.now(), null, List.of(newLine()));
+        assertThrows(IllegalStateException.class, draft::close);
+
+        Estimate closed = Estimate.create(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), Instant.now(), null, List.of(newLine()));
+        closed.markSent();
+        closed.close();
+        assertThrows(IllegalStateException.class, closed::close);
+    }
+
+    @Test
+    void reconstitutePreservesPersistedStatus() {
+        Estimate estimate = Estimate.reconstitute(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                Instant.now(),
+                null,
+                List.of(newLine()),
+                EstimateStatus.CLOSED);
+
+        assertEquals(EstimateStatus.CLOSED, estimate.status());
     }
 
     @Test
