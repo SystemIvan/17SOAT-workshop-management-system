@@ -4,13 +4,13 @@ paths:
   - "src/test/java/br/com/fiap/workshop_management_system/servicelifecycle/**"
   - "docs/features/servicelifecycle/**"
   - "docs/Architecture-Decisions.md"
-  - "docs/ADR-001-realtime-updates-strategy.md"
+  - "docs/adr/ADR-002-realtime-updates-strategy.md"
 ---
 
 # Épico 3 — regras específicas de `servicelifecycle`
 
 Fonte: `docs/Architecture.md` §4.3/4.4, `docs/Architecture-Decisions.md`,
-`docs/ADR-001-realtime-updates-strategy.md`. Não repita este conteúdo em `CLAUDE.md`/`AGENTS.md`.
+`docs/adr/ADR-002-realtime-updates-strategy.md`. Não repita este conteúdo em `CLAUDE.md`/`AGENTS.md`.
 
 ## Invariantes implementados (fato, código atual)
 
@@ -31,10 +31,10 @@ Fonte: `docs/Architecture.md` §4.3/4.4, `docs/Architecture-Decisions.md`,
   compartilhada como aprovada.
 - **AD-015** (estratégia de tracking — polling puro vs. polling+cache vs. SSE/WebSocket): **Resolved**
   em 2026-08-23 — o time ratificou Option A (polling puro, sem cache) para o MVP. Ver
-  `docs/Architecture-Decisions.md` e `docs/adr/ADR-001-realtime-updates-strategy.md`. Não implemente
+  `docs/Architecture-Decisions.md` e `../../docs/adr/ADR-002-realtime-updates-strategy.md`. Não implemente
   cache, SSE ou WebSocket sem uma nova decisão do time — isso reabriria o escopo, não é coberto pela
   ratificação de AD-015.
-- **`docs/adr/ADR-001-realtime-updates-strategy.md`**: `Status: Accepted`. O item "Time concorda com
+- **`../../docs/adr/ADR-002-realtime-updates-strategy.md`**: `Status: Accepted`. O item "Time concorda com
   Polling para MVP" do Approval Checklist foi marcado em 2026-08-23 (ratificação do time). Os outros
   dois itens do checklist (entendimento do plano de migração WebSocket; documentação atualizada em
   `AGENTS.md`) continuam em aberto — não tratar esses dois como resolvidos.

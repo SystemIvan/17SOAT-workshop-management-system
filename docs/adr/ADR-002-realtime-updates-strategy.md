@@ -1,7 +1,7 @@
-# ADR 001: Real-Time Updates Strategy — Polling vs WebSocket
+# ADR 002: Real-Time Updates Strategy — Polling vs WebSocket
 
 **Status:** Accepted
-**Date:** Agosto 2026  
+**Date:** 2026-08  
 **Deciders:** Time de Desenvolvimento (5 pessoas)  
 **Affected By:** Épico 3 (ServiceExecution Status Updates), Customers, Technicians  
 
@@ -213,275 +213,12 @@ Cliente                          Servidor
 
 ## Implementation Details
 
-### Para MVP: Como Implementar
-
-#### 1. Endpoint REST (3 linhas no Controller)
-
-```java
-@RestController
-@RequestMapping("/service-orders")
-public class ServiceOrderController {
-    
-    @Autowired
-    private ServiceExecutionUseCase useCase;
-    
-    /**
-     * GET /service-orders/{id}/status
-     * Retorna status e progresso de execução (cacheado por 5 segundos)
-     * 
-     * @param id ID da Service Order
-     * @return ServiceExecutionDTO com status e progresso
-     */
-    @GetMapping("/{id}/status")
-    @Cacheable(
-        value = "executionStatusCache",
-        key = "#id",
-        unless = "#result == null"
-    )
-    public ResponseEntity<ServiceExecutionDTO> getExecutionStatus(
-        @PathVariable Long id
-    ) {
-        ServiceExecution execution = useCase.getExecution(id);
-        return ResponseEntity.ok(mapper.toDTO(execution));
-    }
-}
-```
-
-#### 2. Configurar Cache (application.yml)
-
-```yaml
-spring:
-  cache:
-    type: simple  # Usar SimpleCache para MVP
-    cache-names: executionStatusCache
-    simple:
-      expire-after-write: 5000  # 5 segundos
-
-# Futuro: trocar para Redis
-#  cache:
-#    type: redis
-#    redis:
-#      time-to-live: 5000
-```
-
-#### 3. Response DTO
-
-```java
-public record ServiceExecutionDTO(
-    String executionId,
-    String technicianName,
-    String currentStatus,  // "PENDING", "IN_PROGRESS", "COMPLETED"
-    Integer progressPercentage,  // 0-100
-    LocalDateTime startedAt,
-    LocalDateTime completedAt,
-    LocalDateTime lastUpdated
-) {}
-```
-
-#### 4. Frontend (JavaScript simples)
-
-```javascript
-class ServiceOrderTracker {
-    constructor(orderId, updateIntervalMs = 5000) {
-        this.orderId = orderId;
-        this.updateIntervalMs = updateIntervalMs;
-        this.intervalId = null;
-    }
-    
-    async start() {
-        this.intervalId = setInterval(() => this.poll(), this.updateIntervalMs);
-    }
-    
-    async poll() {
-        try {
-            const response = await fetch(`/service-orders/${this.orderId}/status`);
-            const data = await response.json();
-            
-            // Atualizar UI com dados
-            this.updateUI(data);
-            
-            // Parar se completado
-            if (data.currentStatus === 'COMPLETED') {
-                this.stop();
-            }
-        } catch (error) {
-            console.error('Erro ao buscar status:', error);
-        }
-    }
-    
-    updateUI(data) {
-        document.getElementById('status').textContent = data.currentStatus;
-        document.getElementById('progress').style.width = data.progressPercentage + '%';
-    }
-    
-    stop() {
-        if (this.intervalId) {
-            clearInterval(this.intervalId);
-        }
-    }
-}
-
-// Uso
-const tracker = new ServiceOrderTracker(123);
-tracker.start();
-```
-
----
-
-## Where to Fit in Your Project
-
-### 📁 Estrutura de Pastas (Adicione isto)
-
-```
-src/main/java/com/workshop/
-├── shared/
-│   ├── cache/
-│   │   ├── CacheConfig.java              ← Configurar Spring Cache
-│   │   └── CacheNames.java               ← Constantes de cache
-│   └── dto/
-│       └── ServiceExecutionDTO.java      ← DTO de resposta
-│
-└── serviceorder/
-    ├── application/
-    │   ├── usecases/
-    │   │   └── GetExecutionStatusUseCase.java  ← Novo UC
-    │   └── dto/
-    │       └── ServiceExecutionDTO.java
-    │
-    └── infrastructure/
-        └── controller/
-            └── ServiceOrderStatusController.java ← Novo controller ou existente
-```
-
-### 🔧 Arquivos a Criar/Modificar
-
-#### Novo: CacheConfig.java
-```java
-@Configuration
-@EnableCaching
-public class CacheConfig {
-    
-    @Bean
-    public CacheManager cacheManager() {
-        SimpleCacheManager cacheManager = new SimpleCacheManager();
-        cacheManager.setCaches(Arrays.asList(
-            new ConcurrentMapCache("executionStatusCache")
-        ));
-        return cacheManager;
-    }
-}
-```
-
-#### Novo: GetExecutionStatusUseCase.java
-```java
-@Service
-public class GetExecutionStatusUseCase {
-    
-    @Autowired
-    private IServiceOrderRepository repository;
-    
-    public ServiceExecution getExecutionStatus(Long serviceOrderId) {
-        ServiceOrder order = repository.findById(
-            new ServiceOrderId(serviceOrderId)
-        ).orElseThrow(() -> 
-            new EntityNotFoundException("ServiceOrder não encontrado")
-        );
-        
-        // Retornar execução mais recente ou atual
-        return order.getCurrentExecution();
-    }
-}
-```
-
-#### Modificar: ServiceOrderController.java (adicione método)
-```java
-@GetMapping("/{id}/status")
-@Cacheable(value = "executionStatusCache", key = "#id")
-public ResponseEntity<ServiceExecutionDTO> getStatus(@PathVariable Long id) {
-    ServiceExecution execution = getExecutionStatusUseCase.getExecutionStatus(id);
-    return ResponseEntity.ok(ServiceExecutionMapper.toDTO(execution));
-}
-```
-
-#### Novo: application-dev.yml
-```yaml
-# application-dev.yml - Configuração para desenvolvimento
-spring:
-  cache:
-    type: simple
-    cache-names: executionStatusCache
-  jpa:
-    hibernate:
-      ddl-auto: update
-```
-
-#### Novo: application-prod.yml (para futuro AWS)
-```yaml
-# application-prod.yml - Configuração para produção
-spring:
-  cache:
-    type: redis
-    redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT}
-      time-to-live: 5000
-```
-
----
-
-## Testing Strategy
-
-### Unit Test: Use Case
-```java
-@ExtendWith(MockitoExtension.class)
-class GetExecutionStatusUseCaseTest {
-    
-    @Mock
-    private IServiceOrderRepository repository;
-    
-    @InjectMocks
-    private GetExecutionStatusUseCase useCase;
-    
-    @Test
-    @DisplayName("Deve retornar status da execução")
-    void shouldReturnExecutionStatus() {
-        // Arrange
-        ServiceOrder order = new ServiceOrder(1L, "Revisão", Priority.HIGH);
-        when(repository.findById(any())).thenReturn(Optional.of(order));
-        
-        // Act
-        ServiceExecution execution = useCase.getExecutionStatus(1L);
-        
-        // Assert
-        assertNotNull(execution);
-    }
-}
-```
-
-### Integration Test: Controller + Cache
-```java
-@SpringBootTest
-@AutoConfigureMockMvc
-class ServiceOrderStatusControllerTest {
-    
-    @Autowired
-    private MockMvc mockMvc;
-    
-    @Autowired
-    private CacheManager cacheManager;
-    
-    @Test
-    @DisplayName("GET /status deve cachear resposta por 5 segundos")
-    void shouldCacheStatusResponse() throws Exception {
-        // First call
-        mockMvc.perform(get("/service-orders/1/status"))
-            .andExpect(status().isOk());
-        
-        // Verify cache hit (segunda chamada é mais rápida)
-        // Isso é testável monitorando tempo de resposta
-    }
-}
-```
+Detalhes de implementação (endpoints, cache, DTOs, testes) não pertencem a esta ADR — eles são
+formalizados no `technical-spec.md` da feature que consome esta decisão (ver
+`docs/features/servicelifecycle/track-execution/technical-spec.md` e
+`docs/features/servicelifecycle/update-progress/technical-spec.md`). Esta ADR registra apenas a decisão
+arquitetural (Polling vs. WebSocket) e seu racional; qualquer esboço de código aqui ficaria desatualizado
+frente ao código real.
 
 ---
 
@@ -510,9 +247,10 @@ class ServiceOrderStatusControllerTest {
 
 ## Related ADRs
 
-- **ADR 002:** (Futuro) WebSocket Implementation Strategy
-- **ADR 003:** (Futuro) Caching Strategy (SimpleCache → Redis)
-- **ADR 004:** (Futuro) Real-Time Notifications Architecture
+- **ADR-003:** Authentication Strategy (Spring Security + JWT)
+- **ADR-004:** Notifications Are an Outbound Capability
+- **ADR-005:** (Futuro, número provisório) WebSocket Implementation Strategy
+- **ADR-006:** (Futuro, número provisório) Caching Strategy (SimpleCache → Redis)
 
 ---
 
@@ -533,7 +271,7 @@ class ServiceOrderStatusControllerTest {
 
 ---
 
-**Last Updated:** 23 de agosto de 2026  
+**Last Updated:** 2026-08-23  
 **Decision Maker:** Santiago Silvestre  
-**Reviewed By:** Time de Desenvolvimento — ratificação do item "Polling para MVP" em 23 de agosto de 2026  
+**Reviewed By:** Time de Desenvolvimento — ratificação do item "Polling para MVP" em 2026-08-23  
 **Status:** Accepted (ratificado pelo time; ver AD-015 em `docs/Architecture-Decisions.md`)
