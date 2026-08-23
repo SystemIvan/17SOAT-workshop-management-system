@@ -123,12 +123,13 @@ class RetryStockReservationUseCaseTest {
         ServiceOrder serviceOrder = ServiceOrder.create(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015));
+                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015), "Initial assessment");
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
         serviceOrder.performDiagnosis(List.of(new DiagnosisItem(
                 UUID.randomUUID(),
                 "Oil change",
                 Money.brl(BigDecimal.TEN),
-                List.of())));
+                List.of())), UUID.randomUUID(), java.time.Instant.EPOCH);
         UUID executionId = serviceOrder.serviceExecutions().getFirst().id();
         InMemoryServiceOrderRepository repository = new InMemoryServiceOrderRepository(serviceOrder);
         AtomicBoolean apiCalled = new AtomicBoolean(false);
@@ -174,7 +175,7 @@ class RetryStockReservationUseCaseTest {
         ServiceOrder serviceOrder = ServiceOrder.create(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015));
+                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015), "Initial assessment");
         StockRequirement requirement = new StockRequirement(
                 UUID.randomUUID(),
                 StockItemType.PART,
@@ -182,11 +183,12 @@ class RetryStockReservationUseCaseTest {
                 "Oil filter",
                 Money.brl(BigDecimal.TEN),
                 false);
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
         UUID diagnosisId = serviceOrder.performDiagnosis(List.of(new DiagnosisItem(
                 UUID.randomUUID(),
                 "Oil change",
                 Money.brl(BigDecimal.TEN),
-                List.of(requirement))));
+                List.of(requirement))), UUID.randomUUID(), java.time.Instant.EPOCH);
         UUID executionId = serviceOrder.serviceExecutions().getFirst().id();
         serviceOrder.freezeStockRequirements(diagnosisId);
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);

@@ -106,12 +106,13 @@ class StockReservationControllerTest {
         ServiceOrder serviceOrder = ServiceOrder.create(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015));
+                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015), "Initial assessment");
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
         serviceOrder.performDiagnosis(List.of(new DiagnosisItem(
                 UUID.randomUUID(),
                 "Oil change",
                 Money.brl(BigDecimal.TEN),
-                List.of())));
+                List.of())), UUID.randomUUID(), java.time.Instant.EPOCH);
         UUID executionId = serviceOrder.serviceExecutions().getFirst().id();
         serviceOrderRepository.save(serviceOrder);
 
@@ -138,7 +139,8 @@ class StockReservationControllerTest {
         ServiceOrder serviceOrder = ServiceOrder.create(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015));
+                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015), "Initial assessment");
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
         UUID diagnosisId = serviceOrder.performDiagnosis(List.of(new DiagnosisItem(
                 UUID.randomUUID(),
                 "Oil change",
@@ -149,7 +151,7 @@ class StockReservationControllerTest {
                         2,
                         "Oil filter",
                         Money.brl(BigDecimal.TEN),
-                        false)))));
+                        false)))), UUID.randomUUID(), java.time.Instant.EPOCH);
         UUID executionId = serviceOrder.serviceExecutions().getFirst().id();
         serviceOrder.freezeStockRequirements(diagnosisId);
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);

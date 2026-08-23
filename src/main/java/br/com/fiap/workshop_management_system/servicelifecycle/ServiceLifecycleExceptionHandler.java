@@ -1,6 +1,7 @@
 package br.com.fiap.workshop_management_system.servicelifecycle;
 
 import br.com.fiap.workshop_management_system.ErrorResponse;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.InvalidServiceOrderException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -15,6 +16,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  */
 @RestControllerAdvice(basePackages = "br.com.fiap.workshop_management_system.servicelifecycle")
 class ServiceLifecycleExceptionHandler {
+
+    @ExceptionHandler(InvalidServiceOrderException.class)
+    ResponseEntity<ErrorResponse> handleInvalidServiceOrder(InvalidServiceOrderException ex) {
+        return ResponseEntity.badRequest()
+                .body(new ErrorResponse("VALIDATION_ERROR", ex.getMessage()));
+    }
 
     @ExceptionHandler(IllegalStateException.class)
     ResponseEntity<ErrorResponse> handleInvalidState(IllegalStateException ex) {

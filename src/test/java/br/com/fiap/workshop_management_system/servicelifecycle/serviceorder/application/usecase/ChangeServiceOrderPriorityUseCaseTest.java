@@ -25,7 +25,8 @@ class ChangeServiceOrderPriorityUseCaseTest {
     void changesThePriorityAndPersistsIt() {
         InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository();
         ChangeServiceOrderPriorityUseCase useCase = new ChangeServiceOrderPriorityUseCase(serviceOrders);
-        ServiceOrder serviceOrder = ServiceOrder.create(UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot);
+        ServiceOrder serviceOrder = ServiceOrder.create(
+                UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, "Initial assessment");
         serviceOrders.save(serviceOrder);
 
         ServiceOrderResponse response = useCase.execute(

@@ -19,13 +19,17 @@ public final class ServiceOrderMapper {
     }
 
     public static ServiceOrderResponse toResponse(ServiceOrder serviceOrder) {
+        var status = serviceOrder.status();
         return new ServiceOrderResponse(
                 serviceOrder.id(),
                 serviceOrder.customerId(),
                 serviceOrder.vehicleId(),
                 toVehicleSnapshotResponse(serviceOrder.vehicleSnapshot()),
                 serviceOrder.priority(),
-                serviceOrder.status(),
+                serviceOrder.initialAssessment(),
+                serviceOrder.diagnosisAssigneeId(),
+                status,
+                status,
                 serviceOrder.approvedEstimateIds(),
                 serviceOrder.serviceExecutions().stream().map(ServiceOrderMapper::toExecutionResponse).toList());
     }
@@ -44,6 +48,8 @@ public final class ServiceOrderMapper {
                 execution.status(),
                 execution.authorizedByEstimateId(),
                 execution.assignedTechnicianId(),
+                execution.diagnosedByTechnicianId(),
+                execution.diagnosedAt(),
                 execution.stockReservationId(),
                 execution.stockRequirements().stream().map(ServiceOrderMapper::toStockRequirementResponse).toList());
     }

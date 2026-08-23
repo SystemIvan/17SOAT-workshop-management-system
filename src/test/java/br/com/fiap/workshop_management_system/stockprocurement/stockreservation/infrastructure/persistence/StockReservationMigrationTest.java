@@ -62,7 +62,7 @@ class StockReservationMigrationTest {
         assertFalse(Boolean.TRUE.equals(reservedOf(jdbcTemplate, readyExecutionId)));
         assertNull(reservationIdOf(jdbcTemplate, readyExecutionId));
         assertNull(reservationIdOf(jdbcTemplate, inProgressExecutionId));
-        assertEquals("AWAITING_ITEMS", orderStatusOf(jdbcTemplate, serviceOrderId));
+        assertEquals("IN_PROGRESS", orderStatusOf(jdbcTemplate, serviceOrderId));
         assertEquals(0, jdbcTemplate.queryForObject("select count(*) from stock_reservations", Integer.class));
     }
 

@@ -1,5 +1,6 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.infrastructure.web;
 
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.AssignDiagnosisAssigneeRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.AssignTechnicianRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ChangeServiceOrderPriorityRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.CreateServiceOrderRequest;
@@ -11,6 +12,7 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.StockReservationAttemptMapper;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.StockReservationAttemptResponse;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.UpdateExecutionProgressRequest;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.AssignDiagnosisAssigneeUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.AssignTechnicianUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.AttachStockRequirementUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.ChangeServiceOrderPriorityUseCase;
@@ -34,6 +36,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -51,6 +54,7 @@ public class ServiceOrderController {
     private final PerformDiagnosisUseCase performDiagnosisUseCase;
     private final ChangeServiceOrderPriorityUseCase changeServiceOrderPriorityUseCase;
     private final AssignTechnicianUseCase assignTechnicianUseCase;
+    private final AssignDiagnosisAssigneeUseCase assignDiagnosisAssigneeUseCase;
     private final StartExecutionUseCase startExecutionUseCase;
     private final UpdateExecutionProgressUseCase updateExecutionProgressUseCase;
     private final CompleteExecutionUseCase completeExecutionUseCase;
@@ -65,6 +69,7 @@ public class ServiceOrderController {
             PerformDiagnosisUseCase performDiagnosisUseCase,
             ChangeServiceOrderPriorityUseCase changeServiceOrderPriorityUseCase,
             AssignTechnicianUseCase assignTechnicianUseCase,
+            AssignDiagnosisAssigneeUseCase assignDiagnosisAssigneeUseCase,
             StartExecutionUseCase startExecutionUseCase,
             UpdateExecutionProgressUseCase updateExecutionProgressUseCase,
             CompleteExecutionUseCase completeExecutionUseCase,
@@ -77,6 +82,7 @@ public class ServiceOrderController {
         this.performDiagnosisUseCase = performDiagnosisUseCase;
         this.changeServiceOrderPriorityUseCase = changeServiceOrderPriorityUseCase;
         this.assignTechnicianUseCase = assignTechnicianUseCase;
+        this.assignDiagnosisAssigneeUseCase = assignDiagnosisAssigneeUseCase;
         this.startExecutionUseCase = startExecutionUseCase;
         this.updateExecutionProgressUseCase = updateExecutionProgressUseCase;
         this.completeExecutionUseCase = completeExecutionUseCase;
@@ -87,6 +93,10 @@ public class ServiceOrderController {
 
     @PostMapping
     @Operation(summary = "Create a service order")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Service order created"),
+            @ApiResponse(responseCode = "400", description = "Invalid or missing service order fields")
+    })
     public ResponseEntity<ServiceOrderResponse> create(@Valid @RequestBody CreateServiceOrderRequest request) {
         ServiceOrderResponse response = createServiceOrderUseCase.execute(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -114,9 +124,30 @@ public class ServiceOrderController {
 
     @PostMapping("/{id}/diagnosis")
     @Operation(summary = "Record a diagnosis and service executions")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Diagnosis recorded"),
+            @ApiResponse(responseCode = "400", description = "Invalid diagnosis request"),
+            @ApiResponse(responseCode = "404", description = "Service order or technician not found"),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Diagnosis assignee is missing or a diagnosis is already open")
+    })
     public ResponseEntity<ServiceOrderResponse> performDiagnosis(
             @PathVariable UUID id, @Valid @RequestBody PerformDiagnosisRequest request) {
         return ResponseEntity.ok(performDiagnosisUseCase.execute(id, request));
+    }
+
+    @PutMapping("/{id}/diagnosis-assignee")
+    @Operation(summary = "Assign the technician planned for the next diagnosis")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Diagnosis assignee assigned"),
+            @ApiResponse(responseCode = "400", description = "Invalid or missing technicianId"),
+            @ApiResponse(responseCode = "404", description = "Service order or technician not found"),
+            @ApiResponse(responseCode = "409", description = "A diagnosis is already open")
+    })
+    public ResponseEntity<ServiceOrderResponse> assignDiagnosisAssignee(
+            @PathVariable UUID id, @Valid @RequestBody AssignDiagnosisAssigneeRequest request) {
+        return ResponseEntity.ok(assignDiagnosisAssigneeUseCase.execute(id, request));
     }
 
     @PatchMapping("/{id}/priority")

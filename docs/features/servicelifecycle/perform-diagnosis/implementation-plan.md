@@ -3,14 +3,17 @@
 | Campo | Valor |
 |---|---|
 | Feature | `perform-diagnosis` |
-| Status | Implemented |
+| Status | Stale |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-20 |
+| Atualizado em | 2026-08-22 |
 | Especificação técnica | `./technical-spec.md` |
 
 > **Nota:** plano retroativo. O domínio, a persistência e o contrato HTTP já estavam implementados em
 > produção antes deste gate SDD; os checkpoints abaixo registram o que já existia e o que foi
 > adicionado especificamente por este esforço de documentação (testes de application e web).
+
+> Está `Stale` desde 2026-08-22 porque a especificação funcional foi devolvida a `Draft` pelos deltas materiais de
+> `assign-diagnosis-assignee` e `diagnosis-authorship`; este plano histórico não autoriza sua implementação.
 
 ## Checkpoints
 

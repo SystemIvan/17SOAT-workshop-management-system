@@ -1,6 +1,7 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model;
 
 import java.util.ArrayList;
+import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -17,6 +18,8 @@ public class ServiceOrder {
     private final UUID customerId;
     private final UUID vehicleId;
     private final VehicleSnapshot vehicleSnapshot;
+    private final String initialAssessment;
+    private UUID diagnosisAssigneeId;
     private final Set<UUID> approvedEstimateIds = new LinkedHashSet<>();
     private final List<ServiceExecution> serviceExecutions = new ArrayList<>();
 
@@ -32,22 +35,41 @@ public class ServiceOrder {
      */
     private boolean hasSentEstimateWithPendingLines;
 
-    public static ServiceOrder create(UUID customerId, UUID vehicleId, VehicleSnapshot vehicleSnapshot) {
-        return create(customerId, vehicleId, vehicleSnapshot, Priority.NORMAL);
+    public static ServiceOrder create(
+            UUID customerId, UUID vehicleId, VehicleSnapshot vehicleSnapshot, String initialAssessment) {
+        return create(customerId, vehicleId, vehicleSnapshot, Priority.NORMAL, initialAssessment);
     }
 
-    public static ServiceOrder create(UUID customerId, UUID vehicleId, VehicleSnapshot vehicleSnapshot, Priority priority) {
-        ServiceOrder serviceOrder = new ServiceOrder(UUID.randomUUID(), customerId, vehicleId, vehicleSnapshot, priority);
+    public static ServiceOrder create(
+            UUID customerId,
+            UUID vehicleId,
+            VehicleSnapshot vehicleSnapshot,
+            Priority priority,
+            String initialAssessment) {
+        ServiceOrder serviceOrder = new ServiceOrder(
+                UUID.randomUUID(),
+                customerId,
+                vehicleId,
+                vehicleSnapshot,
+                priority,
+                requireInitialAssessment(initialAssessment));
         serviceOrder.statusSnapshot = ServiceOrderStatus.RECEIVED;
         return serviceOrder;
     }
 
-    private ServiceOrder(UUID id, UUID customerId, UUID vehicleId, VehicleSnapshot vehicleSnapshot, Priority priority) {
+    private ServiceOrder(
+            UUID id,
+            UUID customerId,
+            UUID vehicleId,
+            VehicleSnapshot vehicleSnapshot,
+            Priority priority,
+            String initialAssessment) {
         this.id = id;
         this.customerId = customerId;
         this.vehicleId = vehicleId;
         this.vehicleSnapshot = vehicleSnapshot;
         this.priority = priority;
+        this.initialAssessment = initialAssessment;
     }
 
     /**
@@ -60,13 +82,17 @@ public class ServiceOrder {
             UUID customerId,
             UUID vehicleId,
             VehicleSnapshot vehicleSnapshot,
+            String initialAssessment,
+            UUID diagnosisAssigneeId,
             Priority priority,
             ServiceOrderStatus statusSnapshot,
             UUID openDiagnosisId,
             boolean hasSentEstimateWithPendingLines,
             Set<UUID> approvedEstimateIds,
             List<ServiceExecution> serviceExecutions) {
-        ServiceOrder serviceOrder = new ServiceOrder(id, customerId, vehicleId, vehicleSnapshot, priority);
+        ServiceOrder serviceOrder = new ServiceOrder(
+                id, customerId, vehicleId, vehicleSnapshot, priority, initialAssessment);
+        serviceOrder.diagnosisAssigneeId = diagnosisAssigneeId;
         serviceOrder.statusSnapshot = statusSnapshot;
         serviceOrder.openDiagnosisId = openDiagnosisId;
         serviceOrder.hasSentEstimateWithPendingLines = hasSentEstimateWithPendingLines;
@@ -86,13 +112,25 @@ public class ServiceOrder {
         this.priority = newPriority;
     }
 
-    public UUID performDiagnosis(List<DiagnosisItem> items) {
+    public UUID performDiagnosis(List<DiagnosisItem> items, UUID diagnosedByTechnicianId, Instant diagnosedAt) {
+        if (diagnosisAssigneeId == null) {
+            throw new IllegalStateException("A diagnosis assignee must be assigned before performing a diagnosis");
+        }
         if (openDiagnosisId != null) {
             throw new IllegalStateException("A diagnosis is already open without an Estimate generated for it");
         }
+        if (diagnosedByTechnicianId == null || diagnosedAt == null) {
+            throw new InvalidServiceOrderException("Diagnosis authorship must be informed");
+        }
         UUID diagnosisId = UUID.randomUUID();
         for (DiagnosisItem item : items) {
-            ServiceExecution execution = ServiceExecution.start(diagnosisId, item.catalogServiceId(), item.name(), item.price());
+            ServiceExecution execution = ServiceExecution.start(
+                    diagnosisId,
+                    item.catalogServiceId(),
+                    item.name(),
+                    item.price(),
+                    diagnosedByTechnicianId,
+                    diagnosedAt);
             item.stockRequirements().forEach(execution::attachStockRequirement);
             serviceExecutions.add(execution);
         }
@@ -105,7 +143,17 @@ public class ServiceOrder {
         if (openDiagnosisId == null || !openDiagnosisId.equals(diagnosisId)) {
             throw new IllegalStateException("Diagnosis " + diagnosisId + " is not open for new service executions");
         }
-        ServiceExecution execution = ServiceExecution.start(diagnosisId, catalogServiceId, name, price);
+        ServiceExecution diagnosisExecution = serviceExecutions.stream()
+                .filter(candidate -> diagnosisId.equals(candidate.diagnosisId()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Diagnosis " + diagnosisId + " has no executions"));
+        ServiceExecution execution = ServiceExecution.start(
+                diagnosisId,
+                catalogServiceId,
+                name,
+                price,
+                diagnosisExecution.diagnosedByTechnicianId(),
+                diagnosisExecution.diagnosedAt());
         serviceExecutions.add(execution);
         recomputeStatusSnapshot(false);
         return execution.id();
@@ -210,6 +258,31 @@ public class ServiceOrder {
         return statusSnapshot;
     }
 
+    public String initialAssessment() {
+        return initialAssessment;
+    }
+
+    public void assignDiagnosisAssignee(UUID technicianId) {
+        if (technicianId == null) {
+            throw new InvalidServiceOrderException("Diagnosis assignee must not be null");
+        }
+        if (openDiagnosisId != null) {
+            throw new IllegalStateException("Diagnosis assignee cannot be changed while a diagnosis is open");
+        }
+        this.diagnosisAssigneeId = technicianId;
+    }
+
+    public UUID diagnosisAssigneeId() {
+        return diagnosisAssigneeId;
+    }
+
+    private static String requireInitialAssessment(String initialAssessment) {
+        if (initialAssessment == null || initialAssessment.isBlank()) {
+            throw new InvalidServiceOrderException("Initial assessment must not be blank");
+        }
+        return initialAssessment;
+    }
+
     private void clearOpenDiagnosisIfCoveredBy(UUID diagnosisId) {
         if (diagnosisId.equals(openDiagnosisId)) {
             boolean anyStillPending = serviceExecutions.stream()
@@ -234,11 +307,12 @@ public class ServiceOrder {
      * and just read back by {@link #status()} on queries.
      */
     private void recomputeStatusSnapshot(boolean vehicleDelivered) {
-        if (vehicleDelivered) {
+        if (statusSnapshot == ServiceOrderStatus.DELIVERED || vehicleDelivered) {
             statusSnapshot = ServiceOrderStatus.DELIVERED;
-        } else if (allNonRejectedExecutionsCompleted()) {
+        } else if (allExecutionsAreTerminal()) {
             statusSnapshot = ServiceOrderStatus.COMPLETED;
-        } else if (anyExecutionInStatus(ServiceExecutionStatus.IN_PROGRESS)) {
+        } else if (anyExecutionInStatus(ServiceExecutionStatus.READY)
+                || anyExecutionInStatus(ServiceExecutionStatus.IN_PROGRESS)) {
             statusSnapshot = ServiceOrderStatus.IN_PROGRESS;
         } else if (anyExecutionInStatus(ServiceExecutionStatus.AWAITING_ITEMS)) {
             statusSnapshot = ServiceOrderStatus.AWAITING_ITEMS;
@@ -251,12 +325,11 @@ public class ServiceOrder {
         }
     }
 
-    private boolean allNonRejectedExecutionsCompleted() {
-        List<ServiceExecution> nonRejected = serviceExecutions.stream()
-                .filter(execution -> execution.status() != ServiceExecutionStatus.REJECTED)
-                .toList();
-        return !nonRejected.isEmpty()
-                && nonRejected.stream().allMatch(execution -> execution.status() == ServiceExecutionStatus.COMPLETED);
+    private boolean allExecutionsAreTerminal() {
+        return !serviceExecutions.isEmpty()
+                && serviceExecutions.stream().allMatch(
+                        execution -> execution.status() == ServiceExecutionStatus.COMPLETED
+                        || execution.status() == ServiceExecutionStatus.REJECTED);
     }
 
     private boolean anyExecutionInStatus(ServiceExecutionStatus status) {

@@ -5,14 +5,26 @@
 | Feature | `service-order-creation` |
 | Status | Approved |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-20 |
-| Aprovado por | Santiago Silvestre |
-| Aprovado em | 2026-08-20 |
+| Atualizado em | 2026-08-22 |
+| Aprovado por | Matheus Apostulo |
+| Aprovado em | 2026-08-22 |
 | Especificação funcional | `docs/features/servicelifecycle/service-order-creation/functional-spec.md` |
 
 > **Nota:** este documento é retroativo. Descreve a arquitetura já implementada em produção, não uma
 > proposta nova. Onde a implementação atual diverge do que seria a escolha ideal, isso é registrado
 > explicitamente em vez de omitido.
+
+> A reconciliação de 2026-08-22 foi revisada e aprovada por humano depois da aprovação da especificação funcional.
+> Este documento cobre somente o impacto técnico no SDD histórico; a implementação permanece no plano da feature
+> `service-order-initial-assessment`.
+
+## Reconciliação RFC-002
+
+A mudança material aprovada em `service-order-initial-assessment` amplia `CreateServiceOrderRequest`,
+`ServiceOrder.create(...)`, persistência e `ServiceOrderResponse` com `initialAssessment`. O request passa a exigir
+texto não vazio; responses de registros legados podem devolvê-lo como `null`. A especificação técnica daquela feature
+é a fonte de verdade para contratos, migration, tratamento de falhas, dados e testes; esta referência evita duplicar
+essas regras no SDD histórico.
 
 ## Objetivo técnico
 
@@ -126,16 +138,19 @@ Request (`CreateServiceOrderRequest`):
     "model": "<string>",
     "year": "<int positivo>"
   },
-  "priority": "<LOW|NORMAL|HIGH|URGENT, opcional>"
+  "priority": "<LOW|NORMAL|HIGH|URGENT, opcional>",
+  "initialAssessment": "<texto não vazio, obrigatório para novas Service Orders>"
 }
 ```
 
 Validação via Bean Validation: `customerId`, `vehicleId` e `vehicleSnapshot` são `@NotNull`;
 `vehicleSnapshot.licensePlate/brand/model` são `@NotBlank`; `vehicleSnapshot.year` é `@Positive`.
-`priority` não tem `@NotNull` — ausência é tratada pelo use case, não pela validação HTTP.
+`priority` não tem `@NotNull` — ausência é tratada pelo use case, não pela validação HTTP. `initialAssessment` é
+`@NotBlank`; sua definição completa está em `service-order-initial-assessment`.
 
 Resposta de sucesso: `201 Created` com `ServiceOrderResponse` (inclui `id`, `customerId`, `vehicleId`,
-`vehicleSnapshot`, `priority`, `status`, `approvedEstimateIds`, `executions` — vazio na criação).
+`vehicleSnapshot`, `priority`, `initialAssessment`, `status`, `approvedEstimateIds`, `executions` — vazio na criação).
+O campo de triagem é anulável somente na leitura de registros legados.
 
 ## Tratamento de erros
 

@@ -5,14 +5,26 @@
 | Feature | `perform-diagnosis` |
 | Status | Approved |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-20 |
-| Aprovado por | Santiago Silvestre |
-| Aprovado em | 2026-08-20 |
+| Atualizado em | 2026-08-22 |
+| Aprovado por | Matheus Apostulo |
+| Aprovado em | 2026-08-22 |
 | Especificação funcional | `docs/features/servicelifecycle/perform-diagnosis/functional-spec.md` |
 
 > **Nota:** este documento é retroativo. Descreve a arquitetura já implementada em produção, não uma
 > proposta nova. Onde a implementação atual diverge do que seria a escolha ideal, isso é registrado
 > explicitamente em vez de omitido.
+
+> A reconciliação de 2026-08-22 foi revisada e aprovada por humano depois da aprovação da especificação funcional.
+> Este documento cobre somente o impacto técnico no SDD histórico; a implementação permanece nos planos das features
+> `assign-diagnosis-assignee` e `diagnosis-authorship`.
+
+## Reconciliação RFC-002
+
+O comando passa a usar leitura bloqueante da Service Order, exigir `diagnosisAssigneeId` e receber
+`diagnosedByTechnicianId` obrigatório. A aplicação valida o Technician autor, gera um único `diagnosedAt` UTC e cria
+todo o lote de forma atômica; cada resposta de execução passa a expor autor e instante, anuláveis somente para legado.
+O request não aceita `diagnosedAt`, e autor pode divergir do planejamento. As especificações técnicas de
+`assign-diagnosis-assignee` e `diagnosis-authorship` são fontes de verdade para o lock, contrato, migrations e testes.
 
 ## Objetivo técnico
 
@@ -134,6 +146,7 @@ progresso, conclusão) — este documento não introduz nem modifica schema.
 Request (`PerformDiagnosisRequest`):
 ```json
 {
+  "diagnosedByTechnicianId": "<UUID obrigatório>",
   "items": [
     {
       "catalogServiceId": "<UUID>",
@@ -159,7 +172,7 @@ quando presente, exige `stockItemId`, `type`, `quantity` (`@Positive`), `nameSna
 `priceSnapshot`.
 
 Resposta de sucesso: `200 OK` com `ServiceOrderResponse`, refletindo os novos `executions` (um por item
-informado, todos `PENDING`) e `status = IN_DIAGNOSIS`.
+informado, todos `PENDING`), seus `diagnosedByTechnicianId` e `diagnosedAt`, e `status = IN_DIAGNOSIS`.
 
 ## Tratamento de erros
 
@@ -168,6 +181,8 @@ informado, todos `PENDING`) e `status = IN_DIAGNOSIS`.
 - `409 Conflict`, código `INVALID_STATE_TRANSITION` — já existe um diagnóstico aberto para a Service
   Order (`ServiceLifecycleExceptionHandler`, mesmo mapeamento de `IllegalStateException` já usado por
   RF10 e pelas transições de `ServiceExecution`).
+- `409 Conflict`, código `INVALID_STATE_TRANSITION` — não há responsável planejado para o próximo Diagnosis.
+- `404 Not Found`, código `NOT_FOUND` — o autor efetivo informado não identifica um Technician existente.
 - `400 Bad Request`, código `VALIDATION_ERROR` — `items` ausente/vazio ou campos obrigatórios de algum
   item ausentes/inválidos.
 

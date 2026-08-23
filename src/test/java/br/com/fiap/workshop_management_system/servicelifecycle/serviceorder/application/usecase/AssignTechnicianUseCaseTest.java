@@ -105,16 +105,20 @@ class AssignTechnicianUseCaseTest {
     }
 
     private ServiceOrder newAuthorizedServiceOrder() {
-        ServiceOrder serviceOrder = ServiceOrder.create(UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot);
+        ServiceOrder serviceOrder = ServiceOrder.create(
+                UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, "Initial assessment");
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
         DiagnosisItem item = new DiagnosisItem(UUID.randomUUID(), "Troca de óleo", Money.brl(BigDecimal.TEN), List.of());
-        serviceOrder.performDiagnosis(List.of(item));
+        serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), java.time.Instant.EPOCH);
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
         return serviceOrder;
     }
 
     private ServiceOrder serviceOrderWithReservedMaterials() {
-        ServiceOrder serviceOrder = ServiceOrder.create(UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot);
+        ServiceOrder serviceOrder = ServiceOrder.create(
+                UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, "Initial assessment");
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
         serviceOrder.performDiagnosis(List.of(new DiagnosisItem(
                 UUID.randomUUID(),
                 "Troca de óleo",
@@ -125,7 +129,7 @@ class AssignTechnicianUseCaseTest {
                                 1,
                                 "Filtro",
                                 Money.brl(BigDecimal.TEN),
-                                false)))));
+                                false)))), UUID.randomUUID(), java.time.Instant.EPOCH);
         UUID diagnosisId = serviceOrder.openDiagnosisId();
         UUID executionId = serviceOrder.serviceExecutions().getFirst().id();
         serviceOrder.freezeStockRequirements(diagnosisId);

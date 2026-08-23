@@ -195,22 +195,31 @@
               "request": {
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"vehicleId\": \"{{vehicleId}}\",\n  \"vehicleSnapshot\": {\n    \"licensePlate\": \"ABC1D23\",\n    \"brand\": \"Fiat\",\n    \"model\": \"Argo\",\n    \"year\": 2024\n  },\n  \"priority\": \"NORMAL\"\n}" },
+                "body": { "mode": "raw", "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"vehicleId\": \"{{vehicleId}}\",\n  \"vehicleSnapshot\": {\n    \"licensePlate\": \"ABC1D23\",\n    \"brand\": \"Fiat\",\n    \"model\": \"Argo\",\n    \"year\": 2024\n  },\n  \"priority\": \"NORMAL\",\n  \"initialAssessment\": \"Ruído ao frear relatado pelo cliente\"\n}" },
                 "url": "{{baseUrl}}/api/service-orders"
               }
             },
             { "name": "Get service order", "request": { "method": "GET", "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}" } },
             { "name": "Get service order status", "request": { "method": "GET", "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/status" } },
             {
+              "name": "Assign diagnosis assignee",
+              "request": {
+                "method": "PUT",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"technicianId\": \"{{technicianId}}\"\n}" },
+                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/diagnosis-assignee"
+              }
+            },
+            {
               "name": "Perform diagnosis",
               "event": [{
                 "listen": "test",
-                "script": { "exec": ["if (pm.response.code === 200 && pm.response.json().executions.length > 0) { pm.collectionVariables.set('executionId', pm.response.json().executions[0].id); pm.collectionVariables.set('serviceExecutionId', pm.response.json().executions[0].id); }"] }
+                "script": { "exec": ["if (pm.response.code === 200 && pm.response.json().executions.length > 0) { const execution = pm.response.json().executions[0]; pm.collectionVariables.set('executionId', execution.id); pm.collectionVariables.set('serviceExecutionId', execution.id); pm.collectionVariables.set('diagnosisId', execution.diagnosisId); }"] }
               }],
               "request": {
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"items\": [{\n    \"catalogServiceId\": \"{{catalogServiceId}}\",\n    \"name\": \"Oil and filter change\",\n    \"price\": { \"value\": 150.00, \"currency\": \"BRL\" },\n    \"stockRequirements\": [{\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"type\": \"PART\",\n      \"quantity\": 1,\n      \"nameSnapshot\": \"Oil filter\",\n      \"priceSnapshot\": { \"value\": 45.90, \"currency\": \"BRL\" }\n    }]\n  }]\n}" },
+                "body": { "mode": "raw", "raw": "{\n  \"diagnosedByTechnicianId\": \"{{technicianId}}\",\n  \"items\": [{\n    \"catalogServiceId\": \"{{catalogServiceId}}\",\n    \"name\": \"Oil and filter change\",\n    \"price\": { \"value\": 150.00, \"currency\": \"BRL\" },\n    \"stockRequirements\": [{\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"type\": \"PART\",\n      \"quantity\": 1,\n      \"nameSnapshot\": \"Oil filter\",\n      \"priceSnapshot\": { \"value\": 45.90, \"currency\": \"BRL\" }\n    }]\n  }]\n}" },
                 "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/diagnosis"
               }
             },
@@ -302,10 +311,16 @@
       "item": [
         {
           "name": "Generate estimate",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('estimateId', pm.response.json().id); }"] }
-          }],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "exec": ["const diagnosisId = pm.collectionVariables.get('diagnosisId'); if (!diagnosisId) { throw new Error('Run Perform diagnosis successfully before generating an estimate.'); } pm.variables.set('diagnosisId', diagnosisId);"] }
+            },
+            {
+              "listen": "test",
+              "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('estimateId', pm.response.json().id); }"] }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
