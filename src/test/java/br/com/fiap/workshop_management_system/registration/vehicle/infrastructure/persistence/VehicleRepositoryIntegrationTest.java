@@ -10,13 +10,16 @@ import br.com.fiap.workshop_management_system.registration.vehicle.application.e
         .VehicleLicensePlateAlreadyExistsException;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.ChassisNumber;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.LicensePlate;
+import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.Mileage;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.Vehicle;
+import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.VehicleMileageCannotDecreaseException;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.VehicleYear;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.repository.VehicleRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -24,6 +27,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -32,6 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -56,6 +61,9 @@ class VehicleRepositoryIntegrationTest {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @Test
     void persistsAndRestoresVehicleWithOptionalChassis() {
         Customer customer = persistCustomer();
@@ -69,11 +77,26 @@ class VehicleRepositoryIntegrationTest {
         assertEquals(customer.id(), storedWithoutChassis.getCustomerId());
         assertEquals("PST1A01", storedWithoutChassis.getLicensePlate());
         assertNull(storedWithoutChassis.getChassisNumber());
+        assertNull(storedWithoutChassis.getMileage());
         assertTrue(storedWithoutChassis.isActive());
 
         Vehicle restored = mapper.toDomain(jpaRepository.findById(withChassis.id()).orElseThrow());
         assertEquals(withChassis.id(), restored.id());
         assertEquals("9BWZZZ377VT004251", restored.chassisNumber().orElseThrow().value());
+    }
+
+    @Test
+    void persistsAndRestoresOptionalMileage() {
+        Customer customer = persistCustomer();
+        Vehicle vehicle = vehicle(customer.id(), "KMT1A01", null);
+        vehicle.recordMileage(new Mileage(42_500));
+
+        vehicleRepository.save(vehicle);
+
+        VehicleJpaEntity stored = jpaRepository.findById(vehicle.id()).orElseThrow();
+        assertEquals(42_500L, stored.getMileage());
+        Vehicle restored = mapper.toDomain(stored);
+        assertEquals(42_500, restored.mileage().orElseThrow().value());
     }
 
     @Test
@@ -103,6 +126,18 @@ class VehicleRepositoryIntegrationTest {
         Vehicle vehicle = vehicle(UUID.randomUUID(), "FKT1A01", null);
 
         assertThrows(DataIntegrityViolationException.class, () -> vehicleRepository.save(vehicle));
+    }
+
+    @Test
+    void databaseRejectsNegativeMileage() {
+        Customer customer = persistCustomer();
+        Vehicle vehicle = vehicle(customer.id(), "CHK1A01", null);
+        vehicleRepository.save(vehicle);
+
+        assertThrows(DataIntegrityViolationException.class,
+                () -> jdbcTemplate.update("UPDATE vehicles SET mileage = -1 WHERE id = ?", vehicle.id()));
+
+        assertNull(jpaRepository.findById(vehicle.id()).orElseThrow().getMileage());
     }
 
     @Test
@@ -182,6 +217,45 @@ class VehicleRepositoryIntegrationTest {
         }
     }
 
+    @Test
+    void serializesConcurrentMileageUpdatesWithoutAllowingRegression() throws Exception {
+        Customer customer = persistCustomer();
+        Vehicle original = vehicle(customer.id(), "KMC1A01", null);
+        vehicleRepository.save(original);
+        CountDownLatch firstLockAcquired = new CountDownLatch(1);
+        CountDownLatch releaseFirstUpdate = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<?> greaterUpdate = executor.submit(() -> inTransaction(() -> {
+                Vehicle locked = vehicleRepository.findByIdForUpdate(original.id()).orElseThrow();
+                firstLockAcquired.countDown();
+                locked.recordMileage(new Mileage(60_000));
+                await(releaseFirstUpdate);
+                vehicleRepository.save(locked);
+            }));
+            assertTrue(firstLockAcquired.await(5, TimeUnit.SECONDS));
+
+            Future<?> lowerUpdate = executor.submit(() -> inTransaction(() -> {
+                Vehicle locked = vehicleRepository.findByIdForUpdate(original.id()).orElseThrow();
+                locked.recordMileage(new Mileage(50_000));
+                vehicleRepository.save(locked);
+            }));
+
+            assertThrows(TimeoutException.class, () -> lowerUpdate.get(250, TimeUnit.MILLISECONDS));
+            releaseFirstUpdate.countDown();
+            greaterUpdate.get(5, TimeUnit.SECONDS);
+            ExecutionException exception = assertThrows(
+                    ExecutionException.class, () -> lowerUpdate.get(5, TimeUnit.SECONDS));
+            assertInstanceOf(VehicleMileageCannotDecreaseException.class, exception.getCause());
+
+            assertEquals(60_000L, jpaRepository.findById(original.id()).orElseThrow().getMileage());
+        } finally {
+            releaseFirstUpdate.countDown();
+            executor.shutdownNow();
+        }
+    }
+
     private Customer persistCustomer() {
         Customer customer = Customer.create("Cliente Vehicle", new TaxId(nextValidCpf()),
                 new ContactInfo("vehicle@example.test", "+5511999999999"));
@@ -192,7 +266,7 @@ class VehicleRepositoryIntegrationTest {
     private static Vehicle vehicle(UUID customerId, String licensePlate, String chassis) {
         ChassisNumber chassisNumber = chassis == null ? null : new ChassisNumber(chassis);
         return Vehicle.create(customerId, new LicensePlate(licensePlate), chassisNumber,
-                "Volkswagen", "Gol", VehicleYear.create(2026, 2026), "Prata");
+                "Volkswagen", "Gol", VehicleYear.create(2026, 2026), "Prata", null);
     }
 
     private void inTransaction(Runnable action) {

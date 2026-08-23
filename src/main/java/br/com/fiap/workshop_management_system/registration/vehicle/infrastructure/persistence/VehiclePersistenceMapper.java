@@ -2,6 +2,7 @@ package br.com.fiap.workshop_management_system.registration.vehicle.infrastructu
 
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.ChassisNumber;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.LicensePlate;
+import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.Mileage;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.Vehicle;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.VehicleYear;
 import org.springframework.stereotype.Component;
@@ -19,6 +20,7 @@ public class VehiclePersistenceMapper {
                 vehicle.model(),
                 vehicle.year().value(),
                 vehicle.color(),
+                vehicle.mileage().map(mileage -> mileage.value()).orElse(null),
                 vehicle.active());
     }
 
@@ -35,6 +37,7 @@ public class VehiclePersistenceMapper {
                 entity.getModel(),
                 VehicleYear.reconstitute(entity.getModelYear()),
                 entity.getColor(),
+                entity.getMileage() == null ? null : new Mileage(entity.getMileage()),
                 entity.isActive());
     }
 }

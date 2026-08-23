@@ -91,7 +91,7 @@
               "request": {
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"licensePlate\": \"ABC-1234\",\n  \"chassis\": \"9BWZZZ377VT004251\",\n  \"brand\": \"Volkswagen\",\n  \"model\": \"Gol\",\n  \"year\": 2026,\n  \"color\": \"Prata\"\n}" },
+                "body": { "mode": "raw", "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"licensePlate\": \"ABC-1234\",\n  \"chassis\": \"9BWZZZ377VT004251\",\n  \"brand\": \"Volkswagen\",\n  \"model\": \"Gol\",\n  \"year\": 2026,\n  \"color\": \"Prata\",\n  \"mileage\": 42500\n}" },
                 "url": "{{baseUrl}}/api/vehicles"
               }
             },
@@ -136,6 +136,16 @@
                 "body": { "mode": "raw", "raw": "{\n  \"brand\": \"Honda\",\n  \"model\": \"City\",\n  \"year\": 2024,\n  \"color\": \"Cinza\",\n  \"chassis\": \"93HGM2630DZ999999\"\n}" },
                 "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
                 "description": "Substitui o chassi atual quando o novo valor é válido e não pertence a outro veículo."
+              }
+            },
+            {
+              "name": "Registrar ou atualizar quilometragem",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"mileage\": 43000\n}" },
+                "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}/mileage",
+                "description": "Registra a primeira quilometragem ou um valor maior. O mesmo valor é idempotente; reduções retornam 409."
               }
             }
           ]

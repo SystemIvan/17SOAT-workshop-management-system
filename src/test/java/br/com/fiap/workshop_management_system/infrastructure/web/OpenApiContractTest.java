@@ -40,6 +40,7 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.paths['/api/customers/{id}/contact-info'].patch").exists())
                 .andExpect(jsonPath("$.paths['/api/vehicles'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/vehicles/{id}'].patch").exists())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}/mileage'].patch").exists())
                 .andExpect(jsonPath("$.paths['/api/technicians'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/technicians'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/technicians/{id}'].get").exists())
@@ -112,12 +113,28 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.components.schemas.CreateVehicleRequest.properties.chassis").exists())
                 .andExpect(jsonPath("$.components.schemas.CreateVehicleRequest.properties.chassis.type",
                         hasItem("null")))
+                .andExpect(jsonPath("$.components.schemas.CreateVehicleRequest.properties.mileage").exists())
+                .andExpect(jsonPath("$.components.schemas.CreateVehicleRequest.properties.mileage.type",
+                        hasItem("integer")))
+                .andExpect(jsonPath("$.components.schemas.CreateVehicleRequest.properties.mileage.type",
+                        hasItem("null")))
+                .andExpect(jsonPath("$.components.schemas.CreateVehicleRequest.properties.mileage.format")
+                        .value("int64"))
+                .andExpect(jsonPath("$.components.schemas.CreateVehicleRequest.properties.mileage.minimum")
+                        .value(0))
+                .andExpect(jsonPath("$.components.schemas.CreateVehicleRequest.required", not(hasItem("mileage"))))
                 .andExpect(jsonPath("$.components.schemas.VehicleResponse.properties.id").exists())
                 .andExpect(jsonPath("$.components.schemas.VehicleResponse.properties.vehicleId").doesNotExist())
                 .andExpect(jsonPath("$.components.schemas.VehicleResponse.properties.customerId").exists())
                 .andExpect(jsonPath("$.components.schemas.VehicleResponse.properties.chassis").exists())
                 .andExpect(jsonPath("$.components.schemas.VehicleResponse.properties.chassis.type",
                         hasItem("null")))
+                .andExpect(jsonPath("$.components.schemas.VehicleResponse.properties.mileage.type",
+                        hasItem("integer")))
+                .andExpect(jsonPath("$.components.schemas.VehicleResponse.properties.mileage.type",
+                        hasItem("null")))
+                .andExpect(jsonPath("$.components.schemas.VehicleResponse.properties.mileage.format")
+                        .value("int64"))
                 .andExpect(jsonPath("$.components.schemas.VehicleResponse.properties.active").exists());
     }
 
@@ -141,5 +158,22 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.components.schemas.UpdateVehicleRequest.required", hasItem("year")))
                 .andExpect(jsonPath("$.components.schemas.UpdateVehicleRequest.required", hasItem("color")))
                 .andExpect(jsonPath("$.components.schemas.UpdateVehicleRequest.required", not(hasItem("chassis"))));
+    }
+
+    @Test
+    void documentVehicleMileageUpdateContract() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}/mileage'].patch.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}/mileage'].patch.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}/mileage'].patch.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}/mileage'].patch.responses['409']").exists())
+                .andExpect(jsonPath("$.components.schemas.UpdateVehicleMileageRequest.properties.mileage.type")
+                        .value("integer"))
+                .andExpect(jsonPath("$.components.schemas.UpdateVehicleMileageRequest.properties.mileage.format")
+                        .value("int64"))
+                .andExpect(jsonPath("$.components.schemas.UpdateVehicleMileageRequest.properties.mileage.minimum")
+                        .value(0))
+                .andExpect(jsonPath("$.components.schemas.UpdateVehicleMileageRequest.required", hasItem("mileage")));
     }
 }

@@ -17,6 +17,7 @@ public final class VehicleMapper {
                 vehicle.model(),
                 vehicle.year().value(),
                 vehicle.color(),
+                vehicle.mileage().map(mileage -> mileage.value()).orElse(null),
                 vehicle.active());
     }
 }
