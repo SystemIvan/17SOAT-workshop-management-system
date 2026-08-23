@@ -382,13 +382,21 @@ logical deactivation when feature implementation is authorized.
 
 ### AD-006 — Decide whether Technician is an aggregate/module or only an identity actor
 
-**Status:** Team Decision Required
+**Status:** Resolved
 
 **Scope:** Whole-team decision
 
+**Decision:** Option A — Technician stays a rich aggregate/module (name, specialties, availability status),
+as already implemented. Assignment (`AssignTechnicianUseCase`, `AssignDiagnosisAssigneeUseCase`) validates
+only that the `technicianId` exists for now; specialty/availability validation against that data is not
+implemented yet and is tracked as technical debt, not as a blocked implementation gap — see
+`docs/tech-debt/TD-002-technician-assignment-does-not-validate-specialty-or-availability.md`.
+
+**Resolved on:** 23 August 2026, ratified by the team.
+
 **Blocking:**
 
-- Blocks the definitive technician ownership and authentication model.
+- No longer blocks the definitive technician ownership model.
 - Does not block Ivan's master-data work.
 
 **Related Epic / responsibility:** Epic 3 and security; existing Technician module.
@@ -414,15 +422,18 @@ Option B — Reduce Technician to an authenticated identity referenced by ID.
 - Advantages: matches newer Miro and simplifies the domain.
 - Disadvantages: discards implemented behavior and loses resource-management rules.
 
-**Recommended option:** Option A for the MVP unless the team explicitly declares specialty/availability out of
-scope. Existing behavior is coherent and removing it creates needless redesign.
+**Recommended option:** Option A, selected by the team. Existing behavior is coherent and removing it would
+have created needless redesign.
 
 **Impact of the decision:** Technician module/domain, auth user mapping, assignment port, ServiceExecution,
 persistence, APIs, tests, Miro and `AGENTS.md`.
 
-**Can work continue without resolving it?** Yes for Ivan. Epic 3 should avoid expanding technician behavior first.
+**Can work continue without resolving it?** Resolved. Technician assignment may proceed under
+existence-only validation; specialty/availability validation is deferred as technical debt (TD-002), not
+as a blocked decision.
 
-**Temporary safe assumption, if any:** Continue referencing Technician only by UUID across modules.
+**Temporary safe assumption, if any:** Not applicable; the decision is resolved. Continue referencing
+Technician only by UUID across modules, as before.
 
 ### AD-007 — Reconcile Part with Stock/StockItem/PurchaseOrder boundaries
 
@@ -1063,7 +1074,6 @@ The following decisions must not be made by Ivan alone:
 | Decision | Why it belongs to the team/other owner | Can Ivan continue? |
 |---|---|---|
 | AD-001 | Defines every bounded-context/module mapping | Jira planning and Customer-local work can continue; Vehicle/ServiceCatalog code cannot |
-| AD-006 | Changes Technician module and Epic 3/auth model | Yes |
 | AD-007 | Owns Epic 4 aggregate/transaction boundary | Yes |
 | AD-009 | Couples Epic 2 pricing to Epic 4 stock | Yes |
 | AD-010 | Shared status-computation strategy was not approved by Ivan; current code already uses Option B | Yes; preserve current behavior |
@@ -1158,10 +1168,10 @@ The existing file is exactly `AGENTS.md` at the repository root. No duplicate fi
 - **Actual architectural decisions identified:** 19.
 - **Ivan / my assigned scope:** 4 (AD-002 through AD-005).
 - **Explicitly approved by Ivan:** 4 (Option A for AD-002 through AD-005).
-- **Team Decision Required:** 12.
+- **Team Decision Required:** 11.
 - **Currently blocking Ivan's Jira planning:** 0.
 - **Currently blocking part of Ivan's implementation:** 1 (AD-001), which gates the conditionally resolved AD-003
   and AD-004.
-- **Resolved:** 6 (AD-002, AD-003, AD-004 and AD-005, approved by Ivan; AD-015 and AD-008, ratified by the team on
-  23 August 2026).
+- **Resolved:** 7 (AD-002, AD-003, AD-004 and AD-005, approved by Ivan; AD-006, AD-008 and AD-015, ratified by the
+  team on 23 August 2026).
 - **Deferred:** 1 (AD-012).

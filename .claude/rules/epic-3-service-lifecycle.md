@@ -20,12 +20,14 @@ Fonte: `docs/Architecture.md` §4.3/4.4, `docs/Architecture-Decisions.md`,
 
 ## Decisões em aberto — não tratar como resolvidas
 
-- **AD-006** (Technician: aggregate/módulo vs. ator autenticado): Team Decision Required. Enquanto
-  não resolvida, referencie Technician só por UUID entre módulos e não amplie comportamento de
-  domínio do Technician além do que já existe. Evidência adicional (Miro, doc "4. Aggregates —
-  Modelo Atualizado", posterior ao RFC-001 de 2026-08-15): classifica Technician como
-  "Ator/capability de apoio... não é aggregate nesta modelagem" — reforça o lado B do conflito, mas
-  não resolve a decisão; o código continua com Technician como aggregate rico.
+- **AD-006** (Technician: aggregate/módulo vs. ator autenticado): **Resolved** em 2026-08-23 — o time
+  ratificou Option A (Technician continua aggregate rico, com `specialties` e `status`/disponibilidade,
+  como já implementado). Continue referenciando Technician só por UUID entre módulos (isso não mudou).
+  A atribuição de Technician (`AssignTechnicianUseCase`, `AssignDiagnosisAssigneeUseCase`) valida hoje
+  apenas a existência do `technicianId` — validar especialidade/disponibilidade contra os dados do
+  aggregate é dívida técnica registrada e não implementada, ver
+  `../../docs/tech-debt/TD-002-technician-assignment-does-not-validate-specialty-or-availability.md`; não
+  trate essa lacuna como decisão pendente nem a implemente sem retomar esse registro.
 - **AD-010** (`statusSnapshot` recalculado em comando vs. calculado em leitura): Team Decision
   Required. Preserve o comportamento implementado (Option B); não redesenhe nem declare a decisão
   compartilhada como aprovada.
