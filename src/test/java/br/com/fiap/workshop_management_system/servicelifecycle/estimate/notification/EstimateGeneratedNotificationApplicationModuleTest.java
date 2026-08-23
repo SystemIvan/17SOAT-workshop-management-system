@@ -48,10 +48,12 @@ class EstimateGeneratedNotificationApplicationModuleTest {
     void generatingAnEstimateReachesTheListenerThroughTheRealPipeline(Scenario scenario) {
         UUID customerId = UUID.randomUUID();
         ServiceOrder serviceOrder = ServiceOrder.create(
-                customerId, UUID.randomUUID(), new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015));
+                customerId, UUID.randomUUID(), new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015),
+                "Initial assessment");
         DiagnosisItem item = new DiagnosisItem(
                 UUID.randomUUID(), "Troca de óleo", Money.brl(BigDecimal.TEN), List.of());
-        serviceOrder.performDiagnosis(List.of(item));
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
+        serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), Instant.EPOCH);
         UUID diagnosisId = serviceOrder.openDiagnosisId();
         serviceOrderRepository.save(serviceOrder);
 
