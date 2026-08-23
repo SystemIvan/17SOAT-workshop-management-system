@@ -527,13 +527,13 @@ class ServiceOrderStatusControllerTest {
 
 ## Approval Checklist
 
-- [ ] Time concorda com Polling para MVP
+- [x] Time concorda com Polling para MVP — ratificado em 23 de agosto de 2026
 - [ ] Team entende plano de migração WebSocket
 - [ ] Documentação atualizada em AGENTS.md
 
 ---
 
-**Last Updated:** Agosto 2026  
+**Last Updated:** 23 de agosto de 2026  
 **Decision Maker:** Santiago Silvestre  
-**Reviewed By:** [Time]  
-**Status:** Accepted
+**Reviewed By:** Time de Desenvolvimento — ratificação do item "Polling para MVP" em 23 de agosto de 2026  
+**Status:** Accepted (ratificado pelo time; ver AD-015 em `docs/Architecture-Decisions.md`)

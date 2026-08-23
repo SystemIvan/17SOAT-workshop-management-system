@@ -43,8 +43,8 @@ A execução termina com `GetServiceOrderStatusUseCaseTest`, `GetServiceOrderUse
 - Não implementar autenticação/autorização por ator (Customer restrito à própria `ServiceOrder`) —
   depende de AD-016, fora de escopo.
 - Não agrupar execuções por Estimate no contrato de resposta — fora de escopo.
-- Não implementar polling com cache, SSE ou WebSocket — depende de AD-015 e do
-  `ADR-001-realtime-updates-strategy.md`, fora de escopo.
+- Não implementar polling com cache, SSE ou WebSocket — AD-015 resolvida a favor de polling puro
+  (2026-08-23), fora de escopo enquanto não houver nova decisão do time.
 - Não importar pacotes internos de `registration` ou `stockprocurement`.
 - Interromper e devolver as specs a `Draft` se surgir uma decisão funcional ou técnica materialmente
   diferente da aprovada.

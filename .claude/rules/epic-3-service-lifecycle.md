@@ -29,14 +29,15 @@ Fonte: `docs/Architecture.md` §4.3/4.4, `docs/Architecture-Decisions.md`,
 - **AD-010** (`statusSnapshot` recalculado em comando vs. calculado em leitura): Team Decision
   Required. Preserve o comportamento implementado (Option B); não redesenhe nem declare a decisão
   compartilhada como aprovada.
-- **AD-015** (estratégia de tracking — polling puro vs. polling+cache vs. SSE/WebSocket): Team
-  Decision Required. Não implemente cache ou WebSocket sem aprovação do time.
-- **`docs/ADR-001-realtime-updates-strategy.md`**: `Status` foi atualizado para `Accepted` por Santiago
-  Silvestre (decision maker registrado) em 2026-08-16. O Approval Checklist do próprio documento
-  (seção final) continua com todos os itens desmarcados — "Time concorda com Polling para MVP" não
-  foi confirmado pelo time. Trate a opção "Polling" como aceita por Santiago, mas **não** como AD-015
-  resolvida: `Architecture-Decisions.md` continua listando AD-015 como Team Decision Required (Scope:
-  Shared architecture) até o time ratificar.
+- **AD-015** (estratégia de tracking — polling puro vs. polling+cache vs. SSE/WebSocket): **Resolved**
+  em 2026-08-23 — o time ratificou Option A (polling puro, sem cache) para o MVP. Ver
+  `docs/Architecture-Decisions.md` e `docs/adr/ADR-001-realtime-updates-strategy.md`. Não implemente
+  cache, SSE ou WebSocket sem uma nova decisão do time — isso reabriria o escopo, não é coberto pela
+  ratificação de AD-015.
+- **`docs/adr/ADR-001-realtime-updates-strategy.md`**: `Status: Accepted`. O item "Time concorda com
+  Polling para MVP" do Approval Checklist foi marcado em 2026-08-23 (ratificação do time). Os outros
+  dois itens do checklist (entendimento do plano de migração WebSocket; documentação atualizada em
+  `AGENTS.md`) continuam em aberto — não tratar esses dois como resolvidos.
 
 ## Regras de fronteira já aceitas (aplicam-se aqui)
 

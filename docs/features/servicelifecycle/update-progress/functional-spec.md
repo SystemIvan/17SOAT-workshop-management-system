@@ -80,8 +80,9 @@ falta — não parte do zero.
   implementado nem proibido explicitamente por esta spec.
 - Qualquer alteração no `statusSnapshot` da `ServiceOrder` como efeito desta operação.
 - Autorização de quem pode registrar progresso — depende de AD-016.
-- Estratégia de tracking em tempo real (polling/cache/WebSocket) — depende de AD-015 e do
-  `docs/adr/ADR-001-realtime-updates-strategy.md`; esta feature não implementa notificação alguma.
+- Estratégia de tracking em tempo real (polling/cache/WebSocket) — AD-015 resolvida em 2026-08-23 a
+  favor de polling puro; cache/push exigiria nova decisão do time. Esta feature não implementa
+  notificação alguma.
 
 ## Critérios de aceite
 

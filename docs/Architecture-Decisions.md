@@ -769,14 +769,21 @@ Option B — Integrate a real email provider.
 
 ### AD-015 — Ratify the tracking update strategy
 
-**Status:** Team Decision Required
+**Status:** Resolved
 
 **Scope:** Shared architecture
 
+**Decision:** Option A — plain client polling of the existing REST status endpoint for MVP, without an
+application cache layer.
+
+**Resolved on:** 23 August 2026, ratified by the team (item 1 of the `ADR-001-realtime-updates-strategy.md`
+Approval Checklist, "Time concorda com Polling para MVP").
+
 **Blocking:**
 
-- Blocks cache/WebSocket-specific implementation.
-- Does not block the existing status query or Ivan.
+- No longer blocks tracking strategy for Epic 3.
+- Cache/WebSocket-specific implementation (Option B and beyond) remains out of scope for the MVP unless a new
+  decision reopens it.
 
 **Related Epic / responsibility:** Epic 3.
 
@@ -786,8 +793,9 @@ mechanism beyond the REST status endpoint.
 **Why this is a decision rather than an implementation gap:** It affects runtime dependencies, consistency,
 client contract and invalidation.
 
-**Conflicting evidence:** `AGENTS.md` declares polling with cache sufficient; C4 shows SimpleCache/5 s; local
-`ADR-001-realtime-updates-strategy.md` has no accepted status; current code exposes GET status but no cache.
+**Conflicting evidence (at the time the decision was open):** `AGENTS.md` declared polling with cache sufficient;
+C4 showed SimpleCache/5 s; local `ADR-001-realtime-updates-strategy.md` had no accepted status; current code
+exposes GET status but no cache.
 
 **Options:**
 
@@ -801,13 +809,16 @@ Option B — Polling plus application cache.
 - Advantages: lower repeated read cost.
 - Disadvantages: invalidation/staleness complexity without demonstrated need.
 
-**Recommended option:** Option A until measurements justify cache. Update the ADR before treating either as final.
+**Recommended option:** Option A, selected by the team. It matches the current implementation
+(`GET /api/service-orders/{id}/status`, no cache) and defers caching until measurements justify it.
 
 **Impact of the decision:** API documentation, caching dependencies/config, invalidation, tests, C4 and AGENTS.
 
-**Can work continue without resolving it?** Yes; keep the existing endpoint free of cache-specific contracts.
+**Can work continue without resolving it?** Resolved. Future work may extend `track-execution` under the plain
+polling contract without a caching layer.
 
-**Temporary safe assumption, if any:** Status remains queryable by REST; clients choose their interval externally.
+**Temporary safe assumption, if any:** Not applicable; the decision is resolved. Introducing a cache, SSE or
+WebSocket mechanism requires a new decision, not a reopening of AD-015.
 
 ### AD-016 — Define identity ownership and authorization policy
 
@@ -1140,9 +1151,10 @@ The existing file is exactly `AGENTS.md` at the repository root. No duplicate fi
 - **Actual architectural decisions identified:** 19.
 - **Ivan / my assigned scope:** 4 (AD-002 through AD-005).
 - **Explicitly approved by Ivan:** 4 (Option A for AD-002 through AD-005).
-- **Team Decision Required:** 14.
+- **Team Decision Required:** 13.
 - **Currently blocking Ivan's Jira planning:** 0.
 - **Currently blocking part of Ivan's implementation:** 1 (AD-001), which gates the conditionally resolved AD-003
   and AD-004.
-- **Resolved:** 4 (AD-002, AD-003, AD-004 and AD-005), all explicitly approved by Ivan.
+- **Resolved:** 5 (AD-002, AD-003, AD-004 and AD-005, approved by Ivan; AD-015, ratified by the team on
+  23 August 2026).
 - **Deferred:** 1 (AD-012).

@@ -74,16 +74,17 @@ servir de base para a cobertura de teste que falta — não parte do zero.
   nesta spec.
 - **Registrar timestamp/duração de execução:** não modelado no domínio atual e não pedido pelo Miro
   para RF22.
-- **Notificar o Customer quando a `ServiceOrder` inteira fica `COMPLETED`:** depende de AD-015
-  (estratégia de tracking) e do `ADR-001-realtime-updates-strategy.md`, ambos ainda pendentes de
-  ratificação pelo time; esta spec não implementa notificação alguma.
+- **Notificar o Customer quando a `ServiceOrder` inteira fica `COMPLETED`:** AD-015 foi resolvida em
+  2026-08-23 a favor de polling puro (sem cache/push); um mecanismo de notificação em tempo real
+  exigiria uma nova decisão do time. Esta spec não implementa notificação alguma.
 
 ## Fora de escopo
 
 - Autorização de quem pode concluir — depende de AD-016.
 - Alterar `TechnicianStatus` ao concluir a execução — depende de AD-006.
 - Registrar timestamp/duração de execução — não modelado no domínio atual.
-- Notificações em tempo real de conclusão — depende de AD-015 e `ADR-001-realtime-updates-strategy.md`.
+- Notificações em tempo real de conclusão — AD-015 resolvida a favor de polling puro (2026-08-23); um
+  mecanismo de push exigiria nova decisão do time.
 - Qualquer mudança na regra de `allNonRejectedExecutionsCompleted` ou na precedência de
   `recomputeStatusSnapshot` — comportamento já implementado e já coberto por teste; esta feature apenas
   fecha a lacuna de cobertura no nível de use case/HTTP e a lacuna de documentação Swagger.
