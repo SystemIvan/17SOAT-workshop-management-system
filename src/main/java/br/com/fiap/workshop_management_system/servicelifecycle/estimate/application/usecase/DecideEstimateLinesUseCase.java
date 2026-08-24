@@ -5,6 +5,7 @@ import br.com.fiap.workshop_management_system.servicelifecycle.estimate.applicat
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.application.dto.EstimateLineDecision;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.Estimate;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateLine;
+import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateStatus;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.repository.EstimateRepository;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderMapper;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderResponse;
@@ -69,6 +70,10 @@ public class DecideEstimateLinesUseCase {
         Estimate estimate = estimateRepository.findById(estimateId)
                 .orElseThrow(() -> new NoSuchElementException("Estimate not found: " + estimateId));
 
+        if (estimate.status() != EstimateStatus.SENT) {
+            throw new IllegalStateException("Estimate is not open for decisions: " + estimateId);
+        }
+
         Set<UUID> requestedIds = new HashSet<>();
         for (LineDecisionRequest decision : request.decisions()) {
             if (!requestedIds.add(decision.serviceExecutionId())) {
@@ -111,6 +116,15 @@ public class DecideEstimateLinesUseCase {
             } else {
                 serviceOrder.rejectExecutionFromEstimate(estimate.id(), decision.serviceExecutionId());
             }
+        }
+
+        boolean allLinesDecided = estimate.lines().stream()
+                .map(EstimateLine::serviceExecutionId)
+                .map(executionsById::get)
+                .noneMatch(execution -> execution.status() == ServiceExecutionStatus.PENDING);
+        if (allLinesDecided) {
+            estimate.close();
+            estimateRepository.save(estimate);
         }
 
         List<ReserveStockItemsCommand> reservationCommands = request.decisions().stream()

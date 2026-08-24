@@ -336,7 +336,8 @@
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"decisions\": [\n    { \"serviceExecutionId\": \"{{executionId}}\", \"decision\": \"APPROVED\" }\n  ]\n}" },
-            "url": "{{baseUrl}}/api/estimates/{{estimateId}}/decisions"
+            "url": "{{baseUrl}}/api/estimates/{{estimateId}}/decisions",
+            "description": "Retorna 409/INVALID_STATE_TRANSITION se a service execution não estiver PENDING ou se a estimate não estiver SENT (ex.: já CLOSED por uma decisão anterior ter fechado todas as linhas)."
           }
         }
       ]

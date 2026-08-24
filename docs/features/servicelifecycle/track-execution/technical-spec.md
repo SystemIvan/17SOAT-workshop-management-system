@@ -72,8 +72,10 @@ Esta feature não implementará:
   depende de AD-016, `Team Decision Required`, e é a lacuna já registrada em `Architecture.md` §11;
 - agrupamento das execuções por Estimate no contrato de resposta — mudança de comportamento, fora do
   escopo de fechamento de lacuna de cobertura;
-- qualquer mecanismo de polling com cache, SSE ou WebSocket — depende de AD-015 (`Team Decision
-  Required`) e do `ADR-001-realtime-updates-strategy.md`;
+- qualquer mecanismo de polling com cache, SSE ou WebSocket — AD-015 foi resolvida em 2026-08-23 a favor
+  de polling puro (Option A), sem cache; introduzir esses mecanismos exigiria uma nova decisão do time,
+  não é coberto pela ratificação atual (ver `docs/Architecture-Decisions.md` e
+  `../../../adr/ADR-002-realtime-updates-strategy.md`);
 - qualquer mudança na precedência de `recomputeStatusSnapshot` — já implementada e já coberta por
   teste de domínio;
 - RF24 (`FinalizeServiceOrderUseCase`) — feature separada.

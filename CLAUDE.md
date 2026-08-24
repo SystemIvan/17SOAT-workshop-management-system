@@ -5,12 +5,12 @@
 Complements `AGENTS.md` (project rules) without repeating it. This section is project-wide — valid for
 any bounded context or epic, not tied to one contributor.
 
-## Known documentation gap
+## ADR numbering (official, resolved 2026-08-23)
 
-`AGENTS.md` references `docs/adr/ADR-002-notifications-boundary.md`; the actual file is
-`docs/adr/ADR-003-notifications-boundary.md`. Already tracked as a gap in `docs/Architecture-Decisions.md`.
-Do not create a duplicate `ADR-002` file to "fix" the mismatch without checking whether the numbering
-gap itself is intentional (e.g. a superseded/renumbered ADR) — read `Architecture-Decisions.md` first.
+`docs/adr/` uses sequential numbers: `ADR-001-escolha-do-banco-de-dados.md`,
+`ADR-002-realtime-updates-strategy.md`, `ADR-003-authentication-strategy.md`,
+`ADR-004-notifications-boundary.md`. Any new ADR must use the next free sequential number (currently
+005) — do not reuse 001–004.
 
 ## Per-epic local rules
 

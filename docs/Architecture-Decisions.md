@@ -382,13 +382,21 @@ logical deactivation when feature implementation is authorized.
 
 ### AD-006 — Decide whether Technician is an aggregate/module or only an identity actor
 
-**Status:** Team Decision Required
+**Status:** Resolved
 
 **Scope:** Whole-team decision
 
+**Decision:** Option A — Technician stays a rich aggregate/module (name, specialties, availability status),
+as already implemented. Assignment (`AssignTechnicianUseCase`, `AssignDiagnosisAssigneeUseCase`) validates
+only that the `technicianId` exists for now; specialty/availability validation against that data is not
+implemented yet and is tracked as technical debt, not as a blocked implementation gap — see
+`docs/tech-debt/TD-002-technician-assignment-does-not-validate-specialty-or-availability.md`.
+
+**Resolved on:** 23 August 2026, ratified by the team.
+
 **Blocking:**
 
-- Blocks the definitive technician ownership and authentication model.
+- No longer blocks the definitive technician ownership model.
 - Does not block Ivan's master-data work.
 
 **Related Epic / responsibility:** Epic 3 and security; existing Technician module.
@@ -414,15 +422,18 @@ Option B — Reduce Technician to an authenticated identity referenced by ID.
 - Advantages: matches newer Miro and simplifies the domain.
 - Disadvantages: discards implemented behavior and loses resource-management rules.
 
-**Recommended option:** Option A for the MVP unless the team explicitly declares specialty/availability out of
-scope. Existing behavior is coherent and removing it creates needless redesign.
+**Recommended option:** Option A, selected by the team. Existing behavior is coherent and removing it would
+have created needless redesign.
 
 **Impact of the decision:** Technician module/domain, auth user mapping, assignment port, ServiceExecution,
 persistence, APIs, tests, Miro and `AGENTS.md`.
 
-**Can work continue without resolving it?** Yes for Ivan. Epic 3 should avoid expanding technician behavior first.
+**Can work continue without resolving it?** Resolved. Technician assignment may proceed under
+existence-only validation; specialty/availability validation is deferred as technical debt (TD-002), not
+as a blocked decision.
 
-**Temporary safe assumption, if any:** Continue referencing Technician only by UUID across modules.
+**Temporary safe assumption, if any:** Not applicable; the decision is resolved. Continue referencing
+Technician only by UUID across modules, as before.
 
 ### AD-007 — Reconcile Part with Stock/StockItem/PurchaseOrder boundaries
 
@@ -469,13 +480,18 @@ under concurrency. The final choice must document the transaction boundary.
 
 ### AD-008 — Confirm Estimate approval granularity and lifecycle
 
-**Status:** Team Decision Required
+**Status:** Resolved
 
 **Scope:** Another team member's scope
 
+**Decision:** Option A — per-ServiceExecution line approval/rejection, with the Estimate itself tracked by status
+(`draft`, `sent`, `closed`, `expired`) rather than a single approve/reject flag on the whole Estimate.
+
+**Resolved on:** 23 August 2026, ratified by the team.
+
 **Blocking:**
 
-- Blocks Estimate aggregate implementation and Epic 3 authorization integration.
+- No longer blocks Estimate aggregate implementation or Epic 3 authorization integration.
 - Does not block Ivan except the future catalog snapshot contract.
 
 **Related Epic / responsibility:** Epic 2 — Diagnosis and Estimate.
@@ -501,15 +517,16 @@ Option B — Whole-Estimate approval/rejection.
 - Advantages: simpler model and UI.
 - Disadvantages: contradicts newer documented decision and loses partial approval.
 
-**Recommended option:** Option A, then mark older whole-Estimate artifacts superseded.
+**Recommended option:** Option A, selected by the team. Older whole-Estimate approve/reject artifacts are
+superseded.
 
 **Impact of the decision:** Estimate, ServiceExecution states/events, stock reservation, tracking, persistence,
 APIs, tests, Jira acceptance criteria and Miro cleanup.
 
-**Can work continue without resolving it?** No for Estimate; other epics may use agreed fake events temporarily.
+**Can work continue without resolving it?** Resolved. Estimate implementation may proceed under per-line
+approval with `draft`/`sent`/`closed`/`expired` Estimate states.
 
-**Temporary safe assumption, if any:** Consumers may mock a versioned `ServiceExecutionApproved` event without
-implementing Estimate internals.
+**Temporary safe assumption, if any:** Not applicable; the decision is resolved.
 
 ### AD-009 — Associate part lines with service decisions
 
@@ -554,14 +571,18 @@ Option B — Nest part snapshots inside each EstimateLineService.
 
 ### AD-010 — Materialize ServiceOrder status as statusSnapshot
 
-**Status:** Team Decision Required
+**Status:** Resolved
 
 **Scope:** Shared architecture
 
+**Decision:** Option B — store `statusSnapshot` on `ServiceOrder` and recompute it after every relevant command,
+as already implemented. Queries only read the stored field; they do not recompute status on the fly.
+
+**Resolved on:** 24 August 2026, ratified by the team.
+
 **Blocking:**
 
-- Does not block Ivan or current ServiceOrder work while existing behavior is preserved.
-- Blocks deliberately replacing or expanding the status-computation strategy without team ratification.
+- No longer blocks Epic 3 tracking/read-model work built on `statusSnapshot`.
 
 **Related Epic / responsibility:** Epic 3 — Execution and Tracking.
 
@@ -585,17 +606,14 @@ Option B — Store and recompute `statusSnapshot` after relevant commands.
 - Advantages: efficient reads; matches current code and newer refinement.
 - Disadvantages: every state-changing path must maintain the snapshot.
 
-**Recommended option:** Option B because it is implemented and matches the newer Miro refinement. This is evidence
-of the current direction, not explicit approval by Ivan; the team must ratify it before the register marks it
-Resolved.
+**Recommended option:** Option B, selected by the team. It is implemented and matches the newer Miro refinement.
 
 **Impact of the decision:** ServiceOrder invariants, persistence, command tests, tracking queries and docs.
 
-**Can work continue without resolving it?** Yes, by preserving the current `statusSnapshot` behavior and avoiding
-architecture changes in this area.
+**Can work continue without resolving it?** Resolved. `statusSnapshot` is confirmed as the durable status
+representation; every command that changes ServiceOrder state must keep maintaining it.
 
-**Temporary safe assumption, if any:** Treat Option B as current implementation evidence, not as permission to
-redesign or declare the shared decision approved.
+**Temporary safe assumption, if any:** Not applicable; the decision is resolved.
 
 ### AD-011 — Choose in-process module integration contracts
 
@@ -769,14 +787,21 @@ Option B — Integrate a real email provider.
 
 ### AD-015 — Ratify the tracking update strategy
 
-**Status:** Team Decision Required
+**Status:** Resolved
 
 **Scope:** Shared architecture
 
+**Decision:** Option A — plain client polling of the existing REST status endpoint for MVP, without an
+application cache layer.
+
+**Resolved on:** 23 August 2026, ratified by the team (item 1 of the `ADR-002-realtime-updates-strategy.md`
+Approval Checklist, "Time concorda com Polling para MVP").
+
 **Blocking:**
 
-- Blocks cache/WebSocket-specific implementation.
-- Does not block the existing status query or Ivan.
+- No longer blocks tracking strategy for Epic 3.
+- Cache/WebSocket-specific implementation (Option B and beyond) remains out of scope for the MVP unless a new
+  decision reopens it.
 
 **Related Epic / responsibility:** Epic 3.
 
@@ -786,8 +811,9 @@ mechanism beyond the REST status endpoint.
 **Why this is a decision rather than an implementation gap:** It affects runtime dependencies, consistency,
 client contract and invalidation.
 
-**Conflicting evidence:** `AGENTS.md` declares polling with cache sufficient; C4 shows SimpleCache/5 s; local
-`ADR-001-realtime-updates-strategy.md` has no accepted status; current code exposes GET status but no cache.
+**Conflicting evidence (at the time the decision was open):** `AGENTS.md` declared polling with cache sufficient;
+C4 showed SimpleCache/5 s; local `ADR-002-realtime-updates-strategy.md` had no accepted status; current code
+exposes GET status but no cache.
 
 **Options:**
 
@@ -801,13 +827,16 @@ Option B — Polling plus application cache.
 - Advantages: lower repeated read cost.
 - Disadvantages: invalidation/staleness complexity without demonstrated need.
 
-**Recommended option:** Option A until measurements justify cache. Update the ADR before treating either as final.
+**Recommended option:** Option A, selected by the team. It matches the current implementation
+(`GET /api/service-orders/{id}/status`, no cache) and defers caching until measurements justify it.
 
 **Impact of the decision:** API documentation, caching dependencies/config, invalidation, tests, C4 and AGENTS.
 
-**Can work continue without resolving it?** Yes; keep the existing endpoint free of cache-specific contracts.
+**Can work continue without resolving it?** Resolved. Future work may extend `track-execution` under the plain
+polling contract without a caching layer.
 
-**Temporary safe assumption, if any:** Status remains queryable by REST; clients choose their interval externally.
+**Temporary safe assumption, if any:** Not applicable; the decision is resolved. Introducing a cache, SSE or
+WebSocket mechanism requires a new decision, not a reopening of AD-015.
 
 ### AD-016 — Define identity ownership and authorization policy
 
@@ -1046,15 +1075,11 @@ The following decisions must not be made by Ivan alone:
 | Decision | Why it belongs to the team/other owner | Can Ivan continue? |
 |---|---|---|
 | AD-001 | Defines every bounded-context/module mapping | Jira planning and Customer-local work can continue; Vehicle/ServiceCatalog code cannot |
-| AD-006 | Changes Technician module and Epic 3/auth model | Yes |
 | AD-007 | Owns Epic 4 aggregate/transaction boundary | Yes |
-| AD-008 | Owns Epic 2 approval semantics and downstream events | Yes, except dependent integration contract |
 | AD-009 | Couples Epic 2 pricing to Epic 4 stock | Yes |
-| AD-010 | Shared status-computation strategy was not approved by Ivan; current code already uses Option B | Yes; preserve current behavior |
 | AD-011 | Establishes all inter-module contracts | Yes with mocks |
 | AD-013 | Owns Estimate business time and scheduling | Yes |
 | AD-014 | Owns Notification module/channel | Yes |
-| AD-015 | Owns runtime tracking/caching strategy | Yes |
 | AD-016 | Establishes cross-system identity and roles | Yes for domain; not secured API completion |
 | AD-017 | Establishes shared database change policy | Yes briefly |
 | AD-018 | Changes external-integration/delivery scope | Yes |
@@ -1070,7 +1095,8 @@ These items do not need a new architecture decision once their related decision,
 - Implement Vehicle CRUD/validation after AD-001/AD-003.
 - Implement ServiceCatalog registration and price update after AD-001/AD-004.
 - Add ServiceOrder list endpoint and administrative filters.
-- Implement Estimate code after AD-008/AD-009/AD-013.
+- Implement Estimate code under the resolved AD-008 per-line/`draft`-`sent`-`closed`-`expired` model, after
+  AD-009/AD-013.
 - Implement PurchaseOrder and stock reservation after AD-007.
 - Implement Notification handlers after AD-014.
 - Add Spring Security/JWT dependencies and filters after AD-016; the technology choice itself is already accepted.
@@ -1085,7 +1111,9 @@ These items do not need a new architecture decision once their related decision,
 
 ## Documentation Gaps
 
-- Mark the old whole-Estimate approval and on-read status documents as superseded where appropriate.
+- Mark the old whole-Estimate approval and on-read status documents as superseded (AD-008 resolved in favor of
+  per-line approval with `draft`/`sent`/`closed`/`expired` Estimate states; AD-010 resolved in favor of persisted
+  `statusSnapshot`, recomputed on command).
 - Align C4 bounded-context names with the eventual AD-001 mapping.
 - Remove or mark Payment Gateway as future/unconfirmed after AD-018.
 - Add External Supplier System to the relevant C4 view if retained.
@@ -1140,9 +1168,10 @@ The existing file is exactly `AGENTS.md` at the repository root. No duplicate fi
 - **Actual architectural decisions identified:** 19.
 - **Ivan / my assigned scope:** 4 (AD-002 through AD-005).
 - **Explicitly approved by Ivan:** 4 (Option A for AD-002 through AD-005).
-- **Team Decision Required:** 14.
+- **Team Decision Required:** 10.
 - **Currently blocking Ivan's Jira planning:** 0.
 - **Currently blocking part of Ivan's implementation:** 1 (AD-001), which gates the conditionally resolved AD-003
   and AD-004.
-- **Resolved:** 4 (AD-002, AD-003, AD-004 and AD-005), all explicitly approved by Ivan.
+- **Resolved:** 8 (AD-002, AD-003, AD-004 and AD-005, approved by Ivan; AD-006, AD-008 and AD-015, ratified by the
+  team on 23 August 2026; AD-010, ratified by the team on 24 August 2026).
 - **Deferred:** 1 (AD-012).
