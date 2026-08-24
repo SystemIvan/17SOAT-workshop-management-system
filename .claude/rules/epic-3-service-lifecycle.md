@@ -16,7 +16,8 @@ Fonte: `docs/Architecture.md` §4.3/4.4, `docs/Architecture-Decisions.md`,
 
 - `ServiceExecution` states: `pending → authorized → ready/awaiting_part → in_progress → completed`,
   com `rejected` terminal.
-- `ServiceOrder.statusSnapshot` é recalculado em comandos e apenas lido nas consultas.
+- `ServiceOrder.statusSnapshot` é recalculado em comandos e apenas lido nas consultas (ratificado como
+  AD-010, ver abaixo).
 
 ## Decisões em aberto — não tratar como resolvidas
 
@@ -26,9 +27,10 @@ Fonte: `docs/Architecture.md` §4.3/4.4, `docs/Architecture-Decisions.md`,
   Modelo Atualizado", posterior ao RFC-001 de 2026-08-15): classifica Technician como
   "Ator/capability de apoio... não é aggregate nesta modelagem" — reforça o lado B do conflito, mas
   não resolve a decisão; o código continua com Technician como aggregate rico.
-- **AD-010** (`statusSnapshot` recalculado em comando vs. calculado em leitura): Team Decision
-  Required. Preserve o comportamento implementado (Option B); não redesenhe nem declare a decisão
-  compartilhada como aprovada.
+- **AD-010** (`statusSnapshot` recalculado em comando vs. calculado em leitura): **Resolved** em
+  2026-08-24 — o time ratificou Option B (armazenar `statusSnapshot` em `ServiceOrder` e recalcular após
+  cada comando relevante), como já implementado. Leituras continuam apenas lendo o campo persistido;
+  não implemente recálculo em leitura sem uma nova decisão do time.
 - **AD-015** (estratégia de tracking — polling puro vs. polling+cache vs. SSE/WebSocket): Team
   Decision Required. Não implemente cache ou WebSocket sem aprovação do time.
 - **`docs/ADR-001-realtime-updates-strategy.md`**: `Status` foi atualizado para `Accepted` por Santiago

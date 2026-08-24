@@ -554,14 +554,18 @@ Option B — Nest part snapshots inside each EstimateLineService.
 
 ### AD-010 — Materialize ServiceOrder status as statusSnapshot
 
-**Status:** Team Decision Required
+**Status:** Resolved
 
 **Scope:** Shared architecture
 
+**Decision:** Option B — store `statusSnapshot` on `ServiceOrder` and recompute it after every relevant command,
+as already implemented. Queries only read the stored field; they do not recompute status on the fly.
+
+**Resolved on:** 24 August 2026, ratified by the team.
+
 **Blocking:**
 
-- Does not block Ivan or current ServiceOrder work while existing behavior is preserved.
-- Blocks deliberately replacing or expanding the status-computation strategy without team ratification.
+- No longer blocks Epic 3 tracking/read-model work built on `statusSnapshot`.
 
 **Related Epic / responsibility:** Epic 3 — Execution and Tracking.
 
@@ -585,17 +589,14 @@ Option B — Store and recompute `statusSnapshot` after relevant commands.
 - Advantages: efficient reads; matches current code and newer refinement.
 - Disadvantages: every state-changing path must maintain the snapshot.
 
-**Recommended option:** Option B because it is implemented and matches the newer Miro refinement. This is evidence
-of the current direction, not explicit approval by Ivan; the team must ratify it before the register marks it
-Resolved.
+**Recommended option:** Option B, selected by the team. It is implemented and matches the newer Miro refinement.
 
 **Impact of the decision:** ServiceOrder invariants, persistence, command tests, tracking queries and docs.
 
-**Can work continue without resolving it?** Yes, by preserving the current `statusSnapshot` behavior and avoiding
-architecture changes in this area.
+**Can work continue without resolving it?** Resolved. `statusSnapshot` is confirmed as the durable status
+representation; every command that changes ServiceOrder state must keep maintaining it.
 
-**Temporary safe assumption, if any:** Treat Option B as current implementation evidence, not as permission to
-redesign or declare the shared decision approved.
+**Temporary safe assumption, if any:** Not applicable; the decision is resolved.
 
 ### AD-011 — Choose in-process module integration contracts
 
@@ -1050,7 +1051,6 @@ The following decisions must not be made by Ivan alone:
 | AD-007 | Owns Epic 4 aggregate/transaction boundary | Yes |
 | AD-008 | Owns Epic 2 approval semantics and downstream events | Yes, except dependent integration contract |
 | AD-009 | Couples Epic 2 pricing to Epic 4 stock | Yes |
-| AD-010 | Shared status-computation strategy was not approved by Ivan; current code already uses Option B | Yes; preserve current behavior |
 | AD-011 | Establishes all inter-module contracts | Yes with mocks |
 | AD-013 | Owns Estimate business time and scheduling | Yes |
 | AD-014 | Owns Notification module/channel | Yes |
@@ -1085,7 +1085,8 @@ These items do not need a new architecture decision once their related decision,
 
 ## Documentation Gaps
 
-- Mark the old whole-Estimate approval and on-read status documents as superseded where appropriate.
+- Mark the old whole-Estimate approval and on-read status documents as superseded (AD-010 resolved in favor of
+  persisted `statusSnapshot`, recomputed on command).
 - Align C4 bounded-context names with the eventual AD-001 mapping.
 - Remove or mark Payment Gateway as future/unconfirmed after AD-018.
 - Add External Supplier System to the relevant C4 view if retained.
@@ -1140,9 +1141,10 @@ The existing file is exactly `AGENTS.md` at the repository root. No duplicate fi
 - **Actual architectural decisions identified:** 19.
 - **Ivan / my assigned scope:** 4 (AD-002 through AD-005).
 - **Explicitly approved by Ivan:** 4 (Option A for AD-002 through AD-005).
-- **Team Decision Required:** 14.
+- **Team Decision Required:** 13.
 - **Currently blocking Ivan's Jira planning:** 0.
 - **Currently blocking part of Ivan's implementation:** 1 (AD-001), which gates the conditionally resolved AD-003
   and AD-004.
-- **Resolved:** 4 (AD-002, AD-003, AD-004 and AD-005), all explicitly approved by Ivan.
+- **Resolved:** 5 (AD-002, AD-003, AD-004 and AD-005, approved by Ivan; AD-010, ratified by the team on
+  24 August 2026).
 - **Deferred:** 1 (AD-012).
