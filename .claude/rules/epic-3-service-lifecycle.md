@@ -16,7 +16,8 @@ Fonte: `docs/Architecture.md` §4.3/4.4, `docs/Architecture-Decisions.md`,
 
 - `ServiceExecution` states: `pending → authorized → ready/awaiting_part → in_progress → completed`,
   com `rejected` terminal.
-- `ServiceOrder.statusSnapshot` é recalculado em comandos e apenas lido nas consultas.
+- `ServiceOrder.statusSnapshot` é recalculado em comandos e apenas lido nas consultas (ratificado como
+  AD-010, ver abaixo).
 
 ## Decisões em aberto — não tratar como resolvidas
 
@@ -28,9 +29,10 @@ Fonte: `docs/Architecture.md` §4.3/4.4, `docs/Architecture-Decisions.md`,
   aggregate é dívida técnica registrada e não implementada, ver
   `../../docs/tech-debt/TD-002-technician-assignment-does-not-validate-specialty-or-availability.md`; não
   trate essa lacuna como decisão pendente nem a implemente sem retomar esse registro.
-- **AD-010** (`statusSnapshot` recalculado em comando vs. calculado em leitura): Team Decision
-  Required. Preserve o comportamento implementado (Option B); não redesenhe nem declare a decisão
-  compartilhada como aprovada.
+- **AD-010** (`statusSnapshot` recalculado em comando vs. calculado em leitura): **Resolved** em
+  2026-08-24 — o time ratificou Option B (armazenar `statusSnapshot` em `ServiceOrder` e recalcular após
+  cada comando relevante), como já implementado. Leituras continuam apenas lendo o campo persistido;
+  não implemente recálculo em leitura sem uma nova decisão do time.
 - **AD-015** (estratégia de tracking — polling puro vs. polling+cache vs. SSE/WebSocket): **Resolved**
   em 2026-08-23 — o time ratificou Option A (polling puro, sem cache) para o MVP. Ver
   `docs/Architecture-Decisions.md` e `../../docs/adr/ADR-002-realtime-updates-strategy.md`. Não implemente
