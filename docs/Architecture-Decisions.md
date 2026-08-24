@@ -1058,11 +1058,9 @@ AD-001 and must not be treated as approval of the shared context mapping.
   administrative endpoint security and authorization tests.
 - **AD-017 — schema migration policy:** does not block model/story planning or short-lived local work; it must be
   resolved before several epics integrate shared schema changes.
-- **AD-010 — status computation:** does not block Ivan; preserve the implemented `statusSnapshot` behavior while
-  team ratification remains pending.
 - **AD-006 through AD-009, AD-014, AD-015, AD-018 and AD-019:** belong to the team or other owners and do not
   block Ivan's registration backlog except through the specific integration dependencies already identified.
-  AD-013 is resolved (see above) and no longer part of this pending group.
+  AD-010 and AD-013 are resolved (see above) and no longer part of this pending group.
 - **AD-012 — event delivery guarantees:** remains deferred and does not block registration work.
 
 ### Blocking
