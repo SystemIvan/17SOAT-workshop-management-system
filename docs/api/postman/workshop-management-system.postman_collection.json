@@ -164,6 +164,26 @@
               }
             },
             {
+              "name": "Rename catalog service",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Troca de óleo premium\"\n}" },
+                "url": "{{baseUrl}}/api/catalog-services/{{catalogServiceId}}",
+                "description": "Atualiza somente o nome de exibição de um serviço ativo."
+              }
+            },
+            {
+              "name": "Update catalog service base price",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"basePrice\": {\n    \"value\": 180.00,\n    \"currency\": \"BRL\"\n  }\n}" },
+                "url": "{{baseUrl}}/api/catalog-services/{{catalogServiceId}}/base-price",
+                "description": "Atualiza somente o preço-base BRL de um serviço ativo."
+              }
+            },
+            {
               "name": "List active catalog services",
               "request": {
                 "method": "GET",

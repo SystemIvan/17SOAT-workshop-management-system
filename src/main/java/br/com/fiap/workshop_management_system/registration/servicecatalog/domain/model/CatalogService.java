@@ -5,7 +5,7 @@ import java.util.UUID;
 public class CatalogService {
 
     private final UUID id;
-    private final CatalogServiceName name;
+    private CatalogServiceName name;
     private Money basePrice;
     private boolean active;
 
@@ -51,5 +51,37 @@ public class CatalogService {
 
     public boolean active() {
         return active;
+    }
+
+    public boolean rename(CatalogServiceName newName) {
+        ensureActive();
+        if (newName == null) {
+            throw new IllegalArgumentException("O nome do serviço é obrigatório");
+        }
+        if (name.value().equals(newName.value())) {
+            return false;
+        }
+
+        name = newName;
+        return true;
+    }
+
+    public boolean updateBasePrice(Money newBasePrice) {
+        ensureActive();
+        if (newBasePrice == null) {
+            throw new IllegalArgumentException("O preço-base do serviço é obrigatório");
+        }
+        if (basePrice.equals(newBasePrice)) {
+            return false;
+        }
+
+        basePrice = newBasePrice;
+        return true;
+    }
+
+    private void ensureActive() {
+        if (!active) {
+            throw new CatalogServiceArchivedException();
+        }
     }
 }

@@ -6,6 +6,8 @@ import br.com.fiap.workshop_management_system.registration.servicecatalog.domain
 import br.com.fiap.workshop_management_system.registration.servicecatalog.domain.model.Money;
 import br.com.fiap.workshop_management_system.registration.servicecatalog.domain.repository.CatalogServiceRepository;
 import br.com.fiap.workshop_management_system.registration.servicecatalog.infrastructure.persistence
+        .CatalogServiceJpaEntity;
+import br.com.fiap.workshop_management_system.registration.servicecatalog.infrastructure.persistence
         .CatalogServiceJpaRepository;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +29,7 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -176,8 +179,218 @@ class CatalogServiceControllerTest {
         assertEquals(0, jpaRepository.count());
     }
 
+    @Test
+    void renamesAndUpdatesThePriceOfAnActiveService() throws Exception {
+        CatalogService service = service("Alinhamento", true);
+        repository.save(service);
+
+        mockMvc.perform(patch("/api/catalog-services/{id}", service.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"  Alinhamento Premium  "}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(service.id().toString()))
+                .andExpect(jsonPath("$.name").value("Alinhamento Premium"))
+                .andExpect(jsonPath("$.basePrice.value").value(50.0))
+                .andExpect(jsonPath("$.active").value(true));
+
+        mockMvc.perform(patch("/api/catalog-services/{id}/base-price", service.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"basePrice":{"value":89.90,"currency":"BRL"}}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(service.id().toString()))
+                .andExpect(jsonPath("$.name").value("Alinhamento Premium"))
+                .andExpect(jsonPath("$.basePrice.value").value(89.9))
+                .andExpect(jsonPath("$.basePrice.currency").value("BRL"))
+                .andExpect(jsonPath("$.active").value(true));
+
+        mockMvc.perform(get("/api/catalog-services/{id}", service.id()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Alinhamento Premium"))
+                .andExpect(jsonPath("$.basePrice.value").value(89.9));
+        assertEquals(1, jpaRepository.count());
+    }
+
+    @Test
+    void treatsIdenticalUpdatesAsSuccessAndPersistsACaseOnlyCorrection() throws Exception {
+        CatalogService service = service("alinhamento", true);
+        repository.save(service);
+
+        mockMvc.perform(patch("/api/catalog-services/{id}", service.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"  alinhamento  "}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("alinhamento"));
+
+        mockMvc.perform(patch("/api/catalog-services/{id}", service.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"ALINHAMENTO"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("ALINHAMENTO"));
+
+        mockMvc.perform(patch("/api/catalog-services/{id}/base-price", service.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"basePrice":{"value":50,"currency":"BRL"}}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.basePrice.value").value(50.0));
+
+        mockMvc.perform(patch("/api/catalog-services/{id}/base-price", service.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"basePrice":{"value":0,"currency":"BRL"}}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.basePrice.value").value(0.0));
+
+        assertEquals("ALINHAMENTO", jpaRepository.findById(service.id()).orElseThrow().getName());
+        assertEquals(1, jpaRepository.count());
+    }
+
+    @Test
+    void rejectsRenameToANameOwnedByAnotherService() throws Exception {
+        CatalogService target = service("Alinhamento", true);
+        CatalogService existing = service("Balanceamento", false);
+        repository.save(target);
+        repository.save(existing);
+
+        mockMvc.perform(patch("/api/catalog-services/{id}", target.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"  BALANCEAMENTO  "}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CATALOG_SERVICE_NAME_ALREADY_EXISTS"))
+                .andExpect(jsonPath("$.message").value(
+                        "Já existe um serviço cadastrado com esse nome: "
+                                + existing.id() + " - Balanceamento"));
+
+        assertEquals("Alinhamento", jpaRepository.findById(target.id()).orElseThrow().getName());
+        assertEquals(2, jpaRepository.count());
+    }
+
+    @Test
+    void rejectsInvalidPatchPayloadsWithoutChangingTheService() throws Exception {
+        CatalogService service = service("Alinhamento", true);
+        repository.save(service);
+
+        expectPatchValidationError("/api/catalog-services/" + service.id(), "{\"name\":\"   \"}");
+        expectPatchValidationError(
+                "/api/catalog-services/" + service.id(),
+                "{\"name\":\"" + "x".repeat(256) + "\"}");
+        expectPatchValidationError("/api/catalog-services/" + service.id(), "{\"name\":}");
+        expectPatchValidationError(
+                "/api/catalog-services/" + service.id() + "/base-price",
+                "{\"basePrice\":null}");
+        expectPatchValidationError(
+                "/api/catalog-services/" + service.id() + "/base-price",
+                "{\"basePrice\":{\"value\":-0.01,\"currency\":\"BRL\"}}");
+        expectPatchValidationError(
+                "/api/catalog-services/" + service.id() + "/base-price",
+                "{\"basePrice\":{\"value\":10.001,\"currency\":\"BRL\"}}");
+        expectPatchValidationError(
+                "/api/catalog-services/" + service.id() + "/base-price",
+                "{\"basePrice\":{\"value\":100000000000000000.00,\"currency\":\"BRL\"}}");
+        expectPatchValidationError(
+                "/api/catalog-services/" + service.id() + "/base-price",
+                "{\"basePrice\":{\"value\":10,\"currency\":\"USD\"}}");
+
+        CatalogServiceJpaEntity stored = jpaRepository.findById(service.id()).orElseThrow();
+        assertEquals("Alinhamento", stored.getName());
+        assertEquals(new BigDecimal("50.00"), stored.getBasePriceValue());
+        assertEquals(1, jpaRepository.count());
+    }
+
+    @Test
+    void reportsMissingMalformedAndArchivedPatchTargets() throws Exception {
+        mockMvc.perform(patch("/api/catalog-services/{id}", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Alinhamento\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CATALOG_SERVICE_NOT_FOUND"));
+
+        mockMvc.perform(patch("/api/catalog-services/not-a-uuid/base-price")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"basePrice\":{\"value\":10,\"currency\":\"BRL\"}}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("Requisição inválida"));
+
+        CatalogService archived = service("Serviço arquivado", false);
+        repository.save(archived);
+
+        mockMvc.perform(patch("/api/catalog-services/{id}", archived.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Serviço arquivado\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CATALOG_SERVICE_ARCHIVED"))
+                .andExpect(jsonPath("$.message").value("Serviço arquivado não pode ser atualizado"));
+
+        mockMvc.perform(patch("/api/catalog-services/{id}/base-price", archived.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"basePrice\":{\"value\":50,\"currency\":\"BRL\"}}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CATALOG_SERVICE_ARCHIVED"));
+    }
+
+    @Test
+    void preventsMassAssignmentAcrossPatchCommands() throws Exception {
+        CatalogService service = service("Alinhamento", true);
+        repository.save(service);
+
+        mockMvc.perform(patch("/api/catalog-services/{id}", service.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "id":"%s",
+                                  "name":"Alinhamento Premium",
+                                  "basePrice":{"value":999.99,"currency":"BRL"},
+                                  "active":false,
+                                  "normalizedNameKey":"controlled"
+                                }
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(service.id().toString()))
+                .andExpect(jsonPath("$.basePrice.value").value(50.0))
+                .andExpect(jsonPath("$.active").value(true));
+
+        mockMvc.perform(patch("/api/catalog-services/{id}/base-price", service.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "id":"%s",
+                                  "name":"Nome controlado",
+                                  "basePrice":{"value":75.00,"currency":"BRL"},
+                                  "active":false
+                                }
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(service.id().toString()))
+                .andExpect(jsonPath("$.name").value("Alinhamento Premium"))
+                .andExpect(jsonPath("$.basePrice.value").value(75.0))
+                .andExpect(jsonPath("$.active").value(true));
+
+        assertEquals(1, jpaRepository.count());
+    }
+
     private void expectValidationError(String body) throws Exception {
         mockMvc.perform(post("/api/catalog-services")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    private void expectPatchValidationError(String path, String body) throws Exception {
+        mockMvc.perform(patch(path)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest())

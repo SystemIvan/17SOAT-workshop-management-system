@@ -5,6 +5,7 @@ import br.com.fiap.workshop_management_system.registration.servicecatalog.applic
         .CatalogServiceNameAlreadyExistsException;
 import br.com.fiap.workshop_management_system.registration.servicecatalog.application.exception
         .CatalogServiceNotFoundException;
+import br.com.fiap.workshop_management_system.registration.servicecatalog.domain.model.CatalogServiceArchivedException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -27,6 +28,12 @@ class CatalogServiceExceptionHandler {
     ResponseEntity<ErrorResponse> handleDuplicateName(CatalogServiceNameAlreadyExistsException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse("CATALOG_SERVICE_NAME_ALREADY_EXISTS", exception.getMessage()));
+    }
+
+    @ExceptionHandler(CatalogServiceArchivedException.class)
+    ResponseEntity<ErrorResponse> handleArchived(CatalogServiceArchivedException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("CATALOG_SERVICE_ARCHIVED", exception.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)

@@ -10,6 +10,7 @@ import br.com.fiap.workshop_management_system.registration.servicecatalog.domain
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -89,6 +90,41 @@ class CatalogServiceRepositoryIntegrationTest {
         assertEquals(existing.name().value(), exception.existingName());
         assertEquals("Já existe um serviço cadastrado com esse nome: "
                 + existing.id() + " - " + existing.name().value(), exception.getMessage());
+    }
+
+    @Test
+    @Transactional
+    void locksAndUpdatesNameCanonicalKeyAndPriceOnTheSameRow() {
+        CatalogService original = service("Revisão " + UUID.randomUUID(), "100.00", true);
+        repository.save(original);
+
+        CatalogService locked = repository.findByIdForUpdate(original.id()).orElseThrow();
+        assertTrue(locked.rename(new CatalogServiceName("REVISÃO PREMIUM")));
+        assertTrue(locked.updateBasePrice(new Money(new BigDecimal("125.50"), CurrencyCode.BRL)));
+        repository.save(locked);
+
+        CatalogServiceJpaEntity stored = jpaRepository.findById(original.id()).orElseThrow();
+        assertEquals("REVISÃO PREMIUM", stored.getName());
+        assertArrayEquals("revisão premium".getBytes(StandardCharsets.UTF_8), stored.getNormalizedNameKey());
+        assertEquals(new BigDecimal("125.50"), stored.getBasePriceValue());
+        assertEquals("BRL", stored.getBasePriceCurrency());
+        assertTrue(stored.isActive());
+        assertEquals(1, jpaRepository.findAll().stream()
+                .filter(entity -> entity.getId().equals(original.id()))
+                .count());
+    }
+
+    @Test
+    @Transactional
+    void locksAndRestoresAnInactiveService() {
+        CatalogService inactive = service("Arquivado " + UUID.randomUUID(), "50.00", false);
+        repository.save(inactive);
+
+        CatalogService locked = repository.findByIdForUpdate(inactive.id()).orElseThrow();
+
+        assertFalse(locked.active());
+        assertEquals(inactive.name(), locked.name());
+        assertEquals(inactive.basePrice(), locked.basePrice());
     }
 
     private static CatalogService service(String name, String value, boolean active) {

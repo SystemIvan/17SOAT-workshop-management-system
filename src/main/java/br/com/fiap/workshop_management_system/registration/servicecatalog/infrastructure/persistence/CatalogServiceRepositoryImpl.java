@@ -37,6 +37,11 @@ public class CatalogServiceRepositoryImpl implements CatalogServiceRepository {
     }
 
     @Override
+    public Optional<CatalogService> findByIdForUpdate(UUID id) {
+        return jpaRepository.findByIdForUpdate(id).map(mapper::toDomain);
+    }
+
+    @Override
     public Optional<CatalogService> findByName(CatalogServiceName name) {
         return jpaRepository.findByNormalizedNameKey(mapper.normalizedNameKey(name)).map(mapper::toDomain);
     }

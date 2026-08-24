@@ -11,6 +11,8 @@ public interface CatalogServiceRepository {
 
     Optional<CatalogService> findById(UUID id);
 
+    Optional<CatalogService> findByIdForUpdate(UUID id);
+
     Optional<CatalogService> findByName(CatalogServiceName name);
 
     List<CatalogService> findAllActive();
