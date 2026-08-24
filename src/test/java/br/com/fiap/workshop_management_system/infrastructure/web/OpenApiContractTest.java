@@ -39,7 +39,10 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.paths['/api/customers/{id}'].delete").exists())
                 .andExpect(jsonPath("$.paths['/api/customers/{id}/contact-info'].patch").exists())
                 .andExpect(jsonPath("$.paths['/api/vehicles'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/vehicles'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/vehicles/{id}'].patch").exists())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}'].delete").exists())
                 .andExpect(jsonPath("$.paths['/api/vehicles/{id}/mileage'].patch").exists())
                 .andExpect(jsonPath("$.paths['/api/technicians'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/technicians'].get").exists())
@@ -175,5 +178,28 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.components.schemas.UpdateVehicleMileageRequest.properties.mileage.minimum")
                         .value(0))
                 .andExpect(jsonPath("$.components.schemas.UpdateVehicleMileageRequest.required", hasItem("mileage")));
+    }
+
+    @Test
+    void documentVehicleLifecycleAndServiceOrderEligibilityContracts() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}'].get.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}'].get.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}'].get.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/api/vehicles'].get.responses['200']").exists())
+                .andExpect(jsonPath(
+                        "$.paths['/api/vehicles'].get.responses['200'].content['application/json'].schema.type")
+                        .value("array"))
+                .andExpect(jsonPath(
+                        "$.paths['/api/vehicles'].get.responses['200'].content['application/json'].schema.items.$ref")
+                        .value("#/components/schemas/VehicleResponse"))
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}'].delete.responses['204']").exists())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}'].delete.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/api/vehicles/{id}'].delete.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/api/service-orders'].post.responses['201']").exists())
+                .andExpect(jsonPath("$.paths['/api/service-orders'].post.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/api/service-orders'].post.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/api/service-orders'].post.responses['409']").exists());
     }
 }

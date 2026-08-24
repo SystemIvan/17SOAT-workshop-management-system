@@ -24,6 +24,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -176,6 +177,46 @@ class VehicleRepositoryIntegrationTest {
         vehicleRepository.save(candidate);
 
         assertTrue(vehicleRepository.existsByChassisNumberAndIdNot(new ChassisNumber(chassis), candidate.id()));
+    }
+
+    @Test
+    void archivesTheSameRowAndKeepsItAvailableOnlyToHistoricalLookup() {
+        Customer customer = persistCustomer();
+        Vehicle active = vehicle(customer.id(), "LST1A01", null);
+        Vehicle archived = vehicle(customer.id(), "LST1A02", "9BWZZZ377VT004256");
+        archived.recordMileage(new Mileage(42_500));
+        vehicleRepository.save(active);
+        vehicleRepository.save(archived);
+
+        assertTrue(archived.archive());
+        vehicleRepository.save(archived);
+
+        Vehicle historical = vehicleRepository.findById(archived.id()).orElseThrow();
+        List<Vehicle> operational = vehicleRepository.findAllActive();
+
+        assertFalse(historical.active());
+        assertEquals(customer.id(), historical.customerId());
+        assertEquals("LST1A02", historical.licensePlate().value());
+        assertEquals("9BWZZZ377VT004256", historical.chassisNumber().orElseThrow().value());
+        assertEquals(42_500, historical.mileage().orElseThrow().value());
+        assertTrue(jpaRepository.existsById(archived.id()));
+        assertTrue(operational.stream().anyMatch(vehicle -> vehicle.id().equals(active.id())));
+        assertTrue(operational.stream().noneMatch(vehicle -> vehicle.id().equals(archived.id())));
+        assertTrue(operational.stream().allMatch(Vehicle::active));
+    }
+
+    @Test
+    void keepsArchivedPlateAndChassisReserved() {
+        Customer customer = persistCustomer();
+        Vehicle archived = vehicle(customer.id(), "RSV1A01", "9BWZZZ377VT004257");
+        vehicleRepository.save(archived);
+        archived.archive();
+        vehicleRepository.save(archived);
+
+        assertThrows(VehicleLicensePlateAlreadyExistsException.class,
+                () -> vehicleRepository.save(vehicle(customer.id(), "RSV1A01", null)));
+        assertThrows(VehicleChassisAlreadyExistsException.class,
+                () -> vehicleRepository.save(vehicle(customer.id(), "RSV1A02", "9BWZZZ377VT004257")));
     }
 
     @Test

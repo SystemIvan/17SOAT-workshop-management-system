@@ -112,6 +112,14 @@ public class Vehicle {
         return true;
     }
 
+    public boolean archive() {
+        if (!active) {
+            return false;
+        }
+        active = false;
+        return true;
+    }
+
     private static String normalizeRequired(String value, String fieldName, int maximumLength) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(fieldName + " é obrigatória");

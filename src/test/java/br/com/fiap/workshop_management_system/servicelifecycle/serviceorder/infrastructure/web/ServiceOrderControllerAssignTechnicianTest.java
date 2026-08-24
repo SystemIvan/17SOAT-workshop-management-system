@@ -173,6 +173,9 @@ class ServiceOrderControllerAssignTechnicianTest {
     }
 
     private String createServiceOrder() throws Exception {
+        UUID customerId = UUID.randomUUID();
+        UUID vehicleId = UUID.randomUUID();
+        ServiceOrderHttpTestFixture.persistActiveVehicle(context, customerId, vehicleId);
         String body = """
                 {
                   "customerId": "%s",
@@ -180,7 +183,7 @@ class ServiceOrderControllerAssignTechnicianTest {
                   "vehicleSnapshot": {"licensePlate": "ABC1D23", "brand": "Fiat", "model": "Uno", "year": 2015},
                   "priority": "NORMAL"
                 }
-                """.formatted(UUID.randomUUID(), UUID.randomUUID());
+                """.formatted(customerId, vehicleId);
         MvcResult result = mockMvc.perform(post("/api/service-orders")
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated())

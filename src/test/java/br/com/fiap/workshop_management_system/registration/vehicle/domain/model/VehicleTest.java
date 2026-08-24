@@ -139,6 +139,45 @@ class VehicleTest {
         assertTrue(vehicle.mileage().isEmpty());
     }
 
+    @Test
+    void archivesActiveVehicleAndPreservesEveryOtherField() {
+        UUID id = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        Vehicle vehicle = Vehicle.reconstitute(
+                id,
+                customerId,
+                new LicensePlate("ABC1234"),
+                new ChassisNumber("9BWZZZ377VT004251"),
+                "Volkswagen",
+                "Gol",
+                VehicleYear.create(2026, 2026),
+                "Prata",
+                new Mileage(42_500),
+                true);
+
+        assertTrue(vehicle.archive());
+
+        assertFalse(vehicle.active());
+        assertEquals(id, vehicle.id());
+        assertEquals(customerId, vehicle.customerId());
+        assertEquals("ABC1234", vehicle.licensePlate().value());
+        assertEquals("9BWZZZ377VT004251", vehicle.chassisNumber().orElseThrow().value());
+        assertEquals("Volkswagen", vehicle.brand());
+        assertEquals("Gol", vehicle.model());
+        assertEquals(2026, vehicle.year().value());
+        assertEquals("Prata", vehicle.color());
+        assertEquals(42_500, vehicle.mileage().orElseThrow().value());
+    }
+
+    @Test
+    void treatsRepeatedArchiveAsIdempotent() {
+        Vehicle vehicle = vehicle(true, null);
+
+        assertTrue(vehicle.archive());
+        assertFalse(vehicle.archive());
+        assertFalse(vehicle.active());
+    }
+
     private static Vehicle vehicle(boolean active, String chassis) {
         ChassisNumber chassisNumber = chassis == null ? null : new ChassisNumber(chassis);
         return Vehicle.reconstitute(UUID.randomUUID(), UUID.randomUUID(), new LicensePlate("ABC1234"), chassisNumber,

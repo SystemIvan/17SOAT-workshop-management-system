@@ -90,6 +90,22 @@
               }
             },
             {
+              "name": "Get vehicle",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
+                "description": "Returns the complete historical representation of an active or archived vehicle."
+              }
+            },
+            {
+              "name": "List vehicles",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/vehicles",
+                "description": "Returns a non-paginated array containing only active vehicles."
+              }
+            },
+            {
               "name": "Update vehicle details",
               "request": {
                 "method": "PATCH",
@@ -107,6 +123,14 @@
                 "body": { "mode": "raw", "raw": "{\n  \"mileage\": 43000\n}" },
                 "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}/mileage",
                 "description": "Records the first mileage reading or a greater value. Repeating the current value is idempotent; lower values return 409."
+              }
+            },
+            {
+              "name": "Archive vehicle",
+              "request": {
+                "method": "DELETE",
+                "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
+                "description": "Archives a vehicle without deleting its history. Repeating the request is idempotent."
               }
             }
           ]

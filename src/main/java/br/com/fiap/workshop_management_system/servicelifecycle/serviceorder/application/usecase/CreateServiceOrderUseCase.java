@@ -3,7 +3,13 @@ package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.app
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.CreateServiceOrderRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderMapper;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderResponse;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .ServiceOrderVehicleArchivedException;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .ServiceOrderVehicleNotFoundException;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.port.TechnicianNotificationPort;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.port.VehicleEligibility;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.port.VehicleEligibilityPort;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Priority;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.VehicleSnapshot;
@@ -24,22 +30,36 @@ public class CreateServiceOrderUseCase {
     private final ServiceOrderRepository repository;
     private final TechnicianRepository technicianRepository;
     private final TechnicianNotificationPort technicianNotificationPort;
+    private final VehicleEligibilityPort vehicleEligibilityPort;
 
     public CreateServiceOrderUseCase(ServiceOrderRepository repository, TechnicianRepository technicianRepository,
-            TechnicianNotificationPort technicianNotificationPort) {
+            TechnicianNotificationPort technicianNotificationPort, VehicleEligibilityPort vehicleEligibilityPort) {
         this.repository = repository;
         this.technicianRepository = technicianRepository;
         this.technicianNotificationPort = technicianNotificationPort;
+        this.vehicleEligibilityPort = vehicleEligibilityPort;
     }
 
     @Transactional
     public ServiceOrderResponse execute(CreateServiceOrderRequest request) {
         VehicleSnapshot vehicleSnapshot = ServiceOrderMapper.toVehicleSnapshot(request.vehicleSnapshot());
         Priority priority = request.priority() != null ? request.priority() : Priority.NORMAL;
-        ServiceOrder serviceOrder = ServiceOrder.create(request.customerId(), request.vehicleId(), vehicleSnapshot, priority);
+        requireActiveVehicle(request.vehicleId());
+        ServiceOrder serviceOrder = ServiceOrder.create(
+                request.customerId(), request.vehicleId(), vehicleSnapshot, priority);
         repository.save(serviceOrder);
         notifyActiveTechnicians(serviceOrder);
         return ServiceOrderMapper.toResponse(serviceOrder);
+    }
+
+    private void requireActiveVehicle(java.util.UUID vehicleId) {
+        VehicleEligibility eligibility = vehicleEligibilityPort.checkForNewWork(vehicleId);
+        if (eligibility == VehicleEligibility.NOT_FOUND) {
+            throw new ServiceOrderVehicleNotFoundException();
+        }
+        if (eligibility == VehicleEligibility.ARCHIVED) {
+            throw new ServiceOrderVehicleArchivedException();
+        }
     }
 
     private void notifyActiveTechnicians(ServiceOrder serviceOrder) {

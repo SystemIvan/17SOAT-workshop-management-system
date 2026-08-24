@@ -1,5 +1,7 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.estimate.infrastructure.web;
 
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.infrastructure.web
+        .ServiceOrderHttpTestFixture;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +36,9 @@ class EstimateControllerDecideLinesTest {
     }
 
     private String createServiceOrder() throws Exception {
+        UUID customerId = UUID.randomUUID();
+        UUID vehicleId = UUID.randomUUID();
+        ServiceOrderHttpTestFixture.persistActiveVehicle(context, customerId, vehicleId);
         String body = """
                 {
                   "customerId": "%s",
@@ -41,7 +46,7 @@ class EstimateControllerDecideLinesTest {
                   "vehicleSnapshot": {"licensePlate": "ABC1D23", "brand": "Fiat", "model": "Uno", "year": 2015},
                   "priority": "NORMAL"
                 }
-                """.formatted(UUID.randomUUID(), UUID.randomUUID());
+                """.formatted(customerId, vehicleId);
         MvcResult result = mockMvc.perform(post("/api/service-orders")
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated())
