@@ -104,10 +104,11 @@ cobertura de teste que falta — não parte do zero.
   (`ServiceOrderResponse`) lista as execuções sem agrupá-las por Estimate. Ampliar o contrato para
   agrupar por Estimate seria uma mudança de comportamento, não uma cobertura de lacuna — fora de
   escopo aqui.
-- **Polling/cache/tempo real:** a estratégia de atualização de tracking (polling puro vs.
-  polling+cache vs. SSE/WebSocket) depende de AD-015 e do `ADR-001-realtime-updates-strategy.md`
-  (Polling aceito por Santiago, mas AD-015 ainda `Team Decision Required` compartilhada). Esta spec
-  cobre apenas a consulta síncrona já implementada; nenhum mecanismo de push/cache é adicionado.
+- **Polling/cache/tempo real:** AD-015 foi resolvida em 2026-08-23 — o time ratificou Option A
+  (polling puro, sem cache) para o MVP, conforme `docs/Architecture-Decisions.md` e
+  `../../../adr/ADR-002-realtime-updates-strategy.md`. Esta spec cobre apenas a consulta síncrona já
+  implementada; nenhum mecanismo de push/cache é adicionado, e introduzi-lo exigiria uma nova decisão
+  do time.
 - **Efeito sobre `TechnicianStatus`:** não aplicável — este RF é somente-leitura e não altera nenhum
   aggregate.
 
@@ -117,8 +118,8 @@ cobertura de teste que falta — não parte do zero.
   etc.) — depende de AD-016.
 - Agrupamento das execuções por Estimate no contrato de resposta — mudança de comportamento, não
   fechamento de lacuna de cobertura.
-- Qualquer mecanismo de polling com cache, SSE ou WebSocket — depende de AD-015 e
-  `ADR-001-realtime-updates-strategy.md`, ambos ainda pendentes de ratificação pelo time.
+- Qualquer mecanismo de polling com cache, SSE ou WebSocket — AD-015 resolvida a favor de polling puro
+  (2026-08-23); adicionar cache/push exigiria nova decisão do time.
 - Implementar os quatro deltas da RFC-002 — são responsabilidades das features referenciadas. Esta spec somente
   reconcilia seu contrato de leitura com as decisões aprovadas.
 - RF24 (finalizar/entregar a `ServiceOrder`) — feature separada.

@@ -95,6 +95,7 @@ class EstimateControllerTest {
                         .value("Troca de oleo"))
                 .andExpect(jsonPath("$.lines[0].servicePrice.value")
                         .value(120.00))
+                .andExpect(jsonPath("$.status").value("SENT"))
                 .andReturn();
 
         String estimateId =
@@ -111,7 +112,8 @@ class EstimateControllerTest {
                 .andExpect(
                         jsonPath("$.serviceOrderId")
                                 .value(serviceOrder.id().toString())
-                );
+                )
+                .andExpect(jsonPath("$.status").value("SENT"));
     }
 
     @Test

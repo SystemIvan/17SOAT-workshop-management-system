@@ -1,12 +1,12 @@
 # Functional Specification: Service Order Finalized Notification (Customer)
 
-| Field | Value |
-|---|---|
-| Feature | `notifications-so-finalized` |
-| Status | Approved |
-| Owner | `Leandro Nascimento` |
-| Updated at | `2026-08-13` |
-| References | `RF33`, `docs/EPIC-5-notifications-plan-v2.md` (item #7), `docs/adr/ADR-003-notifications-boundary.md` |
+| Field | Value                                                                                                  |
+|---|--------------------------------------------------------------------------------------------------------|
+| Feature | `notifications-so-finalized`                                                                           |
+| Status | Approved                                                                                               |
+| Owner | `Leandro Nascimento`                                                                                   |
+| Updated at | `2026-08-13`                                                                                           |
+| References | `RF33`, `docs/EPIC-5-notifications-plan-v2.md` (item #7), `../../adr/ADR-004-notifications-boundary.md` |
 
 ## Problem and outcome
 

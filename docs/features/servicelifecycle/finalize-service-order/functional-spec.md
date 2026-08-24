@@ -78,16 +78,17 @@ falta — não parte do zero.
   contrato atual recebe apenas um booleano (`FinalizeServiceOrderRequest.vehicleDelivered`).
 - **Cobrança/pagamento associado à entrega:** fora do bounded context `servicelifecycle`; não
   mencionado em `Architecture.md` como parte de RF24.
-- **Notificar o Customer quando a `ServiceOrder` fica `DELIVERED`:** depende de AD-015 (estratégia de
-  tracking) e do `ADR-001-realtime-updates-strategy.md`, ambos ainda pendentes de ratificação pelo
-  time; esta spec não implementa notificação alguma.
+- **Notificar o Customer quando a `ServiceOrder` fica `DELIVERED`:** AD-015 foi resolvida em 2026-08-23
+  a favor de polling puro (sem cache/push); um mecanismo de notificação em tempo real exigiria uma nova
+  decisão do time. Esta spec não implementa notificação alguma.
 
 ## Fora de escopo
 
 - Autorização de quem pode finalizar — depende de AD-016.
 - Qualquer mecanismo de confirmação de entrega além do booleano `vehicleDelivered` já existente
   (assinatura digital, checklist, foto, etc.) — não modelado no domínio atual.
-- Notificações em tempo real de entrega — depende de AD-015 e `ADR-001-realtime-updates-strategy.md`.
+- Notificações em tempo real de entrega — AD-015 resolvida a favor de polling puro (2026-08-23); push
+  exigiria nova decisão do time.
 - Qualquer mudança na regra de `finalize` ou na precedência de `recomputeStatusSnapshot` —
   comportamento já implementado e já coberto por teste de domínio; esta feature apenas fecha a lacuna
   de cobertura no nível de use case/HTTP e a lacuna de documentação Swagger.

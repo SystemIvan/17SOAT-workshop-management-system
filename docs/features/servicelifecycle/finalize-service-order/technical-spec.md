@@ -49,8 +49,8 @@ Esta feature não implementará:
   a lacuna já registrada em `Architecture.md` §11 e nas specs de RF20–RF23;
 - qualquer mecanismo de confirmação de entrega além do booleano `vehicleDelivered` já existente —
   mudança de comportamento, fora do escopo de fechamento de lacuna de cobertura;
-- qualquer notificação em tempo real da entrega — depende de AD-015 (`Team Decision Required`) e do
-  `ADR-001-realtime-updates-strategy.md`;
+- qualquer notificação em tempo real da entrega — AD-015 resolvida em 2026-08-23 a favor de polling
+  puro; um mecanismo de push exigiria nova decisão do time;
 - qualquer mudança na regra de `finalize` ou na precedência de `recomputeStatusSnapshot` — já
   implementada e já coberta por teste de domínio.
 
