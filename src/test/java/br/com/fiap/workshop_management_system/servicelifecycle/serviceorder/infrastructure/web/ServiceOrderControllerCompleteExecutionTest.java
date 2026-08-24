@@ -14,6 +14,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
+import br.com.fiap.workshop_management_system.identity.auth.application.port.TokenIssuer;
+import br.com.fiap.workshop_management_system.testsupport.TestAuth;
 
 import java.util.UUID;
 
@@ -35,6 +37,9 @@ class ServiceOrderControllerCompleteExecutionTest {
     private WebApplicationContext context;
 
     @Autowired
+    private TokenIssuer tokenIssuer;
+
+    @Autowired
     private ServiceOrderRepository serviceOrderRepository;
 
     @Autowired
@@ -45,7 +50,12 @@ class ServiceOrderControllerCompleteExecutionTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                .apply(org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers
+                        .springSecurity())
+                .defaultRequest(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/").header("Authorization", "Bearer " + TestAuth.adminToken(tokenIssuer)))
+                .build();
         transactionTemplate = new TransactionTemplate(transactionManager);
     }
 

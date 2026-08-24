@@ -1,6 +1,6 @@
 # ADR 003: Authentication Strategy — Spring Security + JWT vs Spring Authorization Server
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-08  
 **Deciders:** Time de Desenvolvimento (5 pessoas)  
 **Affected By:** Épico 3 (ServiceExecution), APIs administrativas, Segurança  
@@ -247,16 +247,23 @@ Authorization Server) e seu racional.
 
 ### Security Checklist (itens a cobrir na especificação/implementação futura)
 
-- [ ] Tokens expiram após 1 hora
-- [ ] Refresh tokens implementados (opcional)
-- [ ] Senhas com bcrypt (não plaintext)
-- [ ] CORS configurado (se tiver frontend)
-- [ ] CSRF disabled (stateless)
-- [ ] Validação de entrada (CPF/CNPJ)
-- [ ] SQL injection prevenido (JPA parametrizado)
-- [ ] XSS prevenido (respostas JSON)
-- [ ] Rate limiting considerado
-- [ ] Logs de segurança (tentativas falhadas)
+- [x] Tokens expiram após 1 hora — `JwtTokenIssuer.EXPIRATION = Duration.ofHours(1)`, coberto por
+      `JwtTokenIssuerTest.rejectsAnExpiredToken`.
+- [ ] Refresh tokens implementados (opcional) — explicitamente fora de escopo, ver
+      `docs/features/platform/jwt-authentication/functional-spec.md`.
+- [x] Senhas com bcrypt (não plaintext) — `BCryptPasswordHasher`, coberto por `BCryptPasswordHasherTest`.
+- [ ] CORS configurado (se tiver frontend) — N/A, não há frontend integrado nesta fase.
+- [x] CSRF disabled (stateless) — `SecurityConfig` (`csrf().disable()`, `SessionCreationPolicy.STATELESS`).
+- [x] Validação de entrada (CPF/CNPJ) — já implementada por `TaxId` (AD-002); não alterada por esta
+      feature. `LoginRequest`/`CreateUserAccountRequest` usam Bean Validation na borda.
+- [x] SQL injection prevenido (JPA parametrizado) — `UserAccountJpaRepository` (Spring Data JPA, mesmo
+      padrão de todo o projeto).
+- [x] XSS prevenido (respostas JSON) — respostas via Jackson (`ErrorResponse`,
+      `IssuedTokenResponse`/`UserAccountResponse`), mesmo padrão do restante da API.
+- [ ] Rate limiting considerado — considerado e explicitamente adiado (fora de escopo do MVP), ver
+      functional-spec.md; não implementado.
+- [ ] Logs de segurança (tentativas falhadas) — não implementado nesta feature; nenhuma tentativa de
+      login (sucesso ou falha) é logada hoje. Gap conhecido, não bloqueador para o MVP.
 
 ---
 
@@ -310,16 +317,26 @@ Authorization Server) e seu racional.
 
 ## Approval Checklist
 
-- [ ] Arquiteto concorda com Spring Security + JWT para MVP
-- [ ] Team entende fluxo de autenticação
-- [ ] SonarLint vai validar segurança
-- [ ] Testes de segurança planejados
-- [ ] Migração para Authorization Server documentada para Fase 2
+- [x] Arquiteto concorda com Spring Security + JWT para MVP — confirmado por Santiago Silvestre em
+      2026-08-24, no mesmo papel de aprovador usado para ratificar AD-016 e para aprovar
+      `functional-spec.md`/`technical-spec.md` de `jwt-authentication`.
+- [x] Team entende fluxo de autenticação — confirmado por Santiago Silvestre em 2026-08-24; fluxo
+      documentado em `technical-spec.md` (§"Camada de segurança HTTP" e §"Matriz de autorização por
+      papel") e implementado em `identity.auth`/`identity.SecurityConfig`.
+- [ ] SonarLint vai validar segurança — **não configurado nesta feature.** Nenhuma ferramenta de scan
+      estático de segurança está integrada ao projeto ainda; isso é rastreado como lacuna aberta em
+      `GAPS-TECH-CHALLENGE.md` §6 (relatório de vulnerabilidades do desafio), não resolvido aqui.
+- [x] Testes de segurança planejados — implementados: `SecurityAuthorizationTest` (10 casos, matriz de
+      autorização ponta a ponta), `AuthControllerTest`, `UserAccountTest`, `JwtTokenIssuerTest`,
+      `BCryptPasswordHasherTest`.
+- [x] Migração para Authorization Server documentada para Fase 2 — já coberta acima em "Estratégia de
+      Escala (Fase 2+)".
 
 ---
 
-**Last Updated:** 2026-08  
-**Decision Maker:** Santiago Silvestre (Lead Developer) — proposta, aguardando ratificação do time  
-**Reviewed By:** [Time]  
-**Status:** Proposed — nenhum item do Approval Checklist confirmado pelo time ainda  
-**Target Implementation:** A definir após aprovação
+**Last Updated:** 2026-08-24  
+**Decision Maker:** Santiago Silvestre (Lead Developer)  
+**Reviewed By:** Santiago Silvestre  
+**Status:** Accepted — 4 de 5 itens do Approval Checklist confirmados; "SonarLint vai validar segurança"
+permanece em aberto e rastreado separadamente (não bloqueia a implementação de `jwt-authentication`).  
+**Target Implementation:** `docs/features/platform/jwt-authentication/` (Checkpoints 1–5 implementados)

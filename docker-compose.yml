@@ -40,6 +40,7 @@ services:
       SPRING_JPA_SHOW_SQL: ${SHOW_SQL:-false}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       APP_SEED_ENABLED: ${APP_SEED_ENABLED:-true}
+      APP_SECURITY_JWT_SECRET: ${APP_SECURITY_JWT_SECRET:-change-me-to-a-random-secret-with-at-least-32-bytes}
       SERVER_PORT: 8080
       TZ: 'America/Sao_Paulo'
     ports:

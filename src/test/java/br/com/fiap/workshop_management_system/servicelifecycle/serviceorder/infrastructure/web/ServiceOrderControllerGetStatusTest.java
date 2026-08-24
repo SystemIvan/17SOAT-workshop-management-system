@@ -10,6 +10,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import br.com.fiap.workshop_management_system.identity.auth.application.port.TokenIssuer;
+import br.com.fiap.workshop_management_system.testsupport.TestAuth;
 
 import java.util.UUID;
 
@@ -28,11 +30,19 @@ class ServiceOrderControllerGetStatusTest {
     @Autowired
     private WebApplicationContext context;
 
+    @Autowired
+    private TokenIssuer tokenIssuer;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                .apply(org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers
+                        .springSecurity())
+                .defaultRequest(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/").header("Authorization", "Bearer " + TestAuth.adminToken(tokenIssuer)))
+                .build();
     }
 
     @Test
