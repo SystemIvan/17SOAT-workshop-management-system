@@ -26,7 +26,7 @@ public class CreateCatalogServiceUseCase {
         CatalogServiceName name = new CatalogServiceName(request.name());
         Money basePrice = CatalogServiceMapper.toMoney(request.basePrice());
 
-        repository.findByName(name).ifPresent(existing -> {
+        repository.findActiveByName(name).ifPresent(existing -> {
             throw new CatalogServiceNameAlreadyExistsException(existing.id(), existing.name().value());
         });
 

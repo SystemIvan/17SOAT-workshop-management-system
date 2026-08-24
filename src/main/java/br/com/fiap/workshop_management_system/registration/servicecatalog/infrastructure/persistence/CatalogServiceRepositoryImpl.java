@@ -16,7 +16,7 @@ import java.util.UUID;
 @Repository
 public class CatalogServiceRepositoryImpl implements CatalogServiceRepository {
 
-    private static final String NAME_CONSTRAINT = "uk_catalog_services_normalized_name_key";
+    private static final String NAME_CONSTRAINT = "uk_catalog_services_active_normalized_name_key";
 
     private final CatalogServiceJpaRepository jpaRepository;
     private final CatalogServicePersistenceMapper mapper;
@@ -42,8 +42,9 @@ public class CatalogServiceRepositoryImpl implements CatalogServiceRepository {
     }
 
     @Override
-    public Optional<CatalogService> findByName(CatalogServiceName name) {
-        return jpaRepository.findByNormalizedNameKey(mapper.normalizedNameKey(name)).map(mapper::toDomain);
+    public Optional<CatalogService> findActiveByName(CatalogServiceName name) {
+        return jpaRepository.findByActiveTrueAndNormalizedNameKey(mapper.normalizedNameKey(name))
+                .map(mapper::toDomain);
     }
 
     @Override

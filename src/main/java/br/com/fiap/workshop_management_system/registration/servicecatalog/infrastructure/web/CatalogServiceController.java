@@ -6,6 +6,8 @@ import br.com.fiap.workshop_management_system.registration.servicecatalog.applic
 import br.com.fiap.workshop_management_system.registration.servicecatalog.application.dto
         .UpdateCatalogServiceBasePriceRequest;
 import br.com.fiap.workshop_management_system.registration.servicecatalog.application.usecase
+        .ArchiveCatalogServiceUseCase;
+import br.com.fiap.workshop_management_system.registration.servicecatalog.application.usecase
         .CreateCatalogServiceUseCase;
 import br.com.fiap.workshop_management_system.registration.servicecatalog.application.usecase.GetCatalogServiceUseCase;
 import br.com.fiap.workshop_management_system.registration.servicecatalog.application.usecase
@@ -24,6 +26,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -42,6 +45,7 @@ import java.util.UUID;
 public class CatalogServiceController {
 
     private final CreateCatalogServiceUseCase createCatalogServiceUseCase;
+    private final ArchiveCatalogServiceUseCase archiveCatalogServiceUseCase;
     private final GetCatalogServiceUseCase getCatalogServiceUseCase;
     private final ListCatalogServicesUseCase listCatalogServicesUseCase;
     private final RenameCatalogServiceUseCase renameCatalogServiceUseCase;
@@ -49,11 +53,13 @@ public class CatalogServiceController {
 
     public CatalogServiceController(
             CreateCatalogServiceUseCase createCatalogServiceUseCase,
+            ArchiveCatalogServiceUseCase archiveCatalogServiceUseCase,
             GetCatalogServiceUseCase getCatalogServiceUseCase,
             ListCatalogServicesUseCase listCatalogServicesUseCase,
             RenameCatalogServiceUseCase renameCatalogServiceUseCase,
             UpdateCatalogServiceBasePriceUseCase updateCatalogServiceBasePriceUseCase) {
         this.createCatalogServiceUseCase = createCatalogServiceUseCase;
+        this.archiveCatalogServiceUseCase = archiveCatalogServiceUseCase;
         this.getCatalogServiceUseCase = getCatalogServiceUseCase;
         this.listCatalogServicesUseCase = listCatalogServicesUseCase;
         this.renameCatalogServiceUseCase = renameCatalogServiceUseCase;
@@ -105,6 +111,18 @@ public class CatalogServiceController {
                     array = @ArraySchema(schema = @Schema(implementation = CatalogServiceResponse.class))))
     public ResponseEntity<List<CatalogServiceResponse>> list() {
         return ResponseEntity.ok(listCatalogServicesUseCase.execute());
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Arquivar serviço do catálogo")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Serviço arquivado ou já estava arquivado"),
+            @ApiResponse(responseCode = "400", description = "Identificador inválido"),
+            @ApiResponse(responseCode = "404", description = "Serviço não encontrado")
+    })
+    public ResponseEntity<Void> archive(@PathVariable UUID id) {
+        archiveCatalogServiceUseCase.execute(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}")

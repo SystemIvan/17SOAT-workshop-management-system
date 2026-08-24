@@ -28,10 +28,13 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -143,6 +146,65 @@ class CatalogServiceControllerTest {
         mockMvc.perform(get("/api/catalog-services"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void archivesIdempotentlyAndKeepsHistoricalDetail() throws Exception {
+        CatalogService service = service("Alinhamento", true);
+        repository.save(service);
+
+        mockMvc.perform(delete("/api/catalog-services/{id}", service.id()))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+        mockMvc.perform(delete("/api/catalog-services/{id}", service.id()))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        mockMvc.perform(get("/api/catalog-services/{id}", service.id()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(service.id().toString()))
+                .andExpect(jsonPath("$.name").value("Alinhamento"))
+                .andExpect(jsonPath("$.basePrice.value").value(50.0))
+                .andExpect(jsonPath("$.active").value(false));
+        mockMvc.perform(get("/api/catalog-services"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+        assertEquals(1, jpaRepository.count());
+    }
+
+    @Test
+    void reusesAnArchivedNameForANewActiveIdentity() throws Exception {
+        CatalogService archived = service("Balanceamento", true);
+        repository.save(archived);
+        mockMvc.perform(delete("/api/catalog-services/{id}", archived.id()))
+                .andExpect(status().isNoContent());
+
+        MvcResult created = mockMvc.perform(post("/api/catalog-services")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validBody("  BALANCEAMENTO  ", "70.00")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.active").value(true))
+                .andReturn();
+        String createdId = JsonPath.read(created.getResponse().getContentAsString(), "$.id");
+
+        assertNotEquals(archived.id(), UUID.fromString(createdId));
+        mockMvc.perform(get("/api/catalog-services"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(createdId));
+        assertEquals(2, jpaRepository.count());
+    }
+
+    @Test
+    void reportsMissingAndMalformedArchiveTargets() throws Exception {
+        mockMvc.perform(delete("/api/catalog-services/{id}", UUID.randomUUID()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CATALOG_SERVICE_NOT_FOUND"));
+
+        mockMvc.perform(delete("/api/catalog-services/not-a-uuid"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("Requisição inválida"));
     }
 
     @Test
@@ -258,7 +320,7 @@ class CatalogServiceControllerTest {
     @Test
     void rejectsRenameToANameOwnedByAnotherService() throws Exception {
         CatalogService target = service("Alinhamento", true);
-        CatalogService existing = service("Balanceamento", false);
+        CatalogService existing = service("Balanceamento", true);
         repository.save(target);
         repository.save(existing);
 
@@ -275,6 +337,25 @@ class CatalogServiceControllerTest {
 
         assertEquals("Alinhamento", jpaRepository.findById(target.id()).orElseThrow().getName());
         assertEquals(2, jpaRepository.count());
+    }
+
+    @Test
+    void renamesToANameUsedOnlyByAnArchivedService() throws Exception {
+        CatalogService target = service("Alinhamento", true);
+        CatalogService archived = service("Balanceamento", false);
+        repository.save(target);
+        repository.save(archived);
+
+        mockMvc.perform(patch("/api/catalog-services/{id}", target.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"  BALANCEAMENTO  \"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(target.id().toString()))
+                .andExpect(jsonPath("$.name").value("BALANCEAMENTO"))
+                .andExpect(jsonPath("$.active").value(true));
+
+        assertEquals(2, jpaRepository.count());
+        assertEquals("Balanceamento", jpaRepository.findById(archived.id()).orElseThrow().getName());
     }
 
     @Test
@@ -416,4 +497,5 @@ class CatalogServiceControllerTest {
                 new Money(new BigDecimal("50.00"), CurrencyCode.BRL),
                 active);
     }
+
 }

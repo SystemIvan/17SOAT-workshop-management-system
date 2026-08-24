@@ -10,6 +10,7 @@ import br.com.fiap.workshop_management_system.registration.servicecatalog.domain
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -19,6 +20,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,6 +32,9 @@ class CatalogServiceRepositoryIntegrationTest {
 
     @Autowired
     private CatalogServiceJpaRepository jpaRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void persistsAndRestoresCatalogService() {
@@ -58,11 +63,41 @@ class CatalogServiceRepositoryIntegrationTest {
         CatalogService catalogService = service("Troca de Óleo " + suffix, "89.00", true);
         repository.save(catalogService);
 
-        CatalogService found = repository.findByName(
+        CatalogService found = repository.findActiveByName(
                 new CatalogServiceName("  TROCA DE ÓLEO " + suffix.toUpperCase() + "  ")).orElseThrow();
 
         assertEquals(catalogService.id(), found.id());
         assertEquals(catalogService.name().value(), found.name().value());
+    }
+
+    @Test
+    void activeNameLookupIgnoresArchivedHomonyms() {
+        String name = "Higienização " + UUID.randomUUID();
+        CatalogService firstArchived = service(name, "80.00", false);
+        CatalogService secondArchived = service(name.toUpperCase(), "90.00", false);
+        CatalogService active = service(name, "100.00", true);
+
+        repository.save(firstArchived);
+        repository.save(secondArchived);
+        repository.save(active);
+
+        CatalogService found = repository.findActiveByName(new CatalogServiceName(name)).orElseThrow();
+        assertEquals(active.id(), found.id());
+        assertEquals(3, jpaRepository.findAll().stream()
+                .filter(entity -> entity.getNormalizedNameKey().length > 0)
+                .filter(entity -> entity.getName().equalsIgnoreCase(name))
+                .count());
+
+        byte[] activeKey = jdbcTemplate.queryForObject(
+                "select active_normalized_name_key from catalog_services where id = ?",
+                byte[].class,
+                active.id());
+        byte[] archivedKey = jdbcTemplate.queryForObject(
+                "select active_normalized_name_key from catalog_services where id = ?",
+                byte[].class,
+                firstArchived.id());
+        assertArrayEquals(active.name().canonicalValue().getBytes(StandardCharsets.UTF_8), activeKey);
+        assertNull(archivedKey);
     }
 
     @Test

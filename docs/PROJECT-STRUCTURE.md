@@ -10,7 +10,7 @@ br.com.fiap.workshop_management_system
 ├── registration
 │   ├── customer                 # Implemented aggregate
 │   ├── vehicle                  # Registration and descriptive-data updates implemented
-│   └── servicecatalog           # Catalog registration and active queries implemented
+│   └── servicecatalog           # Catalog CRUD, logical archive and active queries implemented
 ├── servicelifecycle
 │   ├── serviceorder             # Implemented aggregate
 │   ├── estimate                 # Planned aggregate
@@ -31,17 +31,20 @@ parts of their owning bounded context.
 | Service Lifecycle | Create, diagnose, estimate, authorize and execute service orders | Service Order and Technician implemented |
 | Stock & Procurement | Maintain the StockItem catalog; inventory, reservations and procurement are future work | StockItem catalog implemented |
 
-Registrations provides stable customer/vehicle identities to Service Lifecycle. Service Lifecycle stores snapshots where
-historical service-order data must not change with later registration edits. Stock & Procurement owns inventory and future
-purchase orders; Service Lifecycle refers to stock items by ID and snapshots. A future supplier integration belongs behind
-an anti-corruption layer owned by Stock & Procurement.
+Registrations provides stable customer/vehicle identities and catalog-service eligibility to Service Lifecycle. A new
+Diagnosis accepts only active Catalog Services; the availability check and Diagnosis commit share the consumer transaction
+so an archive cannot invalidate work while it is being registered. Service Lifecycle stores snapshots where historical
+service-order data must not change with later registration edits or catalog archives. Stock & Procurement owns inventory
+and future purchase orders; Service Lifecycle refers to stock items by ID and snapshots. A future supplier integration
+belongs behind an anti-corruption layer owned by Stock & Procurement.
 
 Notifications is not a bounded context (see `docs/adr/ADR-003-notifications-boundary.md`): a module that needs to notify
 someone defines a consumer-owned outbound port in its own `application` layer and an adapter in its own
-`infrastructure` layer. As the first case of this, Service Lifecycle's Service-Order-finalized notification reads
-Customer contact data live from Registrations through `CustomerRepository`, published via `@NamedInterface` on
-`registration.customer.domain.repository` and `registration.customer.domain.model` — the only Registrations
-sub-packages currently exposed to other modules.
+`infrastructure` layer. Service Lifecycle's Service-Order-finalized notification reads Customer contact data live from
+Registrations through `CustomerRepository`, published via `@NamedInterface` on
+`registration.customer.domain.repository` and `registration.customer.domain.model`. The Service Order capability also
+owns `CatalogServiceEligibilityPort`; its Registration adapter calls the producer-owned
+`registration.servicecatalog.application.api` named interface without importing internal catalog packages.
 
 ## Internal layers
 

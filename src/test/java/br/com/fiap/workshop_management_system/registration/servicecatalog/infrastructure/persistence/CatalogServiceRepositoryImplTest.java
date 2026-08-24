@@ -56,7 +56,7 @@ class CatalogServiceRepositoryImplTest {
     @Test
     void propagatesOriginalNameViolationWhenWinnerCannotBeConfirmed() {
         DataIntegrityViolationException failure = new DataIntegrityViolationException(
-                "duplicate", new IllegalStateException("uk_catalog_services_normalized_name_key"));
+                "duplicate", new IllegalStateException("uk_catalog_services_active_normalized_name_key"));
         when(jpaRepository.saveAndFlush(entity)).thenThrow(failure);
         when(conflictLookup.findCommittedByName(catalogService.name())).thenReturn(Optional.empty());
 

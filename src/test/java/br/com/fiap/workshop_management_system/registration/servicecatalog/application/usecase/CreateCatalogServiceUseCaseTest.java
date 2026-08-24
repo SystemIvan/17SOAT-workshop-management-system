@@ -63,7 +63,7 @@ class CreateCatalogServiceUseCaseTest {
                 new CatalogServiceName("Troca de Óleo"),
                 new Money(new BigDecimal("150.00"), CurrencyCode.BRL),
                 true);
-        when(repository.findByName(new CatalogServiceName("troca de óleo")))
+        when(repository.findActiveByName(new CatalogServiceName("troca de óleo")))
                 .thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> useCase.execute(request(" TROCA DE ÓLEO ", "200.00")))
@@ -82,6 +82,18 @@ class CreateCatalogServiceUseCaseTest {
                 .isInstanceOf(IllegalArgumentException.class);
 
         verifyNoInteractions(repository);
+    }
+
+    @Test
+    void createsWhenNoActiveServiceOwnsAnArchivedName() {
+        CreateCatalogServiceRequest request = request("Troca de Óleo", "200.00");
+        when(repository.findActiveByName(new CatalogServiceName("Troca de Óleo")))
+                .thenReturn(Optional.empty());
+
+        CatalogServiceResponse response = useCase.execute(request);
+
+        assertThat(response.name()).isEqualTo("Troca de Óleo");
+        verify(repository).save(org.mockito.ArgumentMatchers.any());
     }
 
     private static CreateCatalogServiceRequest request(String name, String value) {

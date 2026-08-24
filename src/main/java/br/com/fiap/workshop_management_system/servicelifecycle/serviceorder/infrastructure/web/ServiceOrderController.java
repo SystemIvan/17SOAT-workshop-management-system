@@ -127,10 +127,12 @@ public class ServiceOrderController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Diagnosis recorded"),
             @ApiResponse(responseCode = "400", description = "Invalid diagnosis request"),
-            @ApiResponse(responseCode = "404", description = "Service order or technician not found"),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Service order, technician or Catalog Service not found"),
             @ApiResponse(
                     responseCode = "409",
-                    description = "Diagnosis assignee is missing or a diagnosis is already open")
+                    description = "Diagnosis is unavailable or a Catalog Service is archived")
     })
     public ResponseEntity<ServiceOrderResponse> performDiagnosis(
             @PathVariable UUID id, @Valid @RequestBody PerformDiagnosisRequest request) {

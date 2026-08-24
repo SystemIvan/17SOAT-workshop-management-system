@@ -16,7 +16,7 @@ public interface CatalogServiceJpaRepository extends JpaRepository<CatalogServic
     @Query("select service from CatalogServiceJpaEntity service where service.id = :id")
     Optional<CatalogServiceJpaEntity> findByIdForUpdate(@Param("id") UUID id);
 
-    Optional<CatalogServiceJpaEntity> findByNormalizedNameKey(byte[] normalizedNameKey);
+    Optional<CatalogServiceJpaEntity> findByActiveTrueAndNormalizedNameKey(byte[] normalizedNameKey);
 
     List<CatalogServiceJpaEntity> findAllByActiveTrue();
 }

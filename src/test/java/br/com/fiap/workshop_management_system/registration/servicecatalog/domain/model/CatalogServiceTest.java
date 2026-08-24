@@ -122,4 +122,26 @@ class CatalogServiceTest {
         assertThat(service.basePrice()).isEqualTo(PRICE);
         assertThat(service.active()).isFalse();
     }
+
+    @Test
+    void archivesAnActiveServiceWithoutChangingItsHistoricalState() {
+        UUID id = UUID.randomUUID();
+        CatalogService service = CatalogService.reconstitute(id, NAME, PRICE, true);
+
+        boolean changed = service.archive();
+
+        assertThat(changed).isTrue();
+        assertThat(service.id()).isEqualTo(id);
+        assertThat(service.name()).isEqualTo(NAME);
+        assertThat(service.basePrice()).isEqualTo(PRICE);
+        assertThat(service.active()).isFalse();
+    }
+
+    @Test
+    void treatsRepeatedArchiveAsIdempotent() {
+        CatalogService service = CatalogService.reconstitute(UUID.randomUUID(), NAME, PRICE, false);
+
+        assertThat(service.archive()).isFalse();
+        assertThat(service.active()).isFalse();
+    }
 }

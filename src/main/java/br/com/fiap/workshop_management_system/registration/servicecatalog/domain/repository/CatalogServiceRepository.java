@@ -13,7 +13,7 @@ public interface CatalogServiceRepository {
 
     Optional<CatalogService> findByIdForUpdate(UUID id);
 
-    Optional<CatalogService> findByName(CatalogServiceName name);
+    Optional<CatalogService> findActiveByName(CatalogServiceName name);
 
     List<CatalogService> findAllActive();
 

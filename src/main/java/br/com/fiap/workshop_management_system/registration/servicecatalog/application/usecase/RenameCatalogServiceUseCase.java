@@ -34,7 +34,7 @@ public class RenameCatalogServiceUseCase {
             return CatalogServiceMapper.toResponse(catalogService);
         }
 
-        repository.findByName(newName)
+        repository.findActiveByName(newName)
                 .filter(existing -> !existing.id().equals(id))
                 .ifPresent(existing -> {
                     throw new CatalogServiceNameAlreadyExistsException(

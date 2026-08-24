@@ -79,6 +79,15 @@ public class CatalogService {
         return true;
     }
 
+    public boolean archive() {
+        if (!active) {
+            return false;
+        }
+
+        active = false;
+        return true;
+    }
+
     private void ensureActive() {
         if (!active) {
             throw new CatalogServiceArchivedException();

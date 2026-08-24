@@ -23,6 +23,7 @@ public class CatalogServiceConflictLookup {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public Optional<CatalogService> findCommittedByName(CatalogServiceName name) {
-        return jpaRepository.findByNormalizedNameKey(mapper.normalizedNameKey(name)).map(mapper::toDomain);
+        return jpaRepository.findByActiveTrueAndNormalizedNameKey(mapper.normalizedNameKey(name))
+                .map(mapper::toDomain);
     }
 }

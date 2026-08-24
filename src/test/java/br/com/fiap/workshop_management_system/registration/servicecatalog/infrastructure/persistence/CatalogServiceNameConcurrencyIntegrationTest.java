@@ -146,7 +146,8 @@ class CatalogServiceNameConcurrencyIntegrationTest {
             CatalogService winner = repository.findById(success.catalogServiceId()).orElseThrow();
             assertEquals(winner.id(), exception.existingId());
             assertEquals(winner.name().value(), exception.existingName());
-            assertEquals(winner.id(), repository.findByName(new CatalogServiceName(desiredName)).orElseThrow().id());
+            assertEquals(winner.id(), repository.findActiveByName(
+                    new CatalogServiceName(desiredName)).orElseThrow().id());
             assertEquals(2, jpaRepository.findAll().stream()
                     .filter(entity -> entity.getId().equals(first.id()) || entity.getId().equals(second.id()))
                     .count());
@@ -158,7 +159,7 @@ class CatalogServiceNameConcurrencyIntegrationTest {
     private Attempt attempt(CatalogService catalogService, CyclicBarrier preCheckBarrier) {
         try {
             new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-                assertTrue(repository.findByName(catalogService.name()).isEmpty());
+                assertTrue(repository.findActiveByName(catalogService.name()).isEmpty());
                 await(preCheckBarrier);
                 repository.save(catalogService);
             });
@@ -173,7 +174,7 @@ class CatalogServiceNameConcurrencyIntegrationTest {
             new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
                 CatalogService locked = repository.findByIdForUpdate(id).orElseThrow();
                 CatalogServiceName newName = new CatalogServiceName(displayName);
-                assertTrue(repository.findByName(newName).isEmpty());
+                assertTrue(repository.findActiveByName(newName).isEmpty());
                 await(preCheckBarrier);
                 locked.rename(newName);
                 repository.save(locked);

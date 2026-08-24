@@ -47,7 +47,7 @@ class RenameCatalogServiceUseCaseTest {
     void renamesAnActiveServiceAndReturnsTheCompleteResponse() {
         CatalogService service = service("Alinhamento", true);
         when(repository.findByIdForUpdate(service.id())).thenReturn(Optional.of(service));
-        when(repository.findByName(new CatalogServiceName("Alinhamento Premium")))
+        when(repository.findActiveByName(new CatalogServiceName("Alinhamento Premium")))
                 .thenReturn(Optional.empty());
 
         CatalogServiceResponse response = useCase.execute(
@@ -69,7 +69,7 @@ class RenameCatalogServiceUseCaseTest {
                 service.id(), new RenameCatalogServiceRequest("  Alinhamento  "));
 
         assertThat(response.name()).isEqualTo("Alinhamento");
-        verify(repository, never()).findByName(any());
+        verify(repository, never()).findActiveByName(any());
         verify(repository, never()).save(any());
     }
 
@@ -77,7 +77,7 @@ class RenameCatalogServiceUseCaseTest {
     void allowsACaseOnlyCorrectionWhenTheCanonicalNameBelongsToTheTarget() {
         CatalogService service = service("alinhamento", true);
         when(repository.findByIdForUpdate(service.id())).thenReturn(Optional.of(service));
-        when(repository.findByName(new CatalogServiceName("ALINHAMENTO")))
+        when(repository.findActiveByName(new CatalogServiceName("ALINHAMENTO")))
                 .thenReturn(Optional.of(service));
 
         CatalogServiceResponse response = useCase.execute(
@@ -88,11 +88,11 @@ class RenameCatalogServiceUseCaseTest {
     }
 
     @Test
-    void rejectsANameOwnedByAnotherActiveOrArchivedService() {
+    void rejectsANameOwnedByAnotherActiveService() {
         CatalogService target = service("Alinhamento", true);
-        CatalogService existing = service("Balanceamento", false);
+        CatalogService existing = service("Balanceamento", true);
         when(repository.findByIdForUpdate(target.id())).thenReturn(Optional.of(target));
-        when(repository.findByName(new CatalogServiceName("BALANCEAMENTO")))
+        when(repository.findActiveByName(new CatalogServiceName("BALANCEAMENTO")))
                 .thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> useCase.execute(
@@ -102,6 +102,20 @@ class RenameCatalogServiceUseCaseTest {
                         + existing.id() + " - Balanceamento");
 
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    void allowsANameUsedOnlyByArchivedServices() {
+        CatalogService target = service("Alinhamento", true);
+        when(repository.findByIdForUpdate(target.id())).thenReturn(Optional.of(target));
+        when(repository.findActiveByName(new CatalogServiceName("BALANCEAMENTO")))
+                .thenReturn(Optional.empty());
+
+        CatalogServiceResponse response = useCase.execute(
+                target.id(), new RenameCatalogServiceRequest(" BALANCEAMENTO "));
+
+        assertThat(response.name()).isEqualTo("BALANCEAMENTO");
+        verify(repository).save(target);
     }
 
     @Test
@@ -121,7 +135,7 @@ class RenameCatalogServiceUseCaseTest {
         assertThatThrownBy(() -> useCase.execute(id, new RenameCatalogServiceRequest("Alinhamento")))
                 .isInstanceOf(CatalogServiceNotFoundException.class);
 
-        verify(repository, never()).findByName(any());
+        verify(repository, never()).findActiveByName(any());
         verify(repository, never()).save(any());
     }
 
@@ -134,7 +148,7 @@ class RenameCatalogServiceUseCaseTest {
                 service.id(), new RenameCatalogServiceRequest("Alinhamento")))
                 .isInstanceOf(CatalogServiceArchivedException.class);
 
-        verify(repository, never()).findByName(any());
+        verify(repository, never()).findActiveByName(any());
         verify(repository, never()).save(any());
     }
 

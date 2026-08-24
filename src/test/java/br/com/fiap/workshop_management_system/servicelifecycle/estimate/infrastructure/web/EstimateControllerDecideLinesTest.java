@@ -14,6 +14,8 @@ import org.springframework.web.context.WebApplicationContext;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static br.com.fiap.workshop_management_system.testsupport.CatalogServiceHttpFixture
+        .createActiveCatalogService;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -61,7 +63,7 @@ class EstimateControllerDecideLinesTest {
                     {"catalogServiceId": "%s", "name": "Troca de óleo", "price": {"value": 100.00, "currency": "BRL"}}
                   ]
                 }
-                """.formatted(technicianId, UUID.randomUUID());
+                """.formatted(technicianId, createActiveCatalogService(mockMvc));
         MvcResult result = mockMvc.perform(post("/api/service-orders/{id}/diagnosis", serviceOrderId)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk())
