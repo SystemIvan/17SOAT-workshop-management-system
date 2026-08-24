@@ -1,5 +1,5 @@
 /**
- * Reserved package for the Service Catalog aggregate defined by the Registrations context map.
- * Business behavior will be introduced only by a dedicated feature specification.
+ * Service Catalog capability owned by Registrations.
+ * Provides registration and active queries without introducing a live dependency from Service Lifecycle.
  */
 package br.com.fiap.workshop_management_system.registration.servicecatalog;

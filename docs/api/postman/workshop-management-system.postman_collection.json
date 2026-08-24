@@ -139,6 +139,38 @@
               }
             }
           ]
+        },
+        {
+          "name": "Service Catalog",
+          "item": [
+            {
+              "name": "Create catalog service",
+              "event": [{
+                "listen": "test",
+                "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('catalogServiceId', pm.response.json().id); }"] }
+              }],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Troca de óleo\",\n  \"basePrice\": {\n    \"value\": 150.00,\n    \"currency\": \"BRL\"\n  }\n}" },
+                "url": "{{baseUrl}}/api/catalog-services"
+              }
+            },
+            {
+              "name": "Get catalog service",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/catalog-services/{{catalogServiceId}}"
+              }
+            },
+            {
+              "name": "List active catalog services",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/catalog-services"
+              }
+            }
+          ]
         }
       ]
     },

@@ -10,7 +10,7 @@ br.com.fiap.workshop_management_system
 ├── registration
 │   ├── customer                 # Implemented aggregate
 │   ├── vehicle                  # Registration and descriptive-data updates implemented
-│   └── servicecatalog           # Planned aggregate
+│   └── servicecatalog           # Catalog registration and active queries implemented
 ├── servicelifecycle
 │   ├── serviceorder             # Implemented aggregate
 │   ├── estimate                 # Planned aggregate
@@ -27,7 +27,7 @@ parts of their owning bounded context.
 
 | Context | Responsibilities | Current state |
 |---|---|---|
-| Registrations | Identify and register customers and vehicles; maintain the service catalog | Customer management and Vehicle registration/update implemented |
+| Registrations | Identify and register customers and vehicles; maintain the service catalog | Customer, Vehicle and Service Catalog management implemented |
 | Service Lifecycle | Create, diagnose, estimate, authorize and execute service orders | Service Order and Technician implemented |
 | Stock & Procurement | Maintain the StockItem catalog; inventory, reservations and procurement are future work | StockItem catalog implemented |
 
