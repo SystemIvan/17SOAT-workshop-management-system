@@ -1,6 +1,7 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model;
 
 import java.util.ArrayList;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,6 +16,8 @@ public class ServiceExecution {
     private final UUID catalogServiceId;
     private final String name;
     private final Money price;
+    private final UUID diagnosedByTechnicianId;
+    private final Instant diagnosedAt;
     private final List<StockRequirement> stockRequirements = new ArrayList<>();
 
     private ServiceExecutionStatus status;
@@ -23,16 +26,27 @@ public class ServiceExecution {
     private boolean stockRequirementsFrozen;
     private UUID stockReservationId;
 
-    static ServiceExecution start(UUID diagnosisId, UUID catalogServiceId, String name, Money price) {
-        return new ServiceExecution(UUID.randomUUID(), diagnosisId, catalogServiceId, name, price);
+    static ServiceExecution start(
+            UUID diagnosisId,
+            UUID catalogServiceId,
+            String name,
+            Money price,
+            UUID diagnosedByTechnicianId,
+            Instant diagnosedAt) {
+        return new ServiceExecution(
+                UUID.randomUUID(), diagnosisId, catalogServiceId, name, price, diagnosedByTechnicianId, diagnosedAt);
     }
 
-    private ServiceExecution(UUID id, UUID diagnosisId, UUID catalogServiceId, String name, Money price) {
+    private ServiceExecution(
+            UUID id, UUID diagnosisId, UUID catalogServiceId, String name, Money price,
+            UUID diagnosedByTechnicianId, Instant diagnosedAt) {
         this.id = id;
         this.diagnosisId = diagnosisId;
         this.catalogServiceId = catalogServiceId;
         this.name = name;
         this.price = price;
+        this.diagnosedByTechnicianId = diagnosedByTechnicianId;
+        this.diagnosedAt = diagnosedAt;
         this.status = ServiceExecutionStatus.PENDING;
     }
 
@@ -49,10 +63,13 @@ public class ServiceExecution {
             ServiceExecutionStatus status,
             UUID authorizedByEstimateId,
             UUID assignedTechnicianId,
+            UUID diagnosedByTechnicianId,
+            Instant diagnosedAt,
             boolean stockRequirementsFrozen,
             UUID stockReservationId,
             List<StockRequirement> stockRequirements) {
-        ServiceExecution execution = new ServiceExecution(id, diagnosisId, catalogServiceId, name, price);
+        ServiceExecution execution = new ServiceExecution(
+                id, diagnosisId, catalogServiceId, name, price, diagnosedByTechnicianId, diagnosedAt);
         execution.status = status;
         execution.authorizedByEstimateId = authorizedByEstimateId;
         execution.assignedTechnicianId = assignedTechnicianId;
@@ -81,6 +98,8 @@ public class ServiceExecution {
                 status,
                 authorizedByEstimateId,
                 assignedTechnicianId,
+                null,
+                null,
                 false,
                 null,
                 stockRequirements);
@@ -205,6 +224,14 @@ public class ServiceExecution {
 
     public UUID assignedTechnicianId() {
         return assignedTechnicianId;
+    }
+
+    public UUID diagnosedByTechnicianId() {
+        return diagnosedByTechnicianId;
+    }
+
+    public Instant diagnosedAt() {
+        return diagnosedAt;
     }
 
     public boolean stockRequirementsFrozen() {

@@ -29,7 +29,8 @@ class GetServiceOrderStatusUseCaseTest {
         InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository();
         GetServiceOrderStatusUseCase useCase = new GetServiceOrderStatusUseCase(serviceOrders);
 
-        ServiceOrder serviceOrder = ServiceOrder.create(UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot);
+        ServiceOrder serviceOrder = ServiceOrder.create(
+                UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, "Initial assessment");
         serviceOrders.save(serviceOrder);
 
         ServiceOrderStatusResponse response = useCase.execute(serviceOrder.id());
@@ -43,9 +44,11 @@ class GetServiceOrderStatusUseCaseTest {
         InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository();
         GetServiceOrderStatusUseCase useCase = new GetServiceOrderStatusUseCase(serviceOrders);
 
-        ServiceOrder serviceOrder = ServiceOrder.create(UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot);
+        ServiceOrder serviceOrder = ServiceOrder.create(
+                UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, "Initial assessment");
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
         DiagnosisItem item = new DiagnosisItem(UUID.randomUUID(), "Troca de óleo", Money.brl(BigDecimal.TEN), List.of());
-        serviceOrder.performDiagnosis(List.of(item));
+        serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), java.time.Instant.EPOCH);
         serviceOrders.save(serviceOrder);
 
         ServiceOrderStatusResponse response = useCase.execute(serviceOrder.id());

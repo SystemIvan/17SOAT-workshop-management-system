@@ -5,12 +5,16 @@
 | Feature | `track-execution` |
 | Status | Stale |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-19 |
+| Atualizado em | 2026-08-22 |
 | Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-19) |
 | Especificação técnica | `./technical-spec.md` (`Approved` em 2026-08-19) |
 
 > Stale desde 2026-08-20: a especificação funcional foi devolvida a `Draft` pela feature
 > `stock-item-reservation`. O plano histórico não deve ser usado para nova implementação até nova revisão do SDD.
+
+> A reconciliação de 2026-08-22 também registra os deltas materiais de `service-order-initial-assessment`,
+> `assign-diagnosis-assignee`, `diagnosis-authorship` e `service-order-status-projection`. Este plano não os cobre
+> nem autoriza implementá-los.
 
 ## Objetivo da execução
 

@@ -5,6 +5,7 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
         .ServiceOrderVehicleArchivedException;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
         .ServiceOrderVehicleNotFoundException;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.InvalidServiceOrderException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -30,6 +31,12 @@ class ServiceLifecycleExceptionHandler {
     ResponseEntity<ErrorResponse> handleVehicleArchived(ServiceOrderVehicleArchivedException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse("VEHICLE_ARCHIVED", exception.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidServiceOrderException.class)
+    ResponseEntity<ErrorResponse> handleInvalidServiceOrder(InvalidServiceOrderException ex) {
+        return ResponseEntity.badRequest()
+                .body(new ErrorResponse("VALIDATION_ERROR", ex.getMessage()));
     }
 
     @ExceptionHandler(IllegalStateException.class)

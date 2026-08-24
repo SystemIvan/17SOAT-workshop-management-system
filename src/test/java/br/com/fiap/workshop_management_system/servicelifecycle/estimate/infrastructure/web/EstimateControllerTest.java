@@ -46,12 +46,8 @@ class EstimateControllerTest {
         ServiceOrder serviceOrder = ServiceOrder.create(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                new VehicleSnapshot(
-                        "ABC1D23",
-                        "Fiat",
-                        "Uno",
-                        2015
-                )
+                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015),
+                "Initial assessment"
         );
 
         DiagnosisItem diagnosisItem = new DiagnosisItem(
@@ -61,7 +57,8 @@ class EstimateControllerTest {
                 List.of()
         );
 
-        serviceOrder.performDiagnosis(List.of(diagnosisItem));
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
+        serviceOrder.performDiagnosis(List.of(diagnosisItem), UUID.randomUUID(), java.time.Instant.EPOCH);
         serviceOrderRepository.save(serviceOrder);
 
         UUID diagnosisId = serviceOrder.openDiagnosisId();

@@ -23,6 +23,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -44,7 +45,7 @@ class CreateServiceOrderUseCaseTest {
 
     private final CreateServiceOrderRequest request = new CreateServiceOrderRequest(
             UUID.randomUUID(), UUID.randomUUID(),
-            new VehicleSnapshotRequest("ABC1D23", "Fiat", "Uno", 2015), null);
+            new VehicleSnapshotRequest("ABC1D23", "Fiat", "Uno", 2015), null, "Initial assessment");
 
     @BeforeEach
     void setUp() {
@@ -79,6 +80,7 @@ class CreateServiceOrderUseCaseTest {
         ServiceOrderResponse response = useCase.execute(request);
 
         assertNotNull(response.id());
+        assertEquals("Initial assessment", response.initialAssessment());
         verifyNoInteractions(technicianNotificationPort);
     }
 
@@ -117,7 +119,7 @@ class CreateServiceOrderUseCaseTest {
     @Test
     void mapsRequiredSnapshotBeforeCheckingVehicleEligibility() {
         CreateServiceOrderRequest invalidRequest = new CreateServiceOrderRequest(
-                UUID.randomUUID(), UUID.randomUUID(), null, null);
+                UUID.randomUUID(), UUID.randomUUID(), null, null, "Initial assessment");
 
         assertThrows(NullPointerException.class, () -> useCase.execute(invalidRequest));
 

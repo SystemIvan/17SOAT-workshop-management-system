@@ -59,6 +59,7 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/status'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/diagnosis'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/service-orders/{id}/diagnosis-assignee'].put").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/priority'].patch").exists())
                 .andExpect(jsonPath(
                         "$.paths['/api/service-orders/{id}/executions/{executionId}/assign-technician'].post")
@@ -72,6 +73,48 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/finalize'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{serviceOrderId}/estimates'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/estimates/{estimateId}'].get").exists());
+    }
+
+    @Test
+    void documentServiceOrderInitialAssessmentContract() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/service-orders'].post.responses['201']").exists())
+                .andExpect(jsonPath("$.paths['/api/service-orders'].post.responses['400']").exists())
+                .andExpect(jsonPath(
+                        "$.components.schemas.CreateServiceOrderRequest.properties.initialAssessment").exists())
+                .andExpect(jsonPath(
+                        "$.components.schemas.CreateServiceOrderRequest.required", hasItem("initialAssessment")))
+                .andExpect(jsonPath("$.components.schemas.ServiceOrderResponse.properties.initialAssessment").exists())
+                .andExpect(jsonPath("$.components.schemas.ServiceOrderResponse.properties.initialAssessment.type",
+                        hasItem("null")));
+    }
+
+    @Test
+    void documentServiceOrderStatusProjectionAliases() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.components.schemas.ServiceOrderResponse.properties.status").exists())
+                .andExpect(jsonPath("$.components.schemas.ServiceOrderResponse.properties.status.deprecated")
+                        .value(true))
+                .andExpect(jsonPath("$.components.schemas.ServiceOrderResponse.properties.statusSnapshot").exists());
+    }
+
+    @Test
+    void documentDiagnosisAuthorshipContract() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.components.schemas.PerformDiagnosisRequest.properties.diagnosedByTechnicianId")
+                        .exists())
+                .andExpect(jsonPath("$.components.schemas.PerformDiagnosisRequest.required",
+                        hasItem("diagnosedByTechnicianId")))
+                .andExpect(jsonPath("$.components.schemas.ServiceExecutionResponse.properties.diagnosedByTechnicianId")
+                        .exists())
+                .andExpect(jsonPath("$.components.schemas.ServiceExecutionResponse.properties.diagnosedAt").exists())
+                .andExpect(jsonPath("$.paths['/api/service-orders/{id}/diagnosis'].post.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/api/service-orders/{id}/diagnosis'].post.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/api/service-orders/{id}/diagnosis'].post.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/api/service-orders/{id}/diagnosis'].post.responses['409']").exists());
     }
 
     @Test

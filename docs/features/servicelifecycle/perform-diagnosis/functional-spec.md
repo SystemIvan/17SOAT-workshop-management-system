@@ -5,16 +5,29 @@
 | Feature | `perform-diagnosis` |
 | Status | Approved |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-20 |
-| Aprovado por | Santiago Silvestre |
-| Aprovado em | 2026-08-20 |
-| Referências | `docs/Architecture.md` §2.3 (RF09–RF18) |
+| Atualizado em | 2026-08-22 |
+| Aprovado por | Matheus Apostulo |
+| Aprovado em | 2026-08-22 |
+| Referências | `docs/Architecture.md` §2.3 (RF09–RF18), features `assign-diagnosis-assignee` e `diagnosis-authorship` |
 
 > **Nota:** este documento é retroativo. A feature já está implementada em produção
 > (`ServiceOrder.performDiagnosis`, `PerformDiagnosisUseCase`, `POST /api/service-orders/{id}/diagnosis`)
 > e foi identificada sem passar pelo gate SDD do `AGENTS.md`, no mesmo levantamento que originou a
 > documentação retroativa de `service-order-creation` (RF09). O texto abaixo descreve o comportamento
 > como ele existe hoje no código, não uma proposta nova.
+
+## Deltas materiais aprovados em features dependentes — pendentes de nova aprovação desta spec
+
+`assign-diagnosis-assignee` exige que a Service Order tenha `diagnosisAssigneeId` antes de aceitar cada Diagnosis.
+`diagnosis-authorship` exige `diagnosedByTechnicianId` no request e registra um `diagnosedAt` único, gerado pelo
+sistema, em todas as Service Executions do lote. O responsável planejado pode divergir do autor efetivo e nenhum dos
+dois preenche `assignedTechnicianId`.
+
+Classificação: **material** — há nova precondição, o request incompatível ganha campo obrigatório, a resposta de cada
+execução ganha autoria e instante, e o fluxo passa a validar a existência do autor. As duas specs das features
+dependentes são as fontes de verdade; esta spec não replica regras de lock, persistência ou auditoria. A revisão foi
+aprovada por humano em 2026-08-22 e a especificação técnica revisada foi aprovada na sequência. O plano histórico
+permanece `Stale` porque não cobre a implementação dos deltas.
 
 ## Problema e resultado esperado
 
@@ -35,8 +48,8 @@ Ao final do registro de diagnóstico:
 
 ## Atores e cenários
 
-- Um Technician (ou o atendente em nome dele) registra o diagnóstico de uma Service Order já existente,
-  informando um ou mais serviços identificados.
+- Um Technician (ou o atendente em nome dele) registra o diagnóstico de uma Service Order já existente, após o
+  planejamento de um responsável e informando o autor efetivo e um ou mais serviços identificados.
 - O sistema cria um `ServiceExecution` por item informado e abre um diagnóstico associando todos eles.
 - Um diagnóstico só pode ficar aberto por vez: uma nova tentativa de registrar diagnóstico enquanto o
   anterior ainda não gerou Estimate é rejeitada.
@@ -58,6 +71,16 @@ Ao final do registro de diagnóstico:
 - O diagnóstico deixa de estar aberto quando um Estimate é gerado a partir dele (feature
   `estimate-generation`, fora do escopo deste documento) — a transição de fechamento não é
   responsabilidade desta feature.
+
+### Planejamento e autoria do diagnóstico
+
+- Antes do registro, a Service Order deve conter `diagnosisAssigneeId`; sem o planejamento, o comando é rejeitado
+  sem criar Service Executions.
+- O request informa `diagnosedByTechnicianId`, que deve identificar um Technician existente. Ele é declaratório até
+  existir identidade autenticada e pode divergir do responsável planejado.
+- O sistema define uma única vez `diagnosedAt` para todo o lote. O instante não é informado pelo chamador.
+- Os detalhes completos pertencem, respectivamente, às features `assign-diagnosis-assignee` e
+  `diagnosis-authorship`.
 
 ### Cada item do diagnóstico
 
@@ -108,3 +131,5 @@ execuções em andamento de lotes anteriores. Coberto por
 - [x] Tentar registrar diagnóstico em uma Service Order que já tem um diagnóstico aberto é rejeitado.
 - [x] Tentar registrar diagnóstico em uma Service Order inexistente resulta em erro de "não encontrado".
 - [x] Uma lista de itens vazia ou ausente é rejeitada como erro de validação.
+- [ ] Diagnosis sem responsável planejado ou sem autor efetivo válido é rejeitado sem persistência parcial; a
+      evidência será incluída após a reaprovação e implementação dos deltas.

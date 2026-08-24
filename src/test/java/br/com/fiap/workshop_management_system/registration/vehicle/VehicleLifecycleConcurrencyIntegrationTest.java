@@ -255,7 +255,8 @@ class VehicleLifecycleConcurrencyIntegrationTest {
                 vehicle.id(),
                 new VehicleSnapshotRequest(vehicle.licensePlate().value(), vehicle.brand(), vehicle.model(),
                         vehicle.year().value()),
-                null);
+                null,
+                "Initial assessment");
     }
 
     private <T> T inTransaction(java.util.concurrent.Callable<T> action) {

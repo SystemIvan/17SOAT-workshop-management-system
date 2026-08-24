@@ -181,7 +181,7 @@ class ServiceOrderControllerAssignTechnicianTest {
                   "customerId": "%s",
                   "vehicleId": "%s",
                   "vehicleSnapshot": {"licensePlate": "ABC1D23", "brand": "Fiat", "model": "Uno", "year": 2015},
-                  "priority": "NORMAL"
+                  "priority": "NORMAL", "initialAssessment": "Initial assessment"
                 }
                 """.formatted(customerId, vehicleId);
         MvcResult result = mockMvc.perform(post("/api/service-orders")
@@ -192,13 +192,16 @@ class ServiceOrderControllerAssignTechnicianTest {
     }
 
     private String diagnoseWithOneExecution(String serviceOrderId) throws Exception {
+        String technicianId = createTechnician();
+        assignDiagnosisAssignee(serviceOrderId, technicianId);
         String body = """
                 {
+                  "diagnosedByTechnicianId": "%s",
                   "items": [
                     {"catalogServiceId": "%s", "name": "Troca de óleo", "price": {"value": 100.00, "currency": "BRL"}}
                   ]
                 }
-                """.formatted(UUID.randomUUID());
+                """.formatted(technicianId, UUID.randomUUID());
         MvcResult result = mockMvc.perform(post("/api/service-orders/{id}/diagnosis", serviceOrderId)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk())
@@ -213,6 +216,14 @@ class ServiceOrderControllerAssignTechnicianTest {
                 .andExpect(status().isCreated())
                 .andReturn();
         return JsonPath.read(result.getResponse().getContentAsString(), "$.id");
+    }
+
+    private void assignDiagnosisAssignee(String serviceOrderId, String technicianId) throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/service-orders/{id}/diagnosis-assignee", serviceOrderId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(technicianId)))
+                .andExpect(status().isOk());
     }
 
     private static String assignBody(String technicianId) {

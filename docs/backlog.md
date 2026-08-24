@@ -60,3 +60,39 @@ por suas próprias aprovações funcional e técnica.
   níveis por ambiente, métricas/health checks e regras para impedir registro de dados pessoais, segredos e bodies HTTP.
 - **Pontos para discovery:** requisitos de suporte e auditoria, observabilidade de Flyway e integrações, custo/retenção,
   LGPD, alertas, tracing distribuído e ownership operacional.
+
+## BL-006 — Histórico persistente de progresso de Service Execution
+
+- **Contexto:** Service Lifecycle.
+- **Status:** ideia futura.
+- **Origem:** revisão do fluxo manual principal pelo Postman.
+- **Problema:** `PATCH /api/service-orders/{id}/executions/{executionId}/progress` aceita uma `note`, mas o MVP apenas
+  valida que a execução está `IN_PROGRESS`; a nota não é persistida nem retornada nas consultas.
+- **Evolução a avaliar:** registrar entradas de progresso com texto, instante e autoria, e expor o histórico no detalhe
+  da Service Order sem alterar indevidamente o estado da execução.
+- **Pontos para discovery:** fronteira do aggregate, modelo de auditoria, identificação do autor, ordenação temporal,
+  limites de conteúdo, retenção/LGPD, contrato HTTP e estratégia de migração.
+
+## BL-007 — Listagem operacional de Service Orders
+
+- **Contexto:** Service Lifecycle.
+- **Status:** ideia futura.
+- **Origem:** revisão do fluxo manual principal pelo Postman.
+- **Problema:** a API permite consultar uma Service Order por ID e seu status agregado, mas não oferece uma visão para
+  triagem operacional de ordens abertas.
+- **Evolução a avaliar:** criar uma listagem paginada de resumos de Service Orders, com filtros a definir para
+  `statusSnapshot`, prioridade, Customer, Vehicle e Technician, preservando o detalhe completo para a consulta por ID.
+- **Pontos para discovery:** critérios de ordenação, paginação, projeção de leitura sem carregar todas as execuções,
+  índices e desempenho, campos mínimos para a operação, autorização/exposição de dados de Customer e contrato HTTP.
+
+## BL-008 — Totais calculados de Estimate
+
+- **Contexto:** Service Lifecycle.
+- **Status:** ideia futura.
+- **Origem:** revisão do fluxo manual principal pelo Postman.
+- **Problema:** a Estimate retorna os preços de serviço e dos itens de estoque por linha, mas não expõe subtotal por
+  linha nem total consolidado para consumo por cliente ou interface operacional.
+- **Evolução a avaliar:** expor `lineTotal` e `total`, calculados no servidor a partir dos preços congelados e das
+  quantidades dos itens, sem aceitar valores totais no request.
+- **Pontos para discovery:** regra para moedas distintas, arredondamento, cálculo de itens por quantidade, contrato de
+  resposta, compatibilidade e se os valores derivados exigem persistência para auditoria/versionamento.

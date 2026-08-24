@@ -16,12 +16,15 @@ class ServiceOrderTest {
     private final VehicleSnapshot vehicleSnapshot = new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015);
 
     private ServiceOrder newServiceOrder() {
-        return ServiceOrder.create(UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot);
+        ServiceOrder serviceOrder = ServiceOrder.create(
+                UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, "Initial assessment");
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
+        return serviceOrder;
     }
 
     private UUID diagnoseWithOneExecution(ServiceOrder serviceOrder) {
         DiagnosisItem item = new DiagnosisItem(UUID.randomUUID(), "Troca de óleo", Money.brl(BigDecimal.TEN), List.of());
-        serviceOrder.performDiagnosis(List.of(item));
+        serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), java.time.Instant.EPOCH);
         return serviceOrder.serviceExecutions().get(0).id();
     }
 
@@ -36,6 +39,27 @@ class ServiceOrderTest {
         ServiceOrder serviceOrder = newServiceOrder();
 
         assertEquals(ServiceOrderStatus.RECEIVED, serviceOrder.status());
+        assertEquals("Initial assessment", serviceOrder.initialAssessment());
+    }
+
+    @Test
+    void newServiceOrderDoesNotHaveADiagnosisAssignee() {
+        ServiceOrder serviceOrder = ServiceOrder.create(
+                UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, "Initial assessment");
+
+        assertNull(serviceOrder.diagnosisAssigneeId());
+        assertThrows(IllegalStateException.class,
+                () -> serviceOrder.performDiagnosis(List.of(), UUID.randomUUID(), java.time.Instant.EPOCH));
+    }
+
+    @Test
+    void newServiceOrderRequiresANonBlankInitialAssessment() {
+        assertThrows(InvalidServiceOrderException.class,
+                () -> ServiceOrder.create(UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, null));
+        assertThrows(InvalidServiceOrderException.class,
+                () -> ServiceOrder.create(UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, ""));
+        assertThrows(InvalidServiceOrderException.class,
+                () -> ServiceOrder.create(UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, "   "));
     }
 
     @Test
@@ -53,7 +77,8 @@ class ServiceOrderTest {
         diagnoseWithOneExecution(serviceOrder);
 
         DiagnosisItem secondItem = new DiagnosisItem(UUID.randomUUID(), "Alinhamento", Money.brl(BigDecimal.ONE), List.of());
-        assertThrows(IllegalStateException.class, () -> serviceOrder.performDiagnosis(List.of(secondItem)));
+        assertThrows(IllegalStateException.class,
+                () -> serviceOrder.performDiagnosis(List.of(secondItem), UUID.randomUUID(), java.time.Instant.EPOCH));
     }
 
     @Test
@@ -64,6 +89,7 @@ class ServiceOrderTest {
         authorizeExecution(serviceOrder, executionId);
 
         assertEquals(ServiceExecutionStatus.READY, serviceOrder.serviceExecutions().get(0).status());
+        assertEquals(ServiceOrderStatus.IN_PROGRESS, serviceOrder.status());
     }
 
     @Test
@@ -122,7 +148,7 @@ class ServiceOrderTest {
         ServiceOrder serviceOrder = newServiceOrder();
         DiagnosisItem approvedItem = new DiagnosisItem(UUID.randomUUID(), "Troca de óleo", Money.brl(BigDecimal.TEN), List.of());
         DiagnosisItem rejectedItem = new DiagnosisItem(UUID.randomUUID(), "Polimento", Money.brl(BigDecimal.ONE), List.of());
-        serviceOrder.performDiagnosis(List.of(approvedItem, rejectedItem));
+        serviceOrder.performDiagnosis(List.of(approvedItem, rejectedItem), UUID.randomUUID(), java.time.Instant.EPOCH);
 
         UUID approvedExecutionId = serviceOrder.serviceExecutions().get(0).id();
         UUID rejectedExecutionId = serviceOrder.serviceExecutions().get(1).id();
@@ -131,6 +157,21 @@ class ServiceOrderTest {
         serviceOrder.rejectExecutionFromEstimate(UUID.randomUUID(), rejectedExecutionId);
         serviceOrder.startExecution(approvedExecutionId);
         serviceOrder.completeExecution(approvedExecutionId);
+
+        assertEquals(ServiceOrderStatus.COMPLETED, serviceOrder.status());
+    }
+
+    @Test
+    void allRejectedExecutionsMoveServiceOrderToCompleted() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        DiagnosisItem firstItem = new DiagnosisItem(
+                UUID.randomUUID(), "Alinhamento", Money.brl(BigDecimal.TEN), List.of());
+        DiagnosisItem secondItem = new DiagnosisItem(
+                UUID.randomUUID(), "Polimento", Money.brl(BigDecimal.ONE), List.of());
+        serviceOrder.performDiagnosis(List.of(firstItem, secondItem), UUID.randomUUID(), java.time.Instant.EPOCH);
+
+        serviceOrder.rejectExecutionFromEstimate(UUID.randomUUID(), serviceOrder.serviceExecutions().get(0).id());
+        serviceOrder.rejectExecutionFromEstimate(UUID.randomUUID(), serviceOrder.serviceExecutions().get(1).id());
 
         assertEquals(ServiceOrderStatus.COMPLETED, serviceOrder.status());
     }
@@ -149,6 +190,20 @@ class ServiceOrderTest {
         assertThrows(IllegalStateException.class, () -> serviceOrder.finalize(false));
 
         serviceOrder.finalize(true);
+
+        assertEquals(ServiceOrderStatus.DELIVERED, serviceOrder.status());
+    }
+
+    @Test
+    void deliveredStatusIsPreservedWhenAProjectionConditionChangesLater() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        UUID executionId = diagnoseWithOneExecution(serviceOrder);
+        authorizeExecution(serviceOrder, executionId);
+        serviceOrder.startExecution(executionId);
+        serviceOrder.completeExecution(executionId);
+        serviceOrder.finalize(true);
+
+        serviceOrder.markEstimateSentWithPendingLines();
 
         assertEquals(ServiceOrderStatus.DELIVERED, serviceOrder.status());
     }
@@ -201,7 +256,7 @@ class ServiceOrderTest {
         StockRequirement pendingPart = new StockRequirement(
                 UUID.randomUUID(), StockItemType.PART, 1, "Filtro de óleo", Money.brl(BigDecimal.TEN), false);
         DiagnosisItem item = new DiagnosisItem(UUID.randomUUID(), "Troca de filtro", Money.brl(BigDecimal.TEN), List.of(pendingPart));
-        serviceOrder.performDiagnosis(List.of(item));
+        serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), java.time.Instant.EPOCH);
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
 
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
@@ -254,7 +309,8 @@ class ServiceOrderTest {
 
         DiagnosisItem additionalRepair = new DiagnosisItem(
                 UUID.randomUUID(), "Reparo adicional", Money.brl(BigDecimal.TEN), List.of());
-        UUID secondDiagnosisId = serviceOrder.performDiagnosis(List.of(additionalRepair));
+        UUID secondDiagnosisId = serviceOrder.performDiagnosis(
+                List.of(additionalRepair), UUID.randomUUID(), java.time.Instant.EPOCH);
 
         assertEquals(secondDiagnosisId, serviceOrder.openDiagnosisId());
         assertEquals(2, serviceOrder.serviceExecutions().size());

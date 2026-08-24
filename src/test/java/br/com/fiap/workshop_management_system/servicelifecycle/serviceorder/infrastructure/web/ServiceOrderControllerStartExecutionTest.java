@@ -122,7 +122,7 @@ class ServiceOrderControllerStartExecutionTest {
                   "customerId": "%s",
                   "vehicleId": "%s",
                   "vehicleSnapshot": {"licensePlate": "ABC1D23", "brand": "Fiat", "model": "Uno", "year": 2015},
-                  "priority": "NORMAL"
+                  "priority": "NORMAL", "initialAssessment": "Initial assessment"
                 }
                 """.formatted(customerId, vehicleId);
         MvcResult result = mockMvc.perform(post("/api/service-orders")
@@ -133,17 +133,34 @@ class ServiceOrderControllerStartExecutionTest {
     }
 
     private String diagnoseWithOneExecution(String serviceOrderId) throws Exception {
+        String technicianId = assignDiagnosisAssignee(serviceOrderId);
         String body = """
                 {
+                  "diagnosedByTechnicianId": "%s",
                   "items": [
                     {"catalogServiceId": "%s", "name": "Troca de óleo", "price": {"value": 100.00, "currency": "BRL"}}
                   ]
                 }
-                """.formatted(UUID.randomUUID());
+                """.formatted(technicianId, UUID.randomUUID());
         MvcResult result = mockMvc.perform(post("/api/service-orders/{id}/diagnosis", serviceOrderId)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk())
                 .andReturn();
         return JsonPath.read(result.getResponse().getContentAsString(), "$.executions[0].id");
+    }
+
+    private String assignDiagnosisAssignee(String serviceOrderId) throws Exception {
+        MvcResult technician = mockMvc.perform(post("/api/technicians")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Carlos Silva\",\"specialties\":[\"MECHANICAL\"]}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String technicianId = JsonPath.read(technician.getResponse().getContentAsString(), "$.id");
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/service-orders/{id}/diagnosis-assignee", serviceOrderId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"technicianId\":\"" + technicianId + "\"}"))
+                .andExpect(status().isOk());
+        return technicianId;
     }
 }

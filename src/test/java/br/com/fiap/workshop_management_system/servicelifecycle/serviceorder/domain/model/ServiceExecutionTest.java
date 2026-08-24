@@ -13,9 +13,11 @@ class ServiceExecutionTest {
 
     private ServiceOrder serviceOrderWithOneExecution() {
         ServiceOrder serviceOrder = ServiceOrder.create(
-                UUID.randomUUID(), UUID.randomUUID(), new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015));
+                UUID.randomUUID(), UUID.randomUUID(), new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015),
+                "Initial assessment");
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
         DiagnosisItem item = new DiagnosisItem(UUID.randomUUID(), "Troca de óleo", Money.brl(BigDecimal.TEN), List.of());
-        serviceOrder.performDiagnosis(List.of(item));
+        serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), java.time.Instant.EPOCH);
         return serviceOrder;
     }
 
@@ -32,11 +34,13 @@ class ServiceExecutionTest {
     @Test
     void executionWithPendingStockRequirementStaysAwaitingItemsUntilItsReservationIsConfirmed() {
         ServiceOrder serviceOrder = ServiceOrder.create(
-                UUID.randomUUID(), UUID.randomUUID(), new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015));
+                UUID.randomUUID(), UUID.randomUUID(), new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015),
+                "Initial assessment");
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
         StockRequirement pendingPart = new StockRequirement(
                 UUID.randomUUID(), StockItemType.PART, 1, "Pastilha de freio", Money.brl(BigDecimal.TEN), false);
         DiagnosisItem item = new DiagnosisItem(UUID.randomUUID(), "Troca de pastilha", Money.brl(BigDecimal.TEN), List.of(pendingPart));
-        serviceOrder.performDiagnosis(List.of(item));
+        serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), java.time.Instant.EPOCH);
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
 
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
@@ -154,10 +158,15 @@ class ServiceExecutionTest {
     @Test
     void confirmsAReservationOnlyOnceAndRejectsADifferentReservationId() {
         ServiceOrder serviceOrder = ServiceOrder.create(
-                UUID.randomUUID(), UUID.randomUUID(), new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015));
+                UUID.randomUUID(), UUID.randomUUID(), new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015),
+                "Initial assessment");
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
         StockRequirement requirement = newStockRequirement();
-        serviceOrder.performDiagnosis(List.of(new DiagnosisItem(
-                UUID.randomUUID(), "Troca de correia", Money.brl(BigDecimal.TEN), List.of(requirement))));
+        serviceOrder.performDiagnosis(
+                List.of(new DiagnosisItem(
+                        UUID.randomUUID(), "Troca de correia", Money.brl(BigDecimal.TEN), List.of(requirement))),
+                UUID.randomUUID(),
+                java.time.Instant.EPOCH);
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
         UUID reservationId = UUID.randomUUID();

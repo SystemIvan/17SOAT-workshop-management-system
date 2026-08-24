@@ -46,7 +46,7 @@ public class CreateServiceOrderUseCase {
         Priority priority = request.priority() != null ? request.priority() : Priority.NORMAL;
         requireActiveVehicle(request.vehicleId());
         ServiceOrder serviceOrder = ServiceOrder.create(
-                request.customerId(), request.vehicleId(), vehicleSnapshot, priority);
+                request.customerId(), request.vehicleId(), vehicleSnapshot, priority, request.initialAssessment());
         repository.save(serviceOrder);
         notifyActiveTechnicians(serviceOrder);
         return ServiceOrderMapper.toResponse(serviceOrder);

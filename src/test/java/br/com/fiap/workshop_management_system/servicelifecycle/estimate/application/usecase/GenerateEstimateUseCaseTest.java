@@ -10,6 +10,7 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.doma
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.VehicleSnapshot;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -25,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class GenerateEstimateUseCaseTest {
 
@@ -38,7 +41,8 @@ class GenerateEstimateUseCaseTest {
         ServiceOrder serviceOrder = ServiceOrder.create(
                 customerId,
                 UUID.randomUUID(),
-                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015)
+                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015),
+                "Initial assessment"
         );
 
         StockRequirement stock = new StockRequirement(
@@ -57,7 +61,8 @@ class GenerateEstimateUseCaseTest {
                 List.of(stock)
         );
 
-        serviceOrder.performDiagnosis(List.of(item));
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
+        serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), java.time.Instant.EPOCH);
 
         UUID diagnosisId = serviceOrder.openDiagnosisId();
 
@@ -108,6 +113,27 @@ class GenerateEstimateUseCaseTest {
         // Gerar orçamento não significa aprovação do cliente.
         assertEquals(diagnosisId, serviceOrder.openDiagnosisId());
         assertTrue(serviceOrder.serviceExecutions().getFirst().stockRequirementsFrozen());
+    }
+
+    @Test
+    void publishesEstimateGeneratedEventOnSuccess() {
+        ServiceOrder serviceOrder = diagnosedServiceOrder();
+        UUID diagnosisId = serviceOrder.openDiagnosisId();
+
+        ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+
+        GenerateEstimateUseCase useCase =
+                new GenerateEstimateUseCase(
+                        new InMemoryServiceOrderRepository(serviceOrder),
+                        new InMemoryEstimateRepository(),
+                        Clock.fixed(NOW, ZoneOffset.UTC),
+                        eventPublisher
+                );
+
+        GenerateEstimateUseCase.Result result =
+                useCase.execute(serviceOrder.id(), diagnosisId);
+
+        verify(eventPublisher).publishEvent(result.event());
     }
 
     @Test
@@ -179,7 +205,8 @@ class GenerateEstimateUseCaseTest {
         ServiceOrder serviceOrder = ServiceOrder.create(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015)
+                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015),
+                "Initial assessment"
         );
 
         DiagnosisItem item = new DiagnosisItem(
@@ -189,7 +216,8 @@ class GenerateEstimateUseCaseTest {
                 List.of()
         );
 
-        serviceOrder.performDiagnosis(List.of(item));
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
+        serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), java.time.Instant.EPOCH);
 
         return serviceOrder;
     }

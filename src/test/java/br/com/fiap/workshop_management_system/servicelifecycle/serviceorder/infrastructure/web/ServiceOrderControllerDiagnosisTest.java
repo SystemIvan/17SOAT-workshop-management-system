@@ -27,6 +27,7 @@ class ServiceOrderControllerDiagnosisTest {
     private WebApplicationContext context;
 
     private MockMvc mockMvc;
+    private String diagnosedByTechnicianId;
 
     @BeforeEach
     void setUp() {
@@ -39,29 +40,35 @@ class ServiceOrderControllerDiagnosisTest {
 
         String body = """
                 {
+                  "diagnosedByTechnicianId": "%s",
                   "items": [
                     {"catalogServiceId": "%s", "name": "Troca de óleo", "price": {"value": 100.00, "currency": "BRL"}},
                     {"catalogServiceId": "%s", "name": "Alinhamento", "price": {"value": 80.00, "currency": "BRL"}}
                   ]
                 }
-                """.formatted(UUID.randomUUID(), UUID.randomUUID());
+                """.formatted(diagnosedByTechnicianId, UUID.randomUUID(), UUID.randomUUID());
 
         mockMvc.perform(post("/api/service-orders/{id}/diagnosis", serviceOrderId)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.executions.length()").value(2))
-                .andExpect(jsonPath("$.executions[0].name").value("Troca de óleo"));
+                .andExpect(jsonPath("$.executions[0].name").value("Troca de óleo"))
+                .andExpect(jsonPath("$.executions[0].diagnosedByTechnicianId").value(diagnosedByTechnicianId))
+                .andExpect(jsonPath("$.executions[0].diagnosedAt").exists())
+                .andExpect(jsonPath("$.executions[1].diagnosedByTechnicianId").value(diagnosedByTechnicianId))
+                .andExpect(jsonPath("$.executions[1].diagnosedAt").exists());
     }
 
     @Test
     void returnsNotFoundWhenServiceOrderDoesNotExist() throws Exception {
         String body = """
                 {
+                  "diagnosedByTechnicianId": "%s",
                   "items": [
                     {"catalogServiceId": "%s", "name": "Troca de óleo", "price": {"value": 100.00, "currency": "BRL"}}
                   ]
                 }
-                """.formatted(UUID.randomUUID());
+                """.formatted(createTechnician(), UUID.randomUUID());
 
         mockMvc.perform(post("/api/service-orders/{id}/diagnosis", UUID.randomUUID())
                         .contentType(MediaType.APPLICATION_JSON).content(body))
@@ -84,11 +91,12 @@ class ServiceOrderControllerDiagnosisTest {
         String serviceOrderId = createServiceOrder();
         String body = """
                 {
+                  "diagnosedByTechnicianId": "%s",
                   "items": [
                     {"catalogServiceId": "%s", "name": "Troca de óleo", "price": {"value": 100.00, "currency": "BRL"}}
                   ]
                 }
-                """.formatted(UUID.randomUUID());
+                """.formatted(diagnosedByTechnicianId, UUID.randomUUID());
 
         mockMvc.perform(post("/api/service-orders/{id}/diagnosis", serviceOrderId)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
@@ -109,13 +117,31 @@ class ServiceOrderControllerDiagnosisTest {
                   "customerId": "%s",
                   "vehicleId": "%s",
                   "vehicleSnapshot": {"licensePlate": "ABC1D23", "brand": "Fiat", "model": "Uno", "year": 2015},
-                  "priority": "NORMAL"
+                  "priority": "NORMAL", "initialAssessment": "Initial assessment"
                 }
                 """.formatted(customerId, vehicleId);
         MvcResult result = mockMvc.perform(post("/api/service-orders")
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated())
                 .andReturn();
-        return JsonPath.read(result.getResponse().getContentAsString(), "$.id");
+        String serviceOrderId = JsonPath.read(result.getResponse().getContentAsString(), "$.id");
+        diagnosedByTechnicianId = assignDiagnosisAssignee(serviceOrderId);
+        return serviceOrderId;
+    }
+
+    private String assignDiagnosisAssignee(String serviceOrderId) throws Exception {
+        String technicianId = createTechnician();
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                        "/api/service-orders/{id}/diagnosis-assignee", serviceOrderId)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"technicianId\":\"" + technicianId + "\"}"))
+                .andExpect(status().isOk());
+        return technicianId;
+    }
+
+    private String createTechnician() throws Exception {
+        MvcResult technician = mockMvc.perform(post("/api/technicians").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Carlos Silva\",\"specialties\":[\"MECHANICAL\"]}"))
+                .andExpect(status().isCreated()).andReturn();
+        return JsonPath.read(technician.getResponse().getContentAsString(), "$.id");
     }
 }
