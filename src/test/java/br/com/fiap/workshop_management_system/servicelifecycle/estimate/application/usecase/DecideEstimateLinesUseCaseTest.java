@@ -421,13 +421,24 @@ class DecideEstimateLinesUseCaseTest {
         }
 
         @Override
-        public boolean existsByDiagnosisId(UUID diagnosisId) {
-            return byId.values().stream().anyMatch(estimate -> estimate.diagnosisId().equals(diagnosisId));
-        }
+public boolean existsByDiagnosisId(UUID diagnosisId) {
+    return byId.values().stream()
+            .anyMatch(estimate ->
+                    estimate.diagnosisId().equals(diagnosisId));
+}
 
-        @Override
-        public void save(Estimate estimate) {
-            byId.put(estimate.id(), estimate);
-        }
+@Override
+public List<Estimate> findSentExpiredAtOrBefore(Instant now) {
+    return byId.values().stream()
+            .filter(estimate -> estimate.status() == EstimateStatus.SENT)
+            .filter(estimate -> estimate.expiresAt() != null)
+            .filter(estimate -> !estimate.expiresAt().isAfter(now))
+            .toList();
+}
+
+@Override
+public void save(Estimate estimate) {
+    byId.put(estimate.id(), estimate);
+}
     }
 }
