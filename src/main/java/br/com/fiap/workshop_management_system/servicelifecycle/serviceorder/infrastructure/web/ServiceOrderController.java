@@ -92,10 +92,12 @@ public class ServiceOrderController {
     }
 
     @PostMapping
-    @Operation(summary = "Create a service order")
+    @Operation(summary = "Criar uma ordem de serviço para um veículo ativo")
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Service order created"),
-            @ApiResponse(responseCode = "400", description = "Invalid or missing service order fields")
+            @ApiResponse(responseCode = "201", description = "Ordem de serviço criada"),
+            @ApiResponse(responseCode = "400", description = "Dados da ordem de serviço inválidos"),
+            @ApiResponse(responseCode = "404", description = "Veículo não encontrado"),
+            @ApiResponse(responseCode = "409", description = "Veículo arquivado")
     })
     public ResponseEntity<ServiceOrderResponse> create(@Valid @RequestBody CreateServiceOrderRequest request) {
         ServiceOrderResponse response = createServiceOrderUseCase.execute(request);

@@ -19,6 +19,7 @@ public class Vehicle {
     private String model;
     private VehicleYear year;
     private String color;
+    private Mileage mileage;
     private boolean active;
 
     public static Vehicle create(
@@ -28,8 +29,10 @@ public class Vehicle {
             String brand,
             String model,
             VehicleYear year,
-            String color) {
-        return new Vehicle(UUID.randomUUID(), customerId, licensePlate, chassisNumber, brand, model, year, color, true);
+            String color,
+            Mileage mileage) {
+        return new Vehicle(UUID.randomUUID(), customerId, licensePlate, chassisNumber,
+                brand, model, year, color, mileage, true);
     }
 
     public static Vehicle reconstitute(
@@ -41,8 +44,10 @@ public class Vehicle {
             String model,
             VehicleYear year,
             String color,
+            Mileage mileage,
             boolean active) {
-        return new Vehicle(id, customerId, licensePlate, chassisNumber, brand, model, year, color, active);
+        return new Vehicle(id, customerId, licensePlate, chassisNumber,
+                brand, model, year, color, mileage, active);
     }
 
     private Vehicle(
@@ -54,6 +59,7 @@ public class Vehicle {
             String model,
             VehicleYear year,
             String color,
+            Mileage mileage,
             boolean active) {
         this.id = Objects.requireNonNull(id, "O ID do veículo é obrigatório");
         this.customerId = Objects.requireNonNull(customerId, "O cliente do veículo é obrigatório");
@@ -63,6 +69,7 @@ public class Vehicle {
         this.model = normalizeRequired(model, "O modelo do veículo", MAX_MODEL_LENGTH);
         this.year = Objects.requireNonNull(year, "O ano do veículo é obrigatório");
         this.color = normalizeRequired(color, "A cor do veículo", MAX_COLOR_LENGTH);
+        this.mileage = mileage;
         this.active = active;
     }
 
@@ -88,6 +95,29 @@ public class Vehicle {
         if (chassisUpdate != null) {
             this.chassisNumber = chassisUpdate;
         }
+    }
+
+    public boolean recordMileage(Mileage newMileage) {
+        Objects.requireNonNull(newMileage, "A quilometragem do veículo é obrigatória");
+        if (!active) {
+            throw new VehicleArchivedException();
+        }
+        if (mileage != null && newMileage.compareTo(mileage) < 0) {
+            throw new VehicleMileageCannotDecreaseException();
+        }
+        if (newMileage.equals(mileage)) {
+            return false;
+        }
+        mileage = newMileage;
+        return true;
+    }
+
+    public boolean archive() {
+        if (!active) {
+            return false;
+        }
+        active = false;
+        return true;
     }
 
     private static String normalizeRequired(String value, String fieldName, int maximumLength) {
@@ -131,6 +161,10 @@ public class Vehicle {
 
     public String color() {
         return color;
+    }
+
+    public Optional<Mileage> mileage() {
+        return Optional.ofNullable(mileage);
     }
 
     public boolean active() {

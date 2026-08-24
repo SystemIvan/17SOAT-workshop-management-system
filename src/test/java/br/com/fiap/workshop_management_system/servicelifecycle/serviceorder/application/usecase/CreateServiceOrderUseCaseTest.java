@@ -3,17 +3,25 @@ package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.app
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.CreateServiceOrderRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderResponse;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.VehicleSnapshotRequest;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .ServiceOrderVehicleArchivedException;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .ServiceOrderVehicleNotFoundException;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.port.TechnicianNotificationPort;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.port.VehicleEligibility;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.port.VehicleEligibilityPort;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
 import br.com.fiap.workshop_management_system.servicelifecycle.technician.domain.model.Specialty;
 import br.com.fiap.workshop_management_system.servicelifecycle.technician.domain.model.Technician;
 import br.com.fiap.workshop_management_system.servicelifecycle.technician.domain.repository.TechnicianRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -30,12 +38,19 @@ class CreateServiceOrderUseCaseTest {
     private final ServiceOrderRepository repository = mock(ServiceOrderRepository.class);
     private final TechnicianRepository technicianRepository = mock(TechnicianRepository.class);
     private final TechnicianNotificationPort technicianNotificationPort = mock(TechnicianNotificationPort.class);
+    private final VehicleEligibilityPort vehicleEligibilityPort = mock(VehicleEligibilityPort.class);
     private final CreateServiceOrderUseCase useCase =
-            new CreateServiceOrderUseCase(repository, technicianRepository, technicianNotificationPort);
+            new CreateServiceOrderUseCase(
+                    repository, technicianRepository, technicianNotificationPort, vehicleEligibilityPort);
 
     private final CreateServiceOrderRequest request = new CreateServiceOrderRequest(
             UUID.randomUUID(), UUID.randomUUID(),
             new VehicleSnapshotRequest("ABC1D23", "Fiat", "Uno", 2015), null, "Initial assessment");
+
+    @BeforeEach
+    void setUp() {
+        when(vehicleEligibilityPort.checkForNewWork(request.vehicleId())).thenReturn(VehicleEligibility.ACTIVE);
+    }
 
     private Technician technician(String name, java.util.function.Consumer<Technician> transition) {
         Technician technician = Technician.create(name, Set.of(Specialty.MECHANICAL));
@@ -81,5 +96,33 @@ class CreateServiceOrderUseCaseTest {
 
         verify(technicianNotificationPort).notifyServiceOrderCreated(response.id(), failing.id());
         verify(technicianNotificationPort).notifyServiceOrderCreated(response.id(), succeeding.id());
+    }
+
+    @Test
+    void rejectsMissingVehicleBeforeSaveTechnicianLookupOrNotification() {
+        when(vehicleEligibilityPort.checkForNewWork(request.vehicleId())).thenReturn(VehicleEligibility.NOT_FOUND);
+
+        assertThrows(ServiceOrderVehicleNotFoundException.class, () -> useCase.execute(request));
+
+        verifyNoInteractions(repository, technicianRepository, technicianNotificationPort);
+    }
+
+    @Test
+    void rejectsArchivedVehicleBeforeSaveTechnicianLookupOrNotification() {
+        when(vehicleEligibilityPort.checkForNewWork(request.vehicleId())).thenReturn(VehicleEligibility.ARCHIVED);
+
+        assertThrows(ServiceOrderVehicleArchivedException.class, () -> useCase.execute(request));
+
+        verifyNoInteractions(repository, technicianRepository, technicianNotificationPort);
+    }
+
+    @Test
+    void mapsRequiredSnapshotBeforeCheckingVehicleEligibility() {
+        CreateServiceOrderRequest invalidRequest = new CreateServiceOrderRequest(
+                UUID.randomUUID(), UUID.randomUUID(), null, null, "Initial assessment");
+
+        assertThrows(NullPointerException.class, () -> useCase.execute(invalidRequest));
+
+        verifyNoInteractions(vehicleEligibilityPort, repository, technicianRepository, technicianNotificationPort);
     }
 }

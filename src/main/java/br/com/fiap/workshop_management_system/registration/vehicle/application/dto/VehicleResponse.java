@@ -13,5 +13,6 @@ public record VehicleResponse(
         String model,
         int year,
         String color,
+        @Schema(nullable = true, types = {"integer", "null"}, format = "int64", example = "42500") Long mileage,
         boolean active) {
 }

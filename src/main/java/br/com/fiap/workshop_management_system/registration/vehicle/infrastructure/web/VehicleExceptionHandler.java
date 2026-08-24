@@ -9,6 +9,7 @@ import br.com.fiap.workshop_management_system.registration.vehicle.application.e
         .VehicleLicensePlateAlreadyExistsException;
 import br.com.fiap.workshop_management_system.registration.vehicle.application.exception.VehicleNotFoundException;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.VehicleArchivedException;
+import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.VehicleMileageCannotDecreaseException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -31,6 +32,12 @@ class VehicleExceptionHandler {
     ResponseEntity<ErrorResponse> handleVehicleArchived(VehicleArchivedException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse("VEHICLE_ARCHIVED", exception.getMessage()));
+    }
+
+    @ExceptionHandler(VehicleMileageCannotDecreaseException.class)
+    ResponseEntity<ErrorResponse> handleMileageCannotDecrease(VehicleMileageCannotDecreaseException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("VEHICLE_MILEAGE_CANNOT_DECREASE", exception.getMessage()));
     }
 
     @ExceptionHandler(CustomerNotFoundException.class)
