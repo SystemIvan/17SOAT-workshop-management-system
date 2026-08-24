@@ -94,6 +94,7 @@ public class GenerateEstimateUseCase {
                 expiresAt,
                 lines
         );
+        estimate.markSent();
 
         serviceOrder.freezeStockRequirements(diagnosisId);
         estimateRepository.save(estimate);

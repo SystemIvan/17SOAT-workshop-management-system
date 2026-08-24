@@ -15,7 +15,7 @@ Leia, nesta ordem, antes de opinar:
    (identifique a seção relevante pelo pacote/feature em revisão).
 3. `.claude/rules/epic-<n>-<bounded-context>.md`, se existir um arquivo para o épico/contexto da
    mudança — lista decisões em aberto e invariantes já implementados específicos daquele escopo.
-4. ADRs locais relevantes (ex.: `docs/ADR-001-realtime-updates-strategy.md`) referenciados pelo código
+4. ADRs locais relevantes (ex.: `docs/adr/ADR-002-realtime-updates-strategy.md`) referenciados pelo código
    ou pela spec em revisão.
 5. `AGENTS.md` — regras operacionais de arquitetura, testes e SDD.
 6. O código/spec/plano que está sendo revisado.

@@ -45,8 +45,9 @@ domínio já existentes. Isso já é o padrão estabelecido em `GenerateEstimate
 `ServiceOrder` a partir do módulo `estimate`. Nenhuma importação de pacote `domain`/`infrastructure`
 interno é cruzada — apenas repositórios e modelos de domínio já públicos de `serviceorder`.
 
-Nenhuma mudança na `Estimate`: ela permanece somente leitura após a criação (nenhum campo de status
-novo, conforme a nota sobre AD-008 na `functional-spec.md`).
+Nenhuma mudança na `Estimate`: ela permanece somente leitura após a criação (o campo de status
+`draft`/`sent`/`closed`/`expired`, já aprovado pela resolução de AD-008, é gap de implementação separado —
+ver a nota sobre AD-008 na `functional-spec.md`).
 
 ## Estrutura proposta
 
@@ -265,7 +266,8 @@ já são cobertos (`authorizingExecutionWithoutPendingStockMovesItToReadyAndClos
 
 ## Fora de escopo técnico
 
-- campo de status na `Estimate` (AD-008 continua em aberto);
+- campo de status na `Estimate` (`draft`/`sent`/`closed`/`expired` — parte de AD-008 já aprovada, mas ainda
+  não implementada; requer feature própria);
 - fechamento automático da Estimate quando todas as linhas forem decididas;
 - expiração da Estimate (AD-013, RF14, feature separada e ainda não implementada);
 - qualquer evento de domínio publicado pela decisão (não existe hoje para `authorizeExecutionFromEstimate`

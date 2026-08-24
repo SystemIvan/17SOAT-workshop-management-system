@@ -84,7 +84,8 @@ public class EstimateController {
             @ApiResponse(responseCode = "200", description = "Decisions applied"),
             @ApiResponse(responseCode = "400", description = "Invalid, missing or duplicated decision fields"),
             @ApiResponse(responseCode = "404", description = "Estimate not found or service execution not part of it"),
-            @ApiResponse(responseCode = "409", description = "A service execution is not pending")
+            @ApiResponse(responseCode = "409",
+                    description = "A service execution is not pending, or the estimate is not sent")
     })
     public ResponseEntity<ServiceOrderResponse> decide(
             @PathVariable UUID estimateId, @Valid @RequestBody DecideEstimateLinesRequest request) {

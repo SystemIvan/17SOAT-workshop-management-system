@@ -4,6 +4,7 @@ import br.com.fiap.workshop_management_system.servicelifecycle.estimate.applicat
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.application.dto.DecideEstimateLinesRequest.LineDecisionRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.application.dto.EstimateLineDecision;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.Estimate;
+import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateStatus;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.repository.EstimateRepository;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderResponse;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.DiagnosisItem;
@@ -50,7 +51,7 @@ class DecideEstimateLinesUseCaseTest {
     }
 
     private Estimate estimateFor(ServiceOrder serviceOrder) {
-        return Estimate.create(
+        Estimate estimate = Estimate.create(
                 serviceOrder.id(),
                 serviceOrder.openDiagnosisId(),
                 serviceOrder.customerId(),
@@ -60,6 +61,8 @@ class DecideEstimateLinesUseCaseTest {
                         .map(execution -> new br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateLine(
                                 execution.id(), execution.name(), execution.price(), List.of()))
                         .toList());
+        estimate.markSent();
+        return estimate;
     }
 
     @Test
@@ -79,6 +82,7 @@ class DecideEstimateLinesUseCaseTest {
         assertEquals(ServiceExecutionStatus.READY, response.executions().get(0).status());
         assertEquals(ServiceExecutionStatus.READY,
                 serviceOrders.findById(serviceOrder.id()).orElseThrow().serviceExecutions().get(0).status());
+        assertEquals(EstimateStatus.CLOSED, estimates.findById(estimate.id()).orElseThrow().status());
     }
 
     @Test
@@ -116,6 +120,43 @@ class DecideEstimateLinesUseCaseTest {
 
         assertEquals(ServiceExecutionStatus.READY, response.executions().get(0).status());
         assertEquals(ServiceExecutionStatus.REJECTED, response.executions().get(1).status());
+        assertEquals(EstimateStatus.CLOSED, estimates.findById(estimate.id()).orElseThrow().status());
+    }
+
+    @Test
+    void staysSentWhileSomeLinesAreStillPending() {
+        ServiceOrder serviceOrder = diagnosedServiceOrder("Troca de óleo", "Alinhamento");
+        UUID approvedId = serviceOrder.serviceExecutions().get(0).id();
+        InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository(serviceOrder);
+        Estimate estimate = estimateFor(serviceOrder);
+        InMemoryEstimateRepository estimates = new InMemoryEstimateRepository(estimate);
+        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(
+                estimates, serviceOrders, commands -> List.of());
+
+        useCase.execute(estimate.id(),
+                new DecideEstimateLinesRequest(List.of(
+                        new LineDecisionRequest(approvedId, EstimateLineDecision.APPROVED))));
+
+        assertEquals(EstimateStatus.SENT, estimates.findById(estimate.id()).orElseThrow().status());
+    }
+
+    @Test
+    void rejectsDecidingLinesOfAClosedEstimate() {
+        ServiceOrder serviceOrder = diagnosedServiceOrder("Troca de óleo");
+        UUID executionId = serviceOrder.serviceExecutions().get(0).id();
+        InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository(serviceOrder);
+        Estimate estimate = estimateFor(serviceOrder);
+        estimate.close();
+        InMemoryEstimateRepository estimates = new InMemoryEstimateRepository(estimate);
+        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(
+                estimates, serviceOrders, commands -> List.of());
+
+        assertThrows(IllegalStateException.class, () -> useCase.execute(estimate.id(),
+                new DecideEstimateLinesRequest(List.of(
+                        new LineDecisionRequest(executionId, EstimateLineDecision.APPROVED)))));
+
+        assertEquals(ServiceExecutionStatus.PENDING,
+                serviceOrders.findById(serviceOrder.id()).orElseThrow().serviceExecutions().get(0).status());
     }
 
     @Test
@@ -142,6 +183,7 @@ class DecideEstimateLinesUseCaseTest {
                 Instant.parse("2026-08-20T12:00:00Z"), Instant.parse("2026-08-22T12:00:00Z"),
                 List.of(new br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateLine(
                         inEstimateId, "Troca de óleo", Money.brl(BigDecimal.TEN), List.of())));
+        estimate.markSent();
         InMemoryEstimateRepository estimates = new InMemoryEstimateRepository(estimate);
         DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(
                 estimates, serviceOrders, commands -> List.of());
@@ -186,6 +228,7 @@ class DecideEstimateLinesUseCaseTest {
                                 alreadyRejectedId, "Troca de óleo", Money.brl(BigDecimal.TEN), List.of()),
                         new br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateLine(
                                 pendingId, "Alinhamento", Money.brl(BigDecimal.TEN), List.of())));
+        estimate.markSent();
         InMemoryEstimateRepository estimates = new InMemoryEstimateRepository(estimate);
         DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(
                 estimates, serviceOrders, commands -> List.of());
