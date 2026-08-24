@@ -5,6 +5,7 @@ import br.com.fiap.workshop_management_system.identity.auth.domain.model.Role;
 import br.com.fiap.workshop_management_system.identity.auth.domain.model.UserAccount;
 import br.com.fiap.workshop_management_system.identity.auth.domain.model.Username;
 import br.com.fiap.workshop_management_system.identity.auth.domain.repository.UserAccountRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -32,6 +33,7 @@ class IdentityDevelopmentDataSeeder implements ApplicationRunner {
     private final PasswordHasher passwordHasher;
     private final Clock clock;
 
+    @Autowired
     IdentityDevelopmentDataSeeder(UserAccountRepository repository, PasswordHasher passwordHasher) {
         this(repository, passwordHasher, Clock.systemUTC());
     }
