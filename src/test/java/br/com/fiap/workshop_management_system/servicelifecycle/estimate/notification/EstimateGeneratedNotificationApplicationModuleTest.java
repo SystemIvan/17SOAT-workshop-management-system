@@ -1,7 +1,8 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.estimate.notification;
 
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.application.usecase.GenerateEstimateUseCase;
-import br.com.fiap.workshop_management_system.servicelifecycle.estimate.notification.application.port.CustomerEstimateNotificationPort;
+import br.com.fiap.workshop_management_system.servicelifecycle.estimate.notification.application.port
+        .CustomerEstimateNotificationPort;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.DiagnosisItem;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Money;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;

@@ -2,6 +2,10 @@ package br.com.fiap.workshop_management_system.servicelifecycle;
 
 import br.com.fiap.workshop_management_system.ErrorResponse;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .CatalogServiceArchivedForNewWorkException;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .CatalogServiceNotFoundForNewWorkException;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
         .ServiceOrderVehicleArchivedException;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
         .ServiceOrderVehicleNotFoundException;
@@ -20,6 +24,18 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  */
 @RestControllerAdvice(basePackages = "br.com.fiap.workshop_management_system.servicelifecycle")
 class ServiceLifecycleExceptionHandler {
+
+    @ExceptionHandler(CatalogServiceNotFoundForNewWorkException.class)
+    ResponseEntity<ErrorResponse> handleCatalogServiceNotFound(CatalogServiceNotFoundForNewWorkException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse("CATALOG_SERVICE_NOT_FOUND", ex.getMessage()));
+    }
+
+    @ExceptionHandler(CatalogServiceArchivedForNewWorkException.class)
+    ResponseEntity<ErrorResponse> handleCatalogServiceArchived(CatalogServiceArchivedForNewWorkException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("CATALOG_SERVICE_ARCHIVED", ex.getMessage()));
+    }
 
     @ExceptionHandler(ServiceOrderVehicleNotFoundException.class)
     ResponseEntity<ErrorResponse> handleVehicleNotFound(ServiceOrderVehicleNotFoundException exception) {

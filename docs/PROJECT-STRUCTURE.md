@@ -10,7 +10,7 @@ br.com.fiap.workshop_management_system
 ├── registration
 │   ├── customer                 # Implemented aggregate
 │   ├── vehicle                  # Registration, queries, lifecycle and monotonic mileage implemented
-│   └── servicecatalog           # Planned aggregate
+│   └── servicecatalog           # Catalog CRUD, logical archive and active queries implemented
 ├── servicelifecycle
 │   ├── serviceorder             # Implemented aggregate
 │   ├── estimate                 # Planned aggregate
@@ -27,14 +27,16 @@ parts of their owning bounded context.
 
 | Context | Responsibilities | Current state |
 |---|---|---|
-| Registrations | Register customers and vehicles; maintain the service catalog | Customer and Vehicle management, including lifecycle and mileage |
+| Registrations | Identify and register customers and vehicles; maintain the service catalog | Customer, Vehicle lifecycle/mileage and Service Catalog management implemented |
 | Service Lifecycle | Create, diagnose, estimate, authorize and execute service orders | Service Order and Technician implemented |
 | Stock & Procurement | Maintain the StockItem catalog; inventory, reservations and procurement are future work | StockItem catalog implemented |
 
-Registrations provides stable customer/vehicle identities to Service Lifecycle. Service Lifecycle stores snapshots where
-historical service-order data must not change with later registration edits. Stock & Procurement owns inventory and future
-purchase orders; Service Lifecycle refers to stock items by ID and snapshots. A future supplier integration belongs behind
-an anti-corruption layer owned by Stock & Procurement.
+Registrations provides stable customer/vehicle identities and catalog-service eligibility to Service Lifecycle. A new
+Diagnosis accepts only active Catalog Services; the availability check and Diagnosis commit share the consumer transaction
+so an archive cannot invalidate work while it is being registered. Service Lifecycle stores snapshots where historical
+service-order data must not change with later registration edits or catalog archives. Stock & Procurement owns inventory
+and future purchase orders; Service Lifecycle refers to stock items by ID and snapshots. A future supplier integration
+belongs behind an anti-corruption layer owned by Stock & Procurement.
 
 Vehicle queries distinguish historical and operational views: lookup by ID includes archived records, while the list
 returns active records only. Archiving is logical, irreversible and idempotent. Before creating a new Service Order,
@@ -43,12 +45,14 @@ adapter calls the minimal `registration.vehicle.application.api` named interface
 inside the consumer transaction, preventing a new order from racing with archive. It validates only existence and active
 state: the request snapshot remains historical input and is not reconciled with registration ownership or descriptive data.
 
-Notifications is not a bounded context (see `docs/adr/ADR-003-notifications-boundary.md`): a module that needs to notify
+Notifications is not a bounded context (see `docs/adr/ADR-004-notifications-boundary.md`): a module that needs to notify
 someone defines a consumer-owned outbound port in its own `application` layer and an adapter in its own
-`infrastructure` layer. As the first case of this, Service Lifecycle's Service-Order-finalized notification reads
-Customer contact data live from Registrations through `CustomerRepository`, published via `@NamedInterface` on
-`registration.customer.domain.repository` and `registration.customer.domain.model`. Vehicle eligibility instead uses the
-narrow `registration.vehicle.application.api` named interface and does not expose Vehicle domain or persistence types.
+`infrastructure` layer. Service Lifecycle's Service-Order-finalized notification reads Customer contact data live from
+Registrations through `CustomerRepository`, published via `@NamedInterface` on
+`registration.customer.domain.repository` and `registration.customer.domain.model`. Vehicle eligibility uses the narrow
+`registration.vehicle.application.api` named interface and does not expose Vehicle domain or persistence types. The
+Service Order capability also owns `CatalogServiceEligibilityPort`; its Registration adapter calls the producer-owned
+`registration.servicecatalog.application.api` named interface without importing internal catalog packages.
 
 ## Internal layers
 

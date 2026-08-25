@@ -17,6 +17,7 @@
     { "key": "executionId", "value": "66666666-6666-6666-6666-666666666666" },
     { "key": "serviceExecutionId", "value": "66666666-6666-6666-6666-666666666666" },
     { "key": "catalogServiceId", "value": "77777777-7777-7777-7777-777777777777" },
+    { "key": "archiveCatalogServiceId", "value": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" },
     { "key": "diagnosisId", "value": "88888888-8888-8888-8888-888888888888" },
     { "key": "estimateId", "value": "99999999-9999-9999-9999-999999999999" }
   ],
@@ -134,6 +135,80 @@
               }
             }
           ]
+        },
+        {
+          "name": "Service Catalog",
+          "item": [
+            {
+              "name": "Create catalog service",
+              "event": [{
+                "listen": "test",
+                "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('catalogServiceId', pm.response.json().id); }"] }
+              }],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Troca de óleo\",\n  \"basePrice\": {\n    \"value\": 150.00,\n    \"currency\": \"BRL\"\n  }\n}" },
+                "url": "{{baseUrl}}/api/catalog-services"
+              }
+            },
+            {
+              "name": "Get catalog service",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/catalog-services/{{catalogServiceId}}"
+              }
+            },
+            {
+              "name": "Rename catalog service",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Troca de óleo premium\"\n}" },
+                "url": "{{baseUrl}}/api/catalog-services/{{catalogServiceId}}",
+                "description": "Atualiza somente o nome de exibição de um serviço ativo."
+              }
+            },
+            {
+              "name": "Update catalog service base price",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"basePrice\": {\n    \"value\": 180.00,\n    \"currency\": \"BRL\"\n  }\n}" },
+                "url": "{{baseUrl}}/api/catalog-services/{{catalogServiceId}}/base-price",
+                "description": "Atualiza somente o preço-base BRL de um serviço ativo."
+              }
+            },
+            {
+              "name": "List active catalog services",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/catalog-services"
+              }
+            },
+            {
+              "name": "Create catalog service for archive",
+              "event": [{
+                "listen": "test",
+                "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('archiveCatalogServiceId', pm.response.json().id); }"] }
+              }],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Serviço temporário para arquivamento\",\n  \"basePrice\": {\n    \"value\": 75.00,\n    \"currency\": \"BRL\"\n  }\n}" },
+                "url": "{{baseUrl}}/api/catalog-services",
+                "description": "Cria um registro separado para demonstrar o archive sem invalidar o catalogServiceId usado no fluxo de diagnóstico."
+              }
+            },
+            {
+              "name": "Archive catalog service",
+              "request": {
+                "method": "DELETE",
+                "url": "{{baseUrl}}/api/catalog-services/{{archiveCatalogServiceId}}",
+                "description": "Arquiva logicamente o serviço de forma idempotente. O registro continua disponível por ID, deixa a listagem de ativos, não pode ser usado em novos diagnósticos e libera seu nome para um novo serviço."
+              }
+            }
+          ]
         }
       ]
     },
@@ -215,7 +290,8 @@
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
                 "body": { "mode": "raw", "raw": "{\n  \"diagnosedByTechnicianId\": \"{{technicianId}}\",\n  \"items\": [{\n    \"catalogServiceId\": \"{{catalogServiceId}}\",\n    \"name\": \"Oil and filter change\",\n    \"price\": { \"value\": 150.00, \"currency\": \"BRL\" },\n    \"stockRequirements\": [{\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"type\": \"PART\",\n      \"quantity\": 1,\n      \"nameSnapshot\": \"Oil filter\",\n      \"priceSnapshot\": { \"value\": 45.90, \"currency\": \"BRL\" }\n    }]\n  }]\n}" },
-                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/diagnosis"
+                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/diagnosis",
+                "description": "Cada catalogServiceId deve identificar um serviço ativo no início do diagnóstico. Serviços arquivados ou inexistentes rejeitam todo o lote sem persistência parcial; execuções já criadas preservam seus snapshots."
               }
             },
             {
