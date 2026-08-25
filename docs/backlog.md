@@ -96,3 +96,21 @@ por suas próprias aprovações funcional e técnica.
   quantidades dos itens, sem aceitar valores totais no request.
 - **Pontos para discovery:** regra para moedas distintas, arredondamento, cálculo de itens por quantidade, contrato de
   resposta, compatibilidade e se os valores derivados exigem persistência para auditoria/versionamento.
+
+## BL-009 — Prazo de conclusão e expiração do serviço
+
+- **Contexto:** Service Lifecycle.
+- **Status:** ideia futura.
+- **Origem:** necessidade de negócio de proteger o Customer contra a retenção indefinida do Vehicle na oficina.
+- **Problema:** o fluxo atual não define um prazo máximo para a conclusão do serviço nem o comportamento esperado quando
+  esse prazo é ultrapassado, o que pode deixar o Customer sem previsibilidade e com o Vehicle retido por tempo
+  indeterminado.
+- **Evolução a avaliar:** definir e controlar um prazo de conclusão para o serviço, com regra explícita de expiração ou
+  vencimento quando a oficina não concluir o trabalho no período acordado. Ao vencer o prazo, um evento deve disparar o
+  cancelamento automático do serviço. Também deve existir um endpoint para solicitar o cancelamento em casos
+  excepcionais. O prazo acordado deve constar na Estimate de forma clara para ciência e aprovação do Customer.
+- **Pontos para discovery:** início da contagem, unidade e cálculo do prazo, pausas justificadas, alteração do prazo com
+  nova anuência do Customer, alertas e escalonamento antes do vencimento, publicação e consumo idempotente do evento,
+  autorização e idempotência do endpoint, casos em que o cancelamento manual é permitido, consequências do
+  cancelamento, liberação do Vehicle, auditoria, comunicação ao Customer e impacto nos estados de Estimate,
+  Service Order e Service Execution.
