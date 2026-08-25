@@ -45,6 +45,24 @@ baseline consolidada em 10 de agosto.
 - As notificações de Stock Manager e Technician são disparadas por eventos internos com
   `@TransactionalEventListener(AFTER_COMMIT)`: falhas de entrega são registradas sem desfazer a reserva ou a decisão.
 
+## Atualização de implementação — 24 de agosto de 2026 (I)
+
+A feature `jwt-authentication` introduziu o quarto módulo Spring Modulith, resolvendo AD-016.
+
+- Os módulos diretos passam a ser `registration`, `servicelifecycle`, `stockprocurement` e `identity`. O módulo
+  `identity` (pacote `identity.auth`) é dono exclusivo de credenciais e do mapeamento papel→ID de domínio;
+  `Customer` e `Technician` continuam apenas referências por UUID, sem carregar senha ou papel.
+- Todos os endpoints administrativos existentes passam a exigir um JWT válido (`Authorization: Bearer`), com
+  autorização por papel (`CUSTOMER`, `TECHNICIAN`, `MANAGER`, `ADMIN`) aplicada via `SecurityConfig` e
+  `JwtAuthenticationFilter`, ambos hospedados dentro do módulo `identity` para evitar um ciclo com a raiz da
+  aplicação.
+- A migration `V20260824120000__create_user_accounts.sql` cria a tabela `user_accounts`;
+  `V20260824120001__seed_bootstrap_admin_account.sql` insere a conta `admin`/`ADMIN` como dado de referência
+  obrigatório (não um seed de demonstração), necessária para o bootstrap de qualquer outra conta via
+  `POST /api/auth/users`.
+- `docs/adr/ADR-003-authentication-strategy.md` foi promovida de `Proposed` para `Accepted`. Ver
+  `docs/features/platform/jwt-authentication/` para a trilha SDD completa.
+
 ## 1. Tech Challenge overview
 
 ### 1.1 Problema oficial (A)

@@ -19,9 +19,62 @@
     { "key": "catalogServiceId", "value": "77777777-7777-7777-7777-777777777777" },
     { "key": "archiveCatalogServiceId", "value": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" },
     { "key": "diagnosisId", "value": "88888888-8888-8888-8888-888888888888" },
-    { "key": "estimateId", "value": "99999999-9999-9999-9999-999999999999" }
+    { "key": "estimateId", "value": "99999999-9999-9999-9999-999999999999" },
+    { "key": "authToken", "value": "" }
   ],
   "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login (bootstrap admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) { pm.collectionVariables.set('authToken', pm.response.json().token); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"changeme123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Create user account (ADMIN only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"manager.new\",\n  \"password\": \"changeme123\",\n  \"role\": \"MANAGER\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/users"
+          }
+        }
+      ]
+    },
     {
       "name": "Registrations",
       "item": [
@@ -30,10 +83,16 @@
           "item": [
             {
               "name": "Create customer",
-              "event": [{
-                "listen": "test",
-                "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('customerId', pm.response.json().id); }"] }
-              }],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) { pm.collectionVariables.set('customerId', pm.response.json().id); }"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
@@ -42,15 +101,41 @@
                 "description": "Shows every accepted field. The complete address object is optional."
               }
             },
-            { "name": "Get customer", "request": { "method": "GET", "url": "{{baseUrl}}/api/customers/{{customerId}}" } },
-            { "name": "Identify customer by CPF/CNPJ", "request": { "method": "GET", "url": "{{baseUrl}}/api/customers/identify?document={{customerTaxId}}" } },
-            { "name": "List customers", "request": { "method": "GET", "url": "{{baseUrl}}/api/customers" } },
+            {
+              "name": "Get customer",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/customers/{{customerId}}"
+              }
+            },
+            {
+              "name": "Identify customer by CPF/CNPJ",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/customers/identify?document={{customerTaxId}}"
+              }
+            },
+            {
+              "name": "List customers",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/customers"
+              }
+            },
             {
               "name": "Rename customer",
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Maria Souza\"\n}" },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Maria Souza\"\n}"
+                },
                 "url": "{{baseUrl}}/api/customers/{{customerId}}"
               }
             },
@@ -220,25 +305,59 @@
           "item": [
             {
               "name": "Create technician",
-              "event": [{
-                "listen": "test",
-                "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('technicianId', pm.response.json().id); }"] }
-              }],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) { pm.collectionVariables.set('technicianId', pm.response.json().id); }"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Joao Technician\",\n  \"specialties\": [\"MECHANICAL\", \"DIAGNOSTICS\"]\n}" },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Joao Technician\",\n  \"specialties\": [\"MECHANICAL\", \"DIAGNOSTICS\"]\n}"
+                },
                 "url": "{{baseUrl}}/api/technicians"
               }
             },
-            { "name": "Get technician", "request": { "method": "GET", "url": "{{baseUrl}}/api/technicians/{{technicianId}}" } },
-            { "name": "List technicians", "request": { "method": "GET", "url": "{{baseUrl}}/api/technicians" } },
+            {
+              "name": "Get technician",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/technicians/{{technicianId}}"
+              }
+            },
+            {
+              "name": "List technicians",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/technicians"
+              }
+            },
             {
               "name": "Rename technician",
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Joao Senior Technician\"\n}" },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Joao Senior Technician\"\n}"
+                },
                 "url": "{{baseUrl}}/api/technicians/{{technicianId}}"
               }
             },
@@ -246,8 +365,16 @@
               "name": "Update technician status",
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"status\": \"BUSY\"\n}" },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"BUSY\"\n}"
+                },
                 "url": "{{baseUrl}}/api/technicians/{{technicianId}}/status"
               }
             }
@@ -258,34 +385,74 @@
           "item": [
             {
               "name": "Create service order",
-              "event": [{
-                "listen": "test",
-                "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('serviceOrderId', pm.response.json().id); }"] }
-              }],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) { pm.collectionVariables.set('serviceOrderId', pm.response.json().id); }"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"vehicleId\": \"{{vehicleId}}\",\n  \"vehicleSnapshot\": {\n    \"licensePlate\": \"ABC1D23\",\n    \"brand\": \"Fiat\",\n    \"model\": \"Argo\",\n    \"year\": 2024\n  },\n  \"priority\": \"NORMAL\",\n  \"initialAssessment\": \"Ruído ao frear relatado pelo cliente\"\n}" },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"vehicleId\": \"{{vehicleId}}\",\n  \"vehicleSnapshot\": {\n    \"licensePlate\": \"ABC1D23\",\n    \"brand\": \"Fiat\",\n    \"model\": \"Argo\",\n    \"year\": 2024\n  },\n  \"priority\": \"NORMAL\",\n  \"initialAssessment\": \"Ruído ao frear relatado pelo cliente\"\n}"
+                },
                 "url": "{{baseUrl}}/api/service-orders"
               }
             },
-            { "name": "Get service order", "request": { "method": "GET", "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}" } },
-            { "name": "Get service order status", "request": { "method": "GET", "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/status" } },
+            {
+              "name": "Get service order",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}"
+              }
+            },
+            {
+              "name": "Get service order status",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/status"
+              }
+            },
             {
               "name": "Assign diagnosis assignee",
               "request": {
                 "method": "PUT",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"technicianId\": \"{{technicianId}}\"\n}" },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"technicianId\": \"{{technicianId}}\"\n}"
+                },
                 "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/diagnosis-assignee"
               }
             },
             {
               "name": "Perform diagnosis",
-              "event": [{
-                "listen": "test",
-                "script": { "exec": ["if (pm.response.code === 200 && pm.response.json().executions.length > 0) { const execution = pm.response.json().executions[0]; pm.collectionVariables.set('executionId', execution.id); pm.collectionVariables.set('serviceExecutionId', execution.id); pm.collectionVariables.set('diagnosisId', execution.diagnosisId); }"] }
-              }],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200 && pm.response.json().executions.length > 0) { const execution = pm.response.json().executions[0]; pm.collectionVariables.set('executionId', execution.id); pm.collectionVariables.set('serviceExecutionId', execution.id); pm.collectionVariables.set('diagnosisId', execution.diagnosisId); }"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
@@ -298,8 +465,16 @@
               "name": "Change service order priority",
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"priority\": \"HIGH\"\n}" },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"priority\": \"HIGH\"\n}"
+                },
                 "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/priority"
               }
             },
@@ -307,8 +482,16 @@
               "name": "Assign technician",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"technicianId\": \"{{technicianId}}\"\n}" },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"technicianId\": \"{{technicianId}}\"\n}"
+                },
                 "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/assign-technician"
               }
             },
@@ -316,17 +499,31 @@
               "name": "Attach stock requirement",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"stockItemId\": \"{{stockItemId}}\",\n  \"type\": \"PART\",\n  \"quantity\": 1,\n  \"nameSnapshot\": \"Oil filter\",\n  \"priceSnapshot\": { \"value\": 45.90, \"currency\": \"BRL\" }\n}" },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"stockItemId\": \"{{stockItemId}}\",\n  \"type\": \"PART\",\n  \"quantity\": 1,\n  \"nameSnapshot\": \"Oil filter\",\n  \"priceSnapshot\": { \"value\": 45.90, \"currency\": \"BRL\" }\n}"
+                },
                 "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/stock-requirements"
               }
             },
             {
               "name": "Retry stock reservation",
-              "event": [{
-                "listen": "test",
-                "script": { "exec": ["if (pm.response.code === 200 && pm.response.json().reservationId) { pm.collectionVariables.set('stockReservationId', pm.response.json().reservationId); }"] }
-              }],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200 && pm.response.json().reservationId) { pm.collectionVariables.set('stockReservationId', pm.response.json().reservationId); }"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{serviceExecutionId}}/stock-reservation",
@@ -353,23 +550,51 @@
                 }
               ]
             },
-            { "name": "Start execution", "request": { "method": "POST", "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/start" } },
+            {
+              "name": "Start execution",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/start"
+              }
+            },
             {
               "name": "Update execution progress",
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"note\": \"Oil drained and filter replaced\"\n}" },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"note\": \"Oil drained and filter replaced\"\n}"
+                },
                 "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/progress"
               }
             },
-            { "name": "Complete execution", "request": { "method": "POST", "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/complete" } },
+            {
+              "name": "Complete execution",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/complete"
+              }
+            },
             {
               "name": "Finalize service order",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"vehicleDelivered\": true\n}" },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"vehicleDelivered\": true\n}"
+                },
                 "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/finalize"
               }
             }
@@ -385,17 +610,33 @@
           "event": [
             {
               "listen": "prerequest",
-              "script": { "exec": ["const diagnosisId = pm.collectionVariables.get('diagnosisId'); if (!diagnosisId) { throw new Error('Run Perform diagnosis successfully before generating an estimate.'); } pm.variables.set('diagnosisId', diagnosisId);"] }
+              "script": {
+                "exec": [
+                  "const diagnosisId = pm.collectionVariables.get('diagnosisId'); if (!diagnosisId) { throw new Error('Run Perform diagnosis successfully before generating an estimate.'); } pm.variables.set('diagnosisId', diagnosisId);"
+                ]
+              }
             },
             {
               "listen": "test",
-              "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('estimateId', pm.response.json().id); }"] }
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) { pm.collectionVariables.set('estimateId', pm.response.json().id); }"
+                ]
+              }
             }
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"diagnosisId\": \"{{diagnosisId}}\"\n}" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"diagnosisId\": \"{{diagnosisId}}\"\n}"
+            },
             "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/estimates"
           }
         },
@@ -410,8 +651,16 @@
           "name": "Decide estimate lines",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"decisions\": [\n    { \"serviceExecutionId\": \"{{executionId}}\", \"decision\": \"APPROVED\" }\n  ]\n}" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decisions\": [\n    { \"serviceExecutionId\": \"{{executionId}}\", \"decision\": \"APPROVED\" }\n  ]\n}"
+            },
             "url": "{{baseUrl}}/api/estimates/{{estimateId}}/decisions",
             "description": "Retorna 409/INVALID_STATE_TRANSITION se a service execution não estiver PENDING ou se a estimate não estiver SENT (ex.: já CLOSED por uma decisão anterior ter fechado todas as linhas)."
           }
@@ -423,25 +672,59 @@
       "item": [
         {
           "name": "Create stock item",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('stockItemId', pm.response.json().id); }"] }
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) { pm.collectionVariables.set('stockItemId', pm.response.json().id); }"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Oil filter\",\n  \"sku\": \"FILTER-001\",\n  \"type\": \"PART\",\n  \"availableQuantity\": 20,\n  \"price\": { \"value\": 45.90, \"currency\": \"BRL\" }\n}" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Oil filter\",\n  \"sku\": \"FILTER-001\",\n  \"type\": \"PART\",\n  \"availableQuantity\": 20,\n  \"price\": { \"value\": 45.90, \"currency\": \"BRL\" }\n}"
+            },
             "url": "{{baseUrl}}/api/stock-items"
           }
         },
-        { "name": "Get stock item", "request": { "method": "GET", "url": "{{baseUrl}}/api/stock-items/{{stockItemId}}" } },
-        { "name": "Search available parts and supplies", "request": { "method": "GET", "url": "{{baseUrl}}/api/stock-items?search=filter&type=PART&type=SUPPLY&available=true&active=true" } },
+        {
+          "name": "Get stock item",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/stock-items/{{stockItemId}}"
+          }
+        },
+        {
+          "name": "Search available parts and supplies",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/stock-items?search=filter&type=PART&type=SUPPLY&available=true&active=true"
+          }
+        },
         {
           "name": "Update stock item",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Premium oil filter\",\n  \"price\": { \"value\": 49.90, \"currency\": \"BRL\" }\n}" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Premium oil filter\",\n  \"price\": { \"value\": 49.90, \"currency\": \"BRL\" }\n}"
+            },
             "url": "{{baseUrl}}/api/stock-items/{{stockItemId}}"
           }
         },
@@ -458,15 +741,17 @@
             "method": "GET",
             "url": "{{baseUrl}}/api/stock-reservations/{{stockReservationId}}"
           },
-          "response": [{
-            "name": "Active reservation",
-            "status": "OK",
-            "code": 200,
-            "_postman_previewlanguage": "json",
-            "header": [],
-            "cookie": [],
-            "body": "{\n  \"id\": \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\n  \"serviceExecutionId\": \"66666666-6666-6666-6666-666666666666\",\n  \"status\": \"ACTIVE\",\n  \"lines\": [{\n    \"stockItemId\": \"44444444-4444-4444-4444-444444444444\",\n    \"quantity\": 2\n  }],\n  \"createdAt\": \"2026-08-20T12:00:00Z\",\n  \"consumedAt\": null\n}"
-          }]
+          "response": [
+            {
+              "name": "Active reservation",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "cookie": [],
+              "body": "{\n  \"id\": \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\n  \"serviceExecutionId\": \"66666666-6666-6666-6666-666666666666\",\n  \"status\": \"ACTIVE\",\n  \"lines\": [{\n    \"stockItemId\": \"44444444-4444-4444-4444-444444444444\",\n    \"quantity\": 2\n  }],\n  \"createdAt\": \"2026-08-20T12:00:00Z\",\n  \"consumedAt\": null\n}"
+            }
+          ]
         },
         {
           "name": "Get stock reservation by service execution",
@@ -482,17 +767,29 @@
             "url": "{{baseUrl}}/api/stock-reservations/{{stockReservationId}}/consume",
             "description": "Consome a reserva integralmente. Repetições são idempotentes e retornam a mesma reserva consumida."
           },
-          "response": [{
-            "name": "Consumed reservation",
-            "status": "OK",
-            "code": 200,
-            "_postman_previewlanguage": "json",
-            "header": [],
-            "cookie": [],
-            "body": "{\n  \"id\": \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\n  \"serviceExecutionId\": \"66666666-6666-6666-6666-666666666666\",\n  \"status\": \"CONSUMED\",\n  \"lines\": [{\n    \"stockItemId\": \"44444444-4444-4444-4444-444444444444\",\n    \"quantity\": 2\n  }],\n  \"createdAt\": \"2026-08-20T12:00:00Z\",\n  \"consumedAt\": \"2026-08-20T14:30:00Z\"\n}"
-          }]
+          "response": [
+            {
+              "name": "Consumed reservation",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "cookie": [],
+              "body": "{\n  \"id\": \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\n  \"serviceExecutionId\": \"66666666-6666-6666-6666-666666666666\",\n  \"status\": \"CONSUMED\",\n  \"lines\": [{\n    \"stockItemId\": \"44444444-4444-4444-4444-444444444444\",\n    \"quantity\": 2\n  }],\n  \"createdAt\": \"2026-08-20T12:00:00Z\",\n  \"consumedAt\": \"2026-08-20T14:30:00Z\"\n}"
+            }
+          ]
         }
       ]
     }
-  ]
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  }
 }

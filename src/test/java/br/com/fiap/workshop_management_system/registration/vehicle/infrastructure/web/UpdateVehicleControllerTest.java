@@ -19,6 +19,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import br.com.fiap.workshop_management_system.identity.auth.application.port.TokenIssuer;
+import br.com.fiap.workshop_management_system.testsupport.TestAuth;
 
 import java.time.Year;
 import java.util.UUID;
@@ -40,6 +42,9 @@ class UpdateVehicleControllerTest {
     private WebApplicationContext context;
 
     @Autowired
+    private TokenIssuer tokenIssuer;
+
+    @Autowired
     private CustomerRepository customerRepository;
 
     @Autowired
@@ -52,7 +57,12 @@ class UpdateVehicleControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                .apply(org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers
+                        .springSecurity())
+                .defaultRequest(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/").header("Authorization", "Bearer " + TestAuth.adminToken(tokenIssuer)))
+                .build();
     }
 
     @Test

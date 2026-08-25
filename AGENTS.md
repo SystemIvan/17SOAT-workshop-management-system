@@ -17,6 +17,8 @@ Only direct packages below the application root are Spring Modulith modules:
 - `registration`: Customer, Vehicle and Service Catalog.
 - `servicelifecycle`: Service Order, Estimate and supporting Technician capabilities.
 - `stockprocurement`: Stock and Purchase Order.
+- `identity`: user accounts, credentials and the role-to-domain-ID mapping used for JWT authentication
+  (AD-016). Customer and Technician stay pure domain references; this module never imports their types.
 
 Some aggregates are intentionally represented only by documented package placeholders. Do not invent CRUD, entities,
 repositories or tables for a placeholder without an approved feature specification.

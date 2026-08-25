@@ -847,13 +847,18 @@ WebSocket mechanism requires a new decision, not a reopening of AD-015.
 
 ### AD-016 — Define identity ownership and authorization policy
 
-**Status:** Team Decision Required
+**Status:** Resolved
 
 **Scope:** Whole-team decision
 
+**Decision:** Option A — a small internal Identity/Auth module owns credentials and the role-to-domain-ID
+mapping. Customer and Technician remain domain references, not credential owners.
+
+**Resolved on:** 24 August 2026, ratified by the team.
+
 **Blocking:**
 
-- Blocks JWT implementation and endpoint security tests.
+- No longer blocks starting JWT implementation and endpoint security tests.
 - Does not block Ivan's pure domain/use-case work.
 
 **Related Epic / responsibility:** Security across all epics.
@@ -880,15 +885,18 @@ Option B — Embed credentials/roles in Customer and Technician modules.
 - Advantages: fewer components.
 - Disadvantages: duplicates security concerns and complicates Manager/Admin identities.
 
-**Recommended option:** Option A, while keeping Customer/Technician as domain references rather than credential
-owners. The team must correct the approval actor to Customer for commercial decisions.
+**Recommended option:** Option A, selected by the team, while keeping Customer/Technician as domain references
+rather than credential owners. The approval actor for commercial decisions is Customer, not Manager, correcting
+the earlier mismatch between `AGENTS.md` and Miro/the official brief.
 
 **Impact of the decision:** Security config, login API, database, JWT claims, role matrix, controllers, tests,
 Docker secrets, Miro and AGENTS.
 
-**Can work continue without resolving it?** Domain work can; secured administrative API completion cannot.
+**Can work continue without resolving it?** Resolved. Identity/Auth module and JWT implementation may proceed
+under Option A; Customer and Technician stay pure domain references.
 
-**Temporary safe assumption, if any:** Do not put passwords or roles in Customer/Technician aggregates.
+**Temporary safe assumption, if any:** Not applicable; the decision is resolved. Do not put passwords or roles in
+Customer/Technician aggregates.
 
 ### AD-017 — Adopt schema migration and DDL policy
 
@@ -1029,7 +1037,8 @@ Priority reflects blocking power, downstream impact and dependencies—not decis
 5. **AD-005 — Registration deletion semantics**: resolved with logical deactivation/archival and implemented for
    Customer; Vehicle and ServiceCatalog remain pending.
 6. **AD-011 — Cross-module integration**: team-owned; contracts can be mocked meanwhile.
-7. **AD-016 — Identity/authorization ownership**: team-owned; domain work can remain security-agnostic.
+7. **AD-016 — Identity/authorization ownership**: resolved as an internal Identity/Auth module (Option A);
+   Customer/Technician remain domain references, not credential owners.
 8. **AD-017 — Schema migration policy**: shared; resolve before several epics alter the database concurrently.
 
 All Ivan-owned decisions in this register are resolved. AD-003 and AD-004 remain conditional on the team-owned
@@ -1054,8 +1063,8 @@ AD-001 and must not be treated as approval of the shared context mapping.
 
 - **AD-011 — cross-module contracts:** does not block catalog CRUD or Jira planning; it blocks only finalizing the
   ServiceCatalog lookup adapter used by Service Lifecycle.
-- **AD-016 — identity and authorization ownership:** does not block pure domain/use-case work; it blocks final
-  administrative endpoint security and authorization tests.
+- **AD-016 — identity and authorization ownership:** resolved (Option A, internal Identity/Auth module); does
+  not block pure domain/use-case work while the module is implemented.
 - **AD-017 — schema migration policy:** does not block model/story planning or short-lived local work; it must be
   resolved before several epics integrate shared schema changes.
 - **AD-006 through AD-009, AD-014, AD-015, AD-018 and AD-019:** belong to the team or other owners and do not
@@ -1085,7 +1094,6 @@ The following decisions must not be made by Ivan alone:
 | AD-009 | Couples Epic 2 pricing to Epic 4 stock | Yes |
 | AD-011 | Establishes all inter-module contracts | Yes with mocks |
 | AD-014 | Owns Notification module/channel | Yes |
-| AD-016 | Establishes cross-system identity and roles | Yes for domain; not secured API completion |
 | AD-017 | Establishes shared database change policy | Yes briefly |
 | AD-018 | Changes external-integration/delivery scope | Yes |
 | AD-019 | Defines an official cross-cutting business metric | Yes |
@@ -1174,10 +1182,11 @@ The existing file is exactly `AGENTS.md` at the repository root. No duplicate fi
 - **Actual architectural decisions identified:** 19.
 - **Ivan / my assigned scope:** 4 (AD-002 through AD-005).
 - **Explicitly approved by Ivan:** 4 (Option A for AD-002 through AD-005).
-- **Team Decision Required:** 10.
+- **Team Decision Required:** 9.
 - **Currently blocking Ivan's Jira planning:** 0.
 - **Currently blocking part of Ivan's implementation:** 1 (AD-001), which gates the conditionally resolved AD-003
   and AD-004.
-- **Resolved:** 8 (AD-002, AD-003, AD-004 and AD-005, approved by Ivan; AD-006, AD-008 and AD-015, ratified by the
-  team on 23 August 2026; AD-010, ratified by the team on 24 August 2026).
+- **Resolved:** 9 (AD-002, AD-003, AD-004 and AD-005, approved by Ivan; AD-006, AD-008 and AD-015, ratified by the
+  team on 23 August 2026; AD-010, ratified by the team on 24 August 2026; AD-016, ratified by the team on
+  24 August 2026).
 - **Deferred:** 1 (AD-012).
