@@ -33,6 +33,7 @@ Useful URLs:
 - API base: `http://localhost:8080/api`
 - Swagger UI: `http://localhost:8080/swagger-ui.html`
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+- External Supplier System simulator (WireMock): `http://localhost:8089`
 
 ## Development commands
 
@@ -92,6 +93,9 @@ apenas a origem, sem `/api`: para a execução local, use `http://localhost:8080
 | `authToken` | Preenchida automaticamente pelo passo 0 (`Login (bootstrap admin)`); as demais requisições a usam via `Authorization: Bearer {{authToken}}`. |
 | `customerId`, `vehicleId`, `technicianId`, `stockItemId`, `serviceOrderId`, `executionId`, `serviceExecutionId`, `diagnosisId` e `estimateId` | A coleção as atualiza automaticamente quando a respectiva requisição de criação/diagnóstico obtém sucesso. |
 | `stockReservationId` | É preenchida pelo script de `Retry stock reservation` quando houver `reservationId`; se a reserva já ocorreu na decisão, copie `executions[0].stockReservationId` da resposta da decisão para consultar ou consumir a reserva. |
+| `purchaseDemandId` | É preenchida por `List open purchase demands` com a primeira demanda retornada. |
+| `purchaseOrderId` | É preenchida pelas criações de Purchase Order confirmadas pelo simulador. |
+| `purchaseOrderIdempotencyKey` | Identifica o comando de criação. Preserve o mesmo UUID e body em retries; gere outro UUID para uma compra diferente. |
 | `customerTaxId` | Informe o CPF/CNPJ sem formatação usado para o Customer; é utilizado somente por `Identify customer by CPF/CNPJ`. |
 | `catalogServiceId` | Preenchida automaticamente por `Registrations / Service Catalog / Create catalog service` (passo 4); identifica o serviço informado no diagnóstico (passo 8). |
 
@@ -232,8 +236,9 @@ retornados em respostas `201 Created` são os que devem ser usados no restante d
    ```
 
    Espere `200 OK`. O script define `executionId`, `serviceExecutionId` e `diagnosisId` a partir da primeira execução.
-   Confirme que a execução mostra `diagnosedByTechnicianId` (autor efetivo) e consulte `/status`: o status esperado é
-   `IN_DIAGNOSIS`.
+   Confirme que a execução mostra `diagnosedByTechnicianId` (autor efetivo), `stockAvailability` e consulte `/status`:
+   o status esperado é `IN_DIAGNOSIS`. Se a quantidade observada for insuficiente, a Purchase Demand `PENDING_REPAIR`
+   já é criada neste passo; isso não reserva saldo nem antecipa `AWAITING_ITEMS`.
 
 9. Em `Estimates`, envie `Generate estimate`:
 
@@ -244,8 +249,8 @@ retornados em respostas `201 Created` são os que devem ser usados no restante d
    com `{"diagnosisId":"{{diagnosisId}}"}`. O script de pré-requisição usa o `diagnosisId` salvo pela coleção, mesmo
    que exista uma variável de ambiente com o mesmo nome. Espere `201 Created`, guarde o `estimateId` definido pelo
    script e use `Get estimate` (`GET {{baseUrl}}/api/estimates/{{estimateId}}`) para conferir `lines`, seus
-   `serviceExecutionId`, preço do serviço e eventuais itens de estoque. Os requisitos ficam congelados ao gerar o
-   orçamento.
+   `serviceExecutionId`, preço do serviço, itens comerciais e `stockAvailability`. Os requisitos ficam congelados e a
+   disponibilidade é revalidada ao gerar o orçamento, atualizando a mesma demanda quando ainda houver insuficiência.
 
 10. Decida todas as linhas consultadas em `Decide estimate lines`:
 
@@ -273,7 +278,8 @@ retornados em respostas `201 Created` são os que devem ser usados no restante d
       recebe `stockReservationId`; siga para o passo 12. A reserva pode ser consultada nas requisições de Stock.
     - Se ela ficar `AWAITING_ITEMS`, falta material. Execute `Retry stock reservation`, sem body. `RESERVED` a deixa
       `READY`; `NOT_RESERVED` mostra o motivo em `issues` e o fluxo não pode prosseguir até haver quantidade
-      disponível. A coleção não oferece reposição de estoque.
+      disponível. RF27 agora permite criar a Purchase Order para a demanda, mas o recebimento e a reposição do saldo
+      continuam fora desta feature (RF29).
 
 12. Para cada execução aprovada que será realizada, envie `Assign technician`:
 
@@ -311,6 +317,49 @@ retornados em respostas `201 Created` são os que devem ser usados no restante d
     completo, inclusive `executions` e `statusSnapshot`; o segundo retorna somente `{ "id", "status" }`. No contrato
     atual, `ServiceOrderResponse.status` está marcado como obsoleto; para a leitura completa, use
     `statusSnapshot` como o campo de acompanhamento.
+
+### Fluxo executável de Purchase Order
+
+Use este roteiro como uma bifurcação do fluxo principal, não como um fluxo que libera a execução. O ponto de entrada é
+o **passo 7 — Perform diagnosis**: com `availableQuantity: 1` e requirement de `3` ou mais, o Diagnosis cria a
+Purchase Demand `PENDING_REPAIR` imediatamente. A Estimate ainda pode ser enviada, aprovada, rejeitada ou expirar; a
+necessidade de compra continua concreta.
+
+Onde você está no fluxo principal:
+
+| Situação | Próximo ponto do roteiro principal |
+|---|---|
+| A demanda acabou de nascer no Diagnosis | Continue no **passo 8** para gerar a Estimate. |
+| A Estimate foi aprovada e a reserva falhou | Você está no **passo 10**, com a execução em `AWAITING_ITEMS`. |
+| A Purchase Order foi criada com sucesso | Continue parado no **passo 10**: RF27 não recebe item nem repõe estoque. RF29 é que permitirá nova tentativa de reserva. |
+
+Para registrar a Purchase Order:
+
+1. Execute `Stock & Procurement / List open purchase demands`. Espere `200 OK`, confira a diferença em
+   `suggestedQuantity` e deixe a coleção guardar `purchaseDemandId`.
+2. Gere um novo `purchaseOrderIdempotencyKey` e execute `Create Purchase Order from demand`. A quantidade da linha deve
+   ser pelo menos a sugerida. Espere `201 Created`, `status: "OPEN"` e `Location` com o ID da ordem.
+3. Execute `Retry same Purchase Order` sem alterar header ou body. Espere `200 OK` e a mesma referência externa.
+   Alterar o body com a mesma chave retorna `409 PURCHASE_ORDER_IDEMPOTENCY_CONFLICT`.
+4. Execute `Get Purchase Order`. A demanda deixa de aparecer na listagem aberta porque está `ORDERED`.
+
+O `make docker-up` também inicia o WireMock na porta `8089`; a aplicação usa o endereço interno
+`http://supplier-simulator:8080`. Não configure fornecedor real no MVP: a restrição ao Stock Manager ainda é apenas
+funcional, pois não há autenticação/autorização.
+
+Para criação livre do Stock Manager, crie qualquer Stock Item ativo e execute `Create ad hoc Purchase Order`. O request
+usa `demandIds: []`, gera uma chave nova e deve retornar `201 Created`. Uma ordem mista mantém um ou mais `demandIds` e
+inclui tanto as linhas que cobrem essas demandas quanto linhas ad hoc; itens repetidos são consolidados.
+
+O simulador possui dois SKUs especiais para falhas controladas:
+
+- `SUPPLIER-REJECT-001` retorna `422 SUPPLIER_ORDER_REJECTED`; demandas selecionadas voltam para `OPEN`.
+- `SUPPLIER-TIMEOUT-001` demora sete segundos, acima do timeout padrão de cinco segundos, e retorna
+  `503 EXTERNAL_SUPPLIER_UNAVAILABLE`. A ordem fica `PENDING_SUBMISSION` internamente; repita exatamente o mesmo POST e
+  `Idempotency-Key` depois de restaurar o simulador/comportamento para reconciliar sem duplicar a compra.
+
+RF27 termina quando a ordem está `OPEN`. Ela não recebe os itens, não aumenta `availableQuantity`, não fecha a ordem e
+não tenta novamente as reservas por prioridade. Esses comportamentos permanecem em RF28/RF29.
 
 ### Bifurcações e acompanhamento de status
 

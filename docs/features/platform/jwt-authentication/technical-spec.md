@@ -5,7 +5,7 @@
 | Feature | `jwt-authentication` |
 | Status | Approved |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-24 |
+| Atualizado em | 2026-08-25 |
 | Aprovado por | Santiago Silvestre |
 | Aprovado em | 2026-08-24 |
 | Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-24) |
@@ -127,6 +127,8 @@ functional-spec):
 | `TechnicianController` (`/api/technicians/**`) | `MANAGER`, `ADMIN` |
 | `StockItemController` (`/api/stock-items/**`) | `MANAGER`, `ADMIN` |
 | `StockReservationController` (`/api/stock-reservations/**`) | `MANAGER`, `ADMIN` |
+| `PurchaseDemandController` (`/api/purchase-demands/**`) | `MANAGER`, `ADMIN` |
+| `PurchaseOrderController` (`/api/purchase-orders/**`) | `MANAGER`, `ADMIN` |
 | `ServiceOrderController` — criação, diagnóstico, atribuição, prioridade, progresso, conclusão, anexar peça, finalizar | `MANAGER`, `TECHNICIAN`, `ADMIN` |
 | `ServiceOrderController` — `GET /api/service-orders/{id}/status` (tracking) | `CUSTOMER`, `MANAGER`, `TECHNICIAN`, `ADMIN` (qualquer papel autenticado; checagem de posse fica para uma feature futura) |
 | `EstimateController` — geração de Estimate | `MANAGER`, `ADMIN` |

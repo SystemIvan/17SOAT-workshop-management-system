@@ -17,6 +17,12 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.doma
 import br.com.fiap.workshop_management_system.servicelifecycle.technician.domain.model.Specialty;
 import br.com.fiap.workshop_management_system.servicelifecycle.technician.domain.model.Technician;
 import br.com.fiap.workshop_management_system.servicelifecycle.technician.domain.repository.TechnicianRepository;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentApi;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentCommand;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentExecutionResult;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentResult;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentResultLine;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAvailabilityStatus;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -70,6 +76,43 @@ class PerformDiagnosisUseCaseTest {
         assertEquals(response.executions().get(0).diagnosedAt(), response.executions().get(1).diagnosedAt());
         assertEquals(request.items().stream().map(DiagnosisItemRequest::catalogServiceId).sorted().toList(),
                 catalogServices.checkedIds());
+    }
+
+    @Test
+    void recordsObservedShortageWithoutMovingExecutionToAwaitingItems() {
+        InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository();
+        InMemoryTechnicianRepository technicians = new InMemoryTechnicianRepository();
+        RecordingCatalogServiceEligibilityPort catalogServices = new RecordingCatalogServiceEligibilityPort();
+        UUID stockItemId = UUID.randomUUID();
+        RepairStockAssessmentApi assessmentApi = command -> shortageResult(command, stockItemId);
+        PerformDiagnosisUseCase useCase = new PerformDiagnosisUseCase(
+                serviceOrders, technicians, catalogServices, assessmentApi, Clock.systemUTC());
+        ServiceOrder serviceOrder = ServiceOrder.create(
+                UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, "Initial assessment");
+        Technician technician = Technician.create("Carlos Silva", Set.of(Specialty.MECHANICAL));
+        serviceOrder.assignDiagnosisAssignee(technician.id());
+        serviceOrders.save(serviceOrder);
+        technicians.save(technician);
+
+        PerformDiagnosisRequest request = new PerformDiagnosisRequest(technician.id(), List.of(
+                new DiagnosisItemRequest(UUID.randomUUID(), "Troca de óleo", new MoneyDTO(BigDecimal.TEN, "BRL"),
+                        List.of(new br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto
+                                .StockRequirementRequest(stockItemId,
+                                br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockItemType.PART,
+                                3, "Filtro", new MoneyDTO(BigDecimal.ONE, "BRL"))))));
+
+        ServiceOrderResponse response = useCase.execute(serviceOrder.id(), request);
+
+        assertEquals(1, response.executions().getFirst().stockAvailability().size());
+        assertEquals(2, response.executions().getFirst().stockAvailability().getFirst().shortageQuantity());
+        assertEquals("PENDING", response.executions().getFirst().status().name());
+    }
+
+    private static RepairStockAssessmentResult shortageResult(RepairStockAssessmentCommand command, UUID stockItemId) {
+        UUID executionId = command.executions().getFirst().serviceExecutionId();
+        return new RepairStockAssessmentResult(List.of(new RepairStockAssessmentExecutionResult(executionId, List.of(
+                new RepairStockAssessmentResultLine(stockItemId, 3, 1, 2,
+                        RepairStockAvailabilityStatus.INSUFFICIENT_QUANTITY, Instant.parse("2026-08-25T17:00:00Z"))))));
     }
 
     @Test

@@ -326,7 +326,7 @@ Authorization Server) e seu racional.
 - [ ] SonarLint vai validar segurança — **não configurado nesta feature.** Nenhuma ferramenta de scan
       estático de segurança está integrada ao projeto ainda; isso é rastreado como lacuna aberta em
       `GAPS-TECH-CHALLENGE.md` §6 (relatório de vulnerabilidades do desafio), não resolvido aqui.
-- [x] Testes de segurança planejados — implementados: `SecurityAuthorizationTest` (10 casos, matriz de
+- [x] Testes de segurança planejados — implementados: `SecurityAuthorizationTest` (14 casos, matriz de
       autorização ponta a ponta), `AuthControllerTest`, `UserAccountTest`, `JwtTokenIssuerTest`,
       `BCryptPasswordHasherTest`.
 - [x] Migração para Authorization Server documentada para Fase 2 — já coberta acima em "Estratégia de
@@ -334,9 +334,13 @@ Authorization Server) e seu racional.
 
 ---
 
-**Last Updated:** 2026-08-24  
-**Decision Maker:** Santiago Silvestre (Lead Developer)  
-**Reviewed By:** Santiago Silvestre  
+**Last Updated:** 2026-08-25
+
+**Decision Maker:** Santiago Silvestre (Lead Developer)
+
+**Reviewed By:** Santiago Silvestre
+
 **Status:** Accepted — 4 de 5 itens do Approval Checklist confirmados; "SonarLint vai validar segurança"
-permanece em aberto e rastreado separadamente (não bloqueia a implementação de `jwt-authentication`).  
+permanece em aberto e rastreado separadamente (não bloqueia a implementação de `jwt-authentication`).
+
 **Target Implementation:** `docs/features/platform/jwt-authentication/` (Checkpoints 1–5 implementados)
