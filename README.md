@@ -43,6 +43,20 @@ make verify
 make run-dev
 ```
 
+## E2E smoke suite (Postman/Newman)
+
+Every request in the Postman collection asserts its HTTP status and key response fields via `pm.test`, so it
+doubles as an E2E smoke suite. Run it against a running instance (`make docker-up`) with:
+
+```bash
+make e2e
+```
+
+This drives exactly the happy-path sequence described below via Newman's `--folder` flag (which also matches
+individual request names), so it can be re-run repeatedly: the Customer, Vehicle, Service Catalog and Stock Item
+"Create" requests generate a fresh CPF/plate/chassis/SKU/name on every run to avoid `409 Conflict`. Override the
+target with `BASE_URL=... make e2e`. Requires Node.js (`npx`); no global Newman install needed.
+
 Run `make help` for Docker and database commands. `make docker-reset` explicitly deletes the local database volume and is
 needed once when adopting the initial Flyway baseline over a database previously created by Hibernate.
 
@@ -79,11 +93,12 @@ apenas a origem, sem `/api`: para a execução local, use `http://localhost:8080
 | `customerId`, `vehicleId`, `technicianId`, `stockItemId`, `serviceOrderId`, `executionId`, `serviceExecutionId`, `diagnosisId` e `estimateId` | A coleção as atualiza automaticamente quando a respectiva requisição de criação/diagnóstico obtém sucesso. |
 | `stockReservationId` | É preenchida pelo script de `Retry stock reservation` quando houver `reservationId`; se a reserva já ocorreu na decisão, copie `executions[0].stockReservationId` da resposta da decisão para consultar ou consumir a reserva. |
 | `customerTaxId` | Informe o CPF/CNPJ sem formatação usado para o Customer; é utilizado somente por `Identify customer by CPF/CNPJ`. |
-| `catalogServiceId` | Use o UUID de serviço apresentado na coleção. A coleção não possui uma requisição para cadastrar serviço de catálogo; este campo identifica o serviço informado no diagnóstico. |
+| `catalogServiceId` | Preenchida automaticamente por `Registrations / Service Catalog / Create catalog service` (passo 4); identifica o serviço informado no diagnóstico (passo 8). |
 
-Os exemplos da coleção usam CPF, placa, chassi e SKU fixos. Em uma base que já tenha sido usada, troque esses valores
-por valores únicos antes de criar Customer, Vehicle e Stock Item, e ajuste `customerTaxId` de forma correspondente.
-Os IDs retornados em respostas `201 Created` são os que devem ser usados no restante do teste.
+As requisições `Create customer`, `Create vehicle`, `Create catalog service` e `Create stock item` têm um script de
+pré-requisição que gera CPF (com dígitos verificadores válidos), placa, chassi, nome de serviço e SKU únicos a cada
+execução — não é necessário editar esses valores manualmente entre execuções, mesmo em uma base já usada. Os IDs
+retornados em respostas `201 Created` são os que devem ser usados no restante do teste.
 
 ### Sequência executável
 
@@ -109,9 +124,8 @@ Os IDs retornados em respostas `201 Created` são os que devem ser usados no res
    Use o body da coleção, com `name`, `document` e `contactInfo`. Espere `201 Created`; o script grava o `id` retornado
    em `customerId`.
 
-2. Em `Registrations / Vehicle`, envie `Create vehicle with chassis` (ou `Create vehicle without chassis`). O body deve
-   manter `"customerId": "{{customerId}}"`; os demais campos são `licensePlate`, `chassis` quando aplicável,
-   `brand`, `model`, `year` e `color`.
+2. Em `Registrations / Vehicle`, envie `Create vehicle`. O body deve manter `"customerId": "{{customerId}}"`; os
+   demais campos são `licensePlate`, `chassis` (opcional), `brand`, `model`, `year`, `color` e `mileage` (opcional).
 
    ```http
    POST {{baseUrl}}/api/vehicles
@@ -130,13 +144,26 @@ Os IDs retornados em respostas `201 Created` são os que devem ser usados no res
 
    A resposta esperada é `201 Created` e preenche `technicianId`.
 
-4. Se o diagnóstico usar peça ou insumo, crie-o agora em `Stock & Procurement / Create stock item`. O exemplo da
+4. Em `Registrations / Service Catalog`, envie `Create catalog service`:
+
+   ```json
+   {
+     "name": "{{catalogServiceName}}",
+     "basePrice": { "value": 150.00, "currency": "BRL" }
+   }
+   ```
+
+   Espere `201 Created`; o script grava o `id` retornado em `catalogServiceId`, referenciado pelo diagnóstico no
+   passo 8. Cada `catalogServiceId` usado num diagnóstico deve identificar um serviço ativo — pular este passo faz
+   `Perform diagnosis` falhar com `404`.
+
+5. Se o diagnóstico usar peça ou insumo, crie-o agora em `Stock & Procurement / Create stock item`. O exemplo da
    coleção cria a peça que será referenciada no diagnóstico:
 
    ```json
    {
      "name": "Oil filter",
-     "sku": "FILTER-001",
+     "sku": "{{stockItemSku}}",
      "type": "PART",
      "availableQuantity": 20,
      "price": { "value": 45.90, "currency": "BRL" }
@@ -146,7 +173,7 @@ Os IDs retornados em respostas `201 Created` são os que devem ser usados no res
    Envie `POST {{baseUrl}}/api/stock-items`, espere `201 Created` e use o `stockItemId` gravado pelo script. A
    quantidade disponível deve ser pelo menos a quantidade exigida no diagnóstico para exercitar a reserva bem-sucedida.
 
-5. Em `Service Lifecycle / Service Orders`, envie `Create service order` em
+6. Em `Service Lifecycle / Service Orders`, envie `Create service order` em
    `POST {{baseUrl}}/api/service-orders`. Mantenha `customerId` e `vehicleId` nas variáveis da coleção e informe o
    retrato do veículo e a avaliação inicial, como no exemplo:
 
@@ -168,7 +195,7 @@ Os IDs retornados em respostas `201 Created` são os que devem ser usados no res
    Espere `201 Created`. A resposta registra `serviceOrderId`; consulte já neste ponto `Get service order status`
    (`GET {{baseUrl}}/api/service-orders/{{serviceOrderId}}/status`) e espere `RECEIVED`.
 
-6. Envie `Assign diagnosis assignee`:
+7. Envie `Assign diagnosis assignee`:
 
    ```http
    PUT {{baseUrl}}/api/service-orders/{{serviceOrderId}}/diagnosis-assignee
@@ -177,7 +204,7 @@ Os IDs retornados em respostas `201 Created` são os que devem ser usados no res
    com `{"technicianId":"{{technicianId}}"}`. A resposta é `200 OK` e apresenta `diagnosisAssigneeId`. Esta é a
    atribuição planejada; ela não substitui o autor efetivo registrado no próximo passo.
 
-7. Envie `Perform diagnosis`:
+8. Envie `Perform diagnosis`:
 
    ```http
    POST {{baseUrl}}/api/service-orders/{{serviceOrderId}}/diagnosis
@@ -208,7 +235,7 @@ Os IDs retornados em respostas `201 Created` são os que devem ser usados no res
    Confirme que a execução mostra `diagnosedByTechnicianId` (autor efetivo) e consulte `/status`: o status esperado é
    `IN_DIAGNOSIS`.
 
-8. Em `Estimates`, envie `Generate estimate`:
+9. Em `Estimates`, envie `Generate estimate`:
 
    ```http
    POST {{baseUrl}}/api/service-orders/{{serviceOrderId}}/estimates
@@ -220,35 +247,35 @@ Os IDs retornados em respostas `201 Created` são os que devem ser usados no res
    `serviceExecutionId`, preço do serviço e eventuais itens de estoque. Os requisitos ficam congelados ao gerar o
    orçamento.
 
-9. Decida todas as linhas consultadas em `Decide estimate lines`:
+10. Decida todas as linhas consultadas em `Decide estimate lines`:
 
-   ```http
-   POST {{baseUrl}}/api/estimates/{{estimateId}}/decisions
-   ```
+    ```http
+    POST {{baseUrl}}/api/estimates/{{estimateId}}/decisions
+    ```
 
-   Para aprovar a única linha do exemplo, use:
+    Para aprovar a única linha do exemplo, use:
 
-   ```json
-   {
-     "decisions": [
-       { "serviceExecutionId": "{{executionId}}", "decision": "APPROVED" }
-     ]
-   }
-   ```
+    ```json
+    {
+      "decisions": [
+        { "serviceExecutionId": "{{executionId}}", "decision": "APPROVED" }
+      ]
+    }
+    ```
 
-   A resposta é `200 OK` com a Service Order. Para múltiplas linhas, inclua uma decisão para cada
-   `lines[].serviceExecutionId` retornado por `Get estimate`; uma linha já decidida não pode ser decidida novamente.
+    A resposta é `200 OK` com a Service Order. Para múltiplas linhas, inclua uma decisão para cada
+    `lines[].serviceExecutionId` retornado por `Get estimate`; uma linha já decidida não pode ser decidida novamente.
 
-10. Verifique se a execução aprovada está `READY`.
+11. Verifique se a execução aprovada está `READY`.
 
-    - Se o diagnóstico não tiver peça (`"stockRequirements": []`), ela já estará pronta; siga para o passo 11.
+    - Se o diagnóstico não tiver peça (`"stockRequirements": []`), ela já estará pronta; siga para o passo 12.
     - Se tiver peça, a decisão do orçamento já tenta reservá-la. Com quantidade suficiente, a execução fica `READY` e
-      recebe `stockReservationId`; siga para o passo 11. A reserva pode ser consultada nas requisições de Stock.
+      recebe `stockReservationId`; siga para o passo 12. A reserva pode ser consultada nas requisições de Stock.
     - Se ela ficar `AWAITING_ITEMS`, falta material. Execute `Retry stock reservation`, sem body. `RESERVED` a deixa
       `READY`; `NOT_RESERVED` mostra o motivo em `issues` e o fluxo não pode prosseguir até haver quantidade
       disponível. A coleção não oferece reposição de estoque.
 
-11. Para cada execução aprovada que será realizada, envie `Assign technician`:
+12. Para cada execução aprovada que será realizada, envie `Assign technician`:
 
     ```http
     POST {{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/assign-technician
@@ -257,7 +284,7 @@ Os IDs retornados em respostas `201 Created` são os que devem ser usados no res
     com `{"technicianId":"{{technicianId}}"}`. Espere `200 OK` e confira `assignedTechnicianId`. Não atribua uma
     execução `REJECTED`.
 
-12. Com a execução `READY`, envie, nesta ordem, `Start execution`, `Update execution progress` e `Complete execution`:
+13. Com a execução `READY`, envie, nesta ordem, `Start execution`, `Update execution progress` e `Complete execution`:
 
     ```http
     POST  {{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/start
@@ -271,7 +298,7 @@ Os IDs retornados em respostas `201 Created` são os que devem ser usados no res
     respectivamente, `IN_PROGRESS`, `IN_PROGRESS` e `COMPLETED`. Repita o ciclo para cada linha aprovada antes de
     finalizar a ordem.
 
-13. Quando todas as execuções estiverem `COMPLETED` ou `REJECTED`, envie `Finalize service order`:
+14. Quando todas as execuções estiverem `COMPLETED` ou `REJECTED`, envie `Finalize service order`:
 
     ```http
     POST {{baseUrl}}/api/service-orders/{{serviceOrderId}}/finalize
@@ -280,7 +307,7 @@ Os IDs retornados em respostas `201 Created` são os que devem ser usados no res
     com `{"vehicleDelivered":true}`. Espere `200 OK` e `statusSnapshot: "DELIVERED"`. O valor `false`, ou tentar
     finalizar antes de a ordem estar concluída, retorna conflito (`409`).
 
-14. Durante o roteiro, use tanto `Get service order` quanto `Get service order status`. O primeiro retorna o retrato
+15. Durante o roteiro, use tanto `Get service order` quanto `Get service order status`. O primeiro retorna o retrato
     completo, inclusive `executions` e `statusSnapshot`; o segundo retorna somente `{ "id", "status" }`. No contrato
     atual, `ServiceOrderResponse.status` está marcado como obsoleto; para a leitura completa, use
     `statusSnapshot` como o campo de acompanhamento.
