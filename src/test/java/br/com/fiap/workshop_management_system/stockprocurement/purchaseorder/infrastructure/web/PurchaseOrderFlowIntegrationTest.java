@@ -1,5 +1,6 @@
 package br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.infrastructure.web;
 
+import br.com.fiap.workshop_management_system.identity.auth.application.port.TokenIssuer;
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.exception.ExternalSupplierUnavailableException;
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.port.ExternalPurchaseOrderCommand;
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.port.ExternalPurchaseOrderResult;
@@ -7,6 +8,7 @@ import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.app
 import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.ReserveStockItem;
 import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.ReserveStockItemsCommand;
 import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.StockReservationApi;
+import br.com.fiap.workshop_management_system.testsupport.TestAuth;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -46,11 +49,18 @@ class PurchaseOrderFlowIntegrationTest {
     @Autowired
     private ControllableSupplierGateway supplierGateway;
 
+    @Autowired
+    private TokenIssuer tokenIssuer;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                .apply(SecurityMockMvcConfigurers.springSecurity())
+                .defaultRequest(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/").header("Authorization", "Bearer " + TestAuth.adminToken(tokenIssuer)))
+                .build();
         supplierGateway.reset();
     }
 

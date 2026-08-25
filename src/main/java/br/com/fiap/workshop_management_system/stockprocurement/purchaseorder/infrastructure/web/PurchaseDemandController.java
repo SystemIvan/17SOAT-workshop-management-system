@@ -34,7 +34,9 @@ public class PurchaseDemandController {
             description = "Filters are cumulative and only OPEN demands are returned")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Open demands returned"),
-            @ApiResponse(responseCode = "400", description = "Invalid filter")
+            @ApiResponse(responseCode = "400", description = "Invalid filter"),
+            @ApiResponse(responseCode = "401", description = "Authentication required"),
+            @ApiResponse(responseCode = "403", description = "Manager or administrator role required")
     })
     public ResponseEntity<List<PurchaseDemandResponse>> search(
             @Parameter(description = "Demand origin") @RequestParam(required = false) PurchaseDemandOrigin origin,

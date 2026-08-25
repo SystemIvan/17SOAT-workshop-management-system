@@ -41,7 +41,7 @@ Disponibilizar a avaliação antecipada de reparo para Diagnosis e Estimate. Ins
 ### 4. Documentação, segurança e qualidade
 
 - [x] Atualizar README com o fluxo executável Diagnosis -> Purchase Demand -> Estimate -> reserva após aprovação.
-- [x] Revisar validação, informação exposta, locks, dados persistentes sem seed e ausência de autenticação do baseline.
+- [x] Revisar validação, informação exposta, locks, dados persistentes sem seed e autorização JWT.
 - [x] Rodar testes focados, `make test`, `make verify`, ModuleStructureTest e revisar cobertura.
 
 ## Critérios de conclusão
@@ -54,4 +54,5 @@ Disponibilizar a avaliação antecipada de reparo para Diagnosis e Estimate. Ins
 
 `make verify`, ModuleStructureTest e a migração Flyway contra H2 com Hibernate `validate` passaram em 2026-08-25.
 Os DTOs públicos limitam o input a IDs e quantidades, a ordem não é criada automaticamente e a disponibilidade não
-altera saldo. A ausência de autenticação é uma lacuna preexistente do baseline; não há finding crítico ou alto aberto.
+altera saldo. `Purchase Demand` e `Purchase Order` exigem JWT `MANAGER` ou `ADMIN`; os testes de autorização cobrem
+acesso `MANAGER`, `401` sem token e `403` para papel sem permissão. Não há finding crítico ou alto aberto.

@@ -15,7 +15,7 @@ class ModuleStructureTest {
         modules.verify();
 
         assertThat(modules.stream().map(module -> module.getIdentifier().toString()).toList())
-                .containsExactlyInAnyOrder("registration", "servicelifecycle", "stockprocurement");
+                .containsExactlyInAnyOrder("identity", "registration", "servicelifecycle", "stockprocurement");
     }
 
     @Test

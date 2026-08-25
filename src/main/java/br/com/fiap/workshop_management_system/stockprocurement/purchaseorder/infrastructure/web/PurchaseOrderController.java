@@ -50,6 +50,8 @@ public class PurchaseOrderController {
             @ApiResponse(responseCode = "201", description = "Purchase Order confirmed for the first time"),
             @ApiResponse(responseCode = "200", description = "Existing confirmed Purchase Order replayed"),
             @ApiResponse(responseCode = "400", description = "Invalid request"),
+            @ApiResponse(responseCode = "401", description = "Authentication required"),
+            @ApiResponse(responseCode = "403", description = "Manager or administrator role required"),
             @ApiResponse(responseCode = "404", description = "Demand or Stock Item not found"),
             @ApiResponse(responseCode = "409", description = "Demand, Stock Item or idempotency conflict"),
             @ApiResponse(responseCode = "422", description = "External supplier rejected the order"),
@@ -74,6 +76,8 @@ public class PurchaseOrderController {
     @Operation(summary = "Get a confirmed OPEN Purchase Order")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Purchase Order found"),
+            @ApiResponse(responseCode = "401", description = "Authentication required"),
+            @ApiResponse(responseCode = "403", description = "Manager or administrator role required"),
             @ApiResponse(responseCode = "404", description = "OPEN Purchase Order not found")
     })
     public ResponseEntity<PurchaseOrderResponse> get(@PathVariable UUID purchaseOrderId) {

@@ -55,6 +55,7 @@ services:
       SUPPLIER_BASE_URL: http://supplier-simulator:8080
       SUPPLIER_CONNECT_TIMEOUT: ${SUPPLIER_CONNECT_TIMEOUT:-2s}
       SUPPLIER_READ_TIMEOUT: ${SUPPLIER_READ_TIMEOUT:-5s}
+      APP_SECURITY_JWT_SECRET: ${APP_SECURITY_JWT_SECRET:-change-me-to-a-random-secret-with-at-least-32-bytes}
       SERVER_PORT: 8080
       TZ: 'America/Sao_Paulo'
     ports:

@@ -693,16 +693,12 @@ do Postman poderão criar Stock Items fictícios e sem dados pessoais para acion
 
 ### Autorização
 
-O baseline atual não possui Spring Security. RF27 não criará autenticação improvisada, header de papel ou um novo
-bounded context. Enquanto esse baseline permanecer, os endpoints terão a mesma ausência de enforcement dos demais
-endpoints administrativos, e a restrição funcional ao Stock Manager ficará documentada.
+Com a capability de Identity integrada, `GET /api/purchase-demands`, `POST /api/purchase-orders` e
+`GET /api/purchase-orders/{id}` exigem JWT com papel `MANAGER` ou `ADMIN`. Os testes HTTP devem provar acesso
+`MANAGER`, rejeição dos demais papéis e `401` sem autenticação. A autorização permanece centralizada no
+`SecurityConfig`; nenhum papel é aceito por header ou campo controlado pelo cliente.
 
-O simulador não produz efeito financeiro real. Configurar credenciais ou endpoint de fornecedor real fica bloqueado até
-existir autenticação e autorização que restrinja criação e consulta ao papel `MANAGER`. Se a capability de Identity for
-integrada antes da implementação de RF27, os testes HTTP deverão provar acesso `MANAGER` e rejeição dos demais papéis.
-
-Essa limitação deve ser registrada como finding no checkpoint de segurança; ela não pode ser ocultada por um campo de
-papel enviado pelo cliente.
+O simulador não produz efeito financeiro real. Credenciais ou endpoint de fornecedor real continuam fora de escopo.
 
 ### Recuperação e observabilidade
 

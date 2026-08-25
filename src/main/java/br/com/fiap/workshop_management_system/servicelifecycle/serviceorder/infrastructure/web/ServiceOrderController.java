@@ -21,10 +21,14 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.FinalizeServiceOrderUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.GetServiceOrderStatusUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.GetServiceOrderUseCase;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.ListServiceOrdersUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.PerformDiagnosisUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.RetryStockReservationUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.StartExecutionUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.UpdateExecutionProgressUseCase;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Priority;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrderStatus;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderSearchCriteria;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -39,8 +43,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -51,6 +57,7 @@ public class ServiceOrderController {
     private final CreateServiceOrderUseCase createServiceOrderUseCase;
     private final GetServiceOrderUseCase getServiceOrderUseCase;
     private final GetServiceOrderStatusUseCase getServiceOrderStatusUseCase;
+    private final ListServiceOrdersUseCase listServiceOrdersUseCase;
     private final PerformDiagnosisUseCase performDiagnosisUseCase;
     private final ChangeServiceOrderPriorityUseCase changeServiceOrderPriorityUseCase;
     private final AssignTechnicianUseCase assignTechnicianUseCase;
@@ -66,6 +73,7 @@ public class ServiceOrderController {
             CreateServiceOrderUseCase createServiceOrderUseCase,
             GetServiceOrderUseCase getServiceOrderUseCase,
             GetServiceOrderStatusUseCase getServiceOrderStatusUseCase,
+            ListServiceOrdersUseCase listServiceOrdersUseCase,
             PerformDiagnosisUseCase performDiagnosisUseCase,
             ChangeServiceOrderPriorityUseCase changeServiceOrderPriorityUseCase,
             AssignTechnicianUseCase assignTechnicianUseCase,
@@ -79,6 +87,7 @@ public class ServiceOrderController {
         this.createServiceOrderUseCase = createServiceOrderUseCase;
         this.getServiceOrderUseCase = getServiceOrderUseCase;
         this.getServiceOrderStatusUseCase = getServiceOrderStatusUseCase;
+        this.listServiceOrdersUseCase = listServiceOrdersUseCase;
         this.performDiagnosisUseCase = performDiagnosisUseCase;
         this.changeServiceOrderPriorityUseCase = changeServiceOrderPriorityUseCase;
         this.assignTechnicianUseCase = assignTechnicianUseCase;
@@ -102,6 +111,21 @@ public class ServiceOrderController {
     public ResponseEntity<ServiceOrderResponse> create(@Valid @RequestBody CreateServiceOrderRequest request) {
         ServiceOrderResponse response = createServiceOrderUseCase.execute(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping
+    @Operation(summary = "List service orders, optionally filtered by status, customer, technician or priority")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Service orders listed"),
+            @ApiResponse(responseCode = "400", description = "Invalid filter value")
+    })
+    public ResponseEntity<List<ServiceOrderResponse>> list(
+            @RequestParam(required = false) ServiceOrderStatus status,
+            @RequestParam(required = false) UUID customerId,
+            @RequestParam(required = false) UUID technicianId,
+            @RequestParam(required = false) Priority priority) {
+        return ResponseEntity.ok(listServiceOrdersUseCase.execute(
+                new ServiceOrderSearchCriteria(status, customerId, technicianId, priority)));
     }
 
     @GetMapping("/{id}")
