@@ -1516,7 +1516,12 @@
           "name": "List open purchase demands",
           "event": [{
             "listen": "test",
-            "script": { "exec": ["if (pm.response.code === 200 && pm.response.json().length > 0) { pm.collectionVariables.set('purchaseDemandId', pm.response.json()[0].id); }"] }
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Response is an array', function () { pm.expect(body).to.be.an('array'); });",
+              "if (body.length > 0) { pm.collectionVariables.set('purchaseDemandId', body[0].id); }"
+            ] }
           }],
           "request": {
             "method": "GET",
@@ -1533,7 +1538,12 @@
             },
             {
               "listen": "test",
-              "script": { "exec": ["if (pm.response.code === 201 || pm.response.code === 200) { pm.collectionVariables.set('purchaseOrderId', pm.response.json().id); }"] }
+              "script": { "exec": [
+                "pm.test('Status code is 200 or 201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                "const body = pm.response.json();",
+                "pm.test('Purchase order id is present', function () { pm.expect(body.id).to.be.a('string').and.not.empty; });",
+                "pm.collectionVariables.set('purchaseOrderId', body.id);"
+              ] }
             }
           ],
           "request": {
@@ -1551,7 +1561,11 @@
           "name": "Retry same Purchase Order",
           "event": [{
             "listen": "test",
-            "script": { "exec": ["if (pm.response.code === 200 || pm.response.code === 201) { pm.collectionVariables.set('purchaseOrderId', pm.response.json().id); }"] }
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Same purchase order id is returned', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('purchaseOrderId')); });"
+            ] }
           }],
           "request": {
             "method": "POST",
@@ -1566,6 +1580,13 @@
         },
         {
           "name": "Get Purchase Order",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Purchase order is OPEN', function () { pm.expect(pm.response.json().status).to.eql('OPEN'); });"
+            ] }
+          }],
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/purchase-orders/{{purchaseOrderId}}",
@@ -1581,7 +1602,12 @@
             },
             {
               "listen": "test",
-              "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('purchaseOrderId', pm.response.json().id); }"] }
+              "script": { "exec": [
+                "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+                "const body = pm.response.json();",
+                "pm.test('Purchase order id is present', function () { pm.expect(body.id).to.be.a('string').and.not.empty; });",
+                "pm.collectionVariables.set('purchaseOrderId', body.id);"
+              ] }
             }
           ],
           "request": {
