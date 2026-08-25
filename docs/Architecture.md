@@ -623,7 +623,7 @@ situação de implementação.
 | CRUD de Vehicle | Vehicle, RF03–RF06; AD-003/AD-005 | Covered | RF06 significa desativação lógica; implementação aguarda AD-001 |
 | CRUD de Service Catalog | ServiceCatalog, RF07–RF08; AD-004/AD-005 | Partially covered | Cadastro/preço e desativação estão definidos; list/detail e contratos REST seguem incompletos |
 | CRUD de peças/insumos e estoque | Stock/StockItem, RF25–RF30 | Partially covered | O modelo foca operação de estoque, não explicita todo o CRUD administrativo |
-| Listar/detalhar Service Orders | C4/API e read models do Event Storming | Partially covered | Contratos e filtros não foram identificados |
+| Listar/detalhar Service Orders | C4/API e read models do Event Storming | Covered | RF34 implementado: `GET /api/service-orders` (filtros `status`/`customerId`/`technicianId`/`priority`, combináveis com AND) e `GET /api/service-orders/{id}`; ver `docs/features/servicelifecycle/list-service-orders/` |
 | Tempo médio de execução | Performance Analytics como generic subdomain | Not identified | Não há evento temporal, métrica, consulta ou modelo definido |
 | JWT nas APIs administrativas | ADR 002 | Covered | Implementação/autorização ainda deve seguir a matriz final de papéis |
 | Validar CPF/CNPJ e placa | TaxId e LicensePlate VOs | Covered | Regras foram descritas no DDD tático |
