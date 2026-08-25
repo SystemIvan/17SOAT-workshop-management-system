@@ -62,6 +62,7 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.paths['/api/stock-items/{id}'].delete").exists())
                 .andExpect(jsonPath("$.paths['/api/parts']").doesNotExist())
                 .andExpect(jsonPath("$.paths['/api/service-orders'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/service-orders'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/status'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/diagnosis'].post").exists())
@@ -140,6 +141,19 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/diagnosis'].post.responses['400']").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/diagnosis'].post.responses['404']").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/diagnosis'].post.responses['409']").exists());
+    }
+
+    @Test
+    void documentServiceOrderListingContract() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/service-orders'].get.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/api/service-orders'].get.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/api/service-orders'].get.parameters[?(@.name=='status')]").exists())
+                .andExpect(jsonPath("$.paths['/api/service-orders'].get.parameters[?(@.name=='customerId')]").exists())
+                .andExpect(
+                        jsonPath("$.paths['/api/service-orders'].get.parameters[?(@.name=='technicianId')]").exists())
+                .andExpect(jsonPath("$.paths['/api/service-orders'].get.parameters[?(@.name=='priority')]").exists());
     }
 
     @Test

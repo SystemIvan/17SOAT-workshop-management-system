@@ -411,6 +411,42 @@
               }
             },
             {
+              "name": "List service orders",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/service-orders",
+                "description": "Sem parâmetros retorna todas as ordens de serviço. status, customerId, technicianId e priority são filtros opcionais e combináveis com AND; technicianId casa com o diagnosisAssigneeId da SO ou com o assignedTechnicianId de qualquer execução."
+              }
+            },
+            {
+              "name": "List service orders filtered by status",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/service-orders?status=IN_DIAGNOSIS"
+              }
+            },
+            {
+              "name": "List service orders filtered by customer",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/service-orders?customerId={{customerId}}"
+              }
+            },
+            {
+              "name": "List service orders filtered by technician",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/service-orders?technicianId={{technicianId}}"
+              }
+            },
+            {
+              "name": "List service orders filtered by priority",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/service-orders?priority=HIGH"
+              }
+            },
+            {
               "name": "Get service order",
               "request": {
                 "method": "GET",

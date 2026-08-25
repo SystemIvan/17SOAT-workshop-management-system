@@ -110,6 +110,14 @@ class SecurityAuthorizationTest {
     }
 
     @Test
+    void serviceOrderListingRejectsCustomerRole() throws Exception {
+        String token = tokenFor(Role.CUSTOMER, UUID.randomUUID());
+
+        mockMvc.perform(get("/api/service-orders").header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void estimateGenerationRejectsTechnicianRole() throws Exception {
         String token = tokenFor(Role.TECHNICIAN, UUID.randomUUID());
 
