@@ -40,6 +40,9 @@ public class EstimateLineJpaEntity {
     )
     private List<EstimateStockItemJpaEntity> stockItems = new ArrayList<>();
 
+    @OneToMany(mappedBy = "estimateLine", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<EstimateStockAvailabilityJpaEntity> stockAvailability = new ArrayList<>();
+
     protected EstimateLineJpaEntity() {
     }
 
@@ -67,6 +70,11 @@ public class EstimateLineJpaEntity {
         stockItem.setEstimateLine(this);
     }
 
+    public void addStockAvailability(EstimateStockAvailabilityJpaEntity availability) {
+        stockAvailability.add(availability);
+        availability.setEstimateLine(this);
+    }
+
     public UUID getId() { return id; }
     public int getLineOrder() { return lineOrder; }
     public UUID getServiceExecutionId() { return serviceExecutionId; }
@@ -74,4 +82,5 @@ public class EstimateLineJpaEntity {
     public BigDecimal getServicePriceValue() { return servicePriceValue; }
     public String getServicePriceCurrency() { return servicePriceCurrency; }
     public List<EstimateStockItemJpaEntity> getStockItems() { return stockItems; }
+    public List<EstimateStockAvailabilityJpaEntity> getStockAvailability() { return stockAvailability; }
 }

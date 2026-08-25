@@ -3,9 +3,11 @@ package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.dom
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -68,6 +70,21 @@ class ServiceOrderTest {
 
         diagnoseWithOneExecution(serviceOrder);
 
+        assertEquals(ServiceOrderStatus.IN_DIAGNOSIS, serviceOrder.status());
+    }
+
+    @Test
+    void recordingAvailabilityIsInformationalAndKeepsExecutionPending() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        UUID executionId = diagnoseWithOneExecution(serviceOrder);
+        UUID diagnosisId = serviceOrder.openDiagnosisId();
+        StockAvailabilitySnapshot snapshot = new StockAvailabilitySnapshot(
+                UUID.randomUUID(), 3, 1, 2, StockAvailabilityStatus.INSUFFICIENT_QUANTITY, Instant.now());
+
+        serviceOrder.recordStockAvailability(diagnosisId, Map.of(executionId, List.of(snapshot)));
+
+        assertEquals(ServiceExecutionStatus.PENDING, serviceOrder.serviceExecutions().getFirst().status());
+        assertEquals(snapshot, serviceOrder.serviceExecutions().getFirst().stockAvailability().getFirst());
         assertEquals(ServiceOrderStatus.IN_DIAGNOSIS, serviceOrder.status());
     }
 

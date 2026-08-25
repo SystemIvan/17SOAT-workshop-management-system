@@ -96,3 +96,21 @@ por suas próprias aprovações funcional e técnica.
   quantidades dos itens, sem aceitar valores totais no request.
 - **Pontos para discovery:** regra para moedas distintas, arredondamento, cálculo de itens por quantidade, contrato de
   resposta, compatibilidade e se os valores derivados exigem persistência para auditoria/versionamento.
+
+## BL-009 — Prazo de conclusão e monitoramento de serviço em atraso
+
+- **Contexto:** Service Lifecycle.
+- **Status:** ideia futura.
+- **Origem:** necessidade de negócio de proteger o Customer contra a retenção indefinida do Vehicle na oficina.
+- **Problema:** o fluxo atual não define um prazo para a conclusão do serviço nem oferece visibilidade operacional quando
+  esse prazo é ultrapassado, o que pode deixar o Customer sem previsibilidade e com o Vehicle retido por tempo
+  indeterminado.
+- **Evolução a avaliar:** definir e controlar um prazo de conclusão para o serviço. Quando a oficina não concluir o
+  trabalho no período acordado, um evento deve registrar o atraso e alimentar métricas, alertas e acompanhamento
+  operacional, sem cancelar o serviço automaticamente. Também deve existir um endpoint para solicitar o cancelamento em
+  casos excepcionais. O prazo acordado deve constar na Estimate de forma clara para ciência e aprovação do Customer.
+- **Pontos para discovery:** início da contagem, unidade e cálculo do prazo, pausas justificadas, alteração do prazo com
+  nova anuência do Customer, indicadores de atraso, metas operacionais, alertas e escalonamento antes e depois do prazo,
+  publicação e consumo idempotente do evento, prevenção de eventos e métricas duplicados, autorização e idempotência do
+  endpoint, casos em que o cancelamento manual é permitido, consequências do cancelamento, liberação do Vehicle,
+  auditoria, comunicação ao Customer e impacto nos estados de Estimate, Service Order e Service Execution.

@@ -30,6 +30,7 @@
 		<java.version>21</java.version>
 		<springdoc.version>3.0.3</springdoc.version>
 		<jacoco.version>0.8.13</jacoco.version>
+		<wiremock.version>3.13.1</wiremock.version>
 		<jjwt.version>0.12.6</jjwt.version>
 	</properties>
 	<dependencies>
@@ -129,6 +130,13 @@
 		<dependency>
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.wiremock</groupId>
+			<artifactId>wiremock-standalone</artifactId>
+			<version>${wiremock.version}</version>
 			<scope>test</scope>
 		</dependency>
 

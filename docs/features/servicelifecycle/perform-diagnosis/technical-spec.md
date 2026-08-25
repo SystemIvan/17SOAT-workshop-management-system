@@ -5,237 +5,227 @@
 | Feature | `perform-diagnosis` |
 | Status | Approved |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-22 |
+| Atualizado em | 2026-08-25 |
 | Aprovado por | Matheus Apostulo |
-| Aprovado em | 2026-08-22 |
-| Especificação funcional | `docs/features/servicelifecycle/perform-diagnosis/functional-spec.md` |
+| Aprovado em | 2026-08-25 |
+| Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-25) |
 
-> **Nota:** este documento é retroativo. Descreve a arquitetura já implementada em produção, não uma
-> proposta nova. Onde a implementação atual diverge do que seria a escolha ideal, isso é registrado
-> explicitamente em vez de omitido.
+## Gate de aprovação
 
-> A reconciliação de 2026-08-22 foi revisada e aprovada por humano depois da aprovação da especificação funcional.
-> Este documento cobre somente o impacto técnico no SDD histórico; a implementação permanece nos planos das features
-> `assign-diagnosis-assignee` e `diagnosis-authorship`.
-
-## Reconciliação RFC-002
-
-O comando passa a usar leitura bloqueante da Service Order, exigir `diagnosisAssigneeId` e receber
-`diagnosedByTechnicianId` obrigatório. A aplicação valida o Technician autor, gera um único `diagnosedAt` UTC e cria
-todo o lote de forma atômica; cada resposta de execução passa a expor autor e instante, anuláveis somente para legado.
-O request não aceita `diagnosedAt`, e autor pode divergir do planejamento. As especificações técnicas de
-`assign-diagnosis-assignee` e `diagnosis-authorship` são fontes de verdade para o lock, contrato, migrations e testes.
+Esta revisão deriva da especificação funcional aprovada em 2026-08-25. Nenhum código, migration ou contrato HTTP deste
+delta pode ser alterado antes da aprovação humana explícita desta especificação técnica. O plano histórico permanece
+`Stale` e não autoriza implementação.
 
 ## Objetivo técnico
 
-Documentar a implementação existente de registro de diagnóstico (`ServiceOrder.performDiagnosis`,
-`PerformDiagnosisUseCase`, `POST /api/service-orders/{id}/diagnosis`) no módulo
-`servicelifecycle.serviceorder`, cobrindo domínio, caso de uso e contrato HTTP, para fechar o gap de
-gate SDD identificado no mesmo levantamento que originou a documentação retroativa de RF09/RF10.
+Estender o fluxo existente de `POST /api/service-orders/{id}/diagnosis` para que, depois de criar as Service Executions,
+ele:
 
-## Contexto e fronteiras
+- consolide os Stock Requirements por execução e Stock Item;
+- solicite uma avaliação síncrona à API pública de Stock & Procurement;
+- registre na Service Execution um snapshot informativo da disponibilidade observada;
+- permita que Stock & Procurement crie ou atualize `PENDING_REPAIR` na mesma transação;
+- preserve `PENDING`, sem reservar unidades nem alterar `availableQuantity`.
 
-A implementação pertence a `servicelifecycle.serviceorder`. `ServiceExecution` é uma Entity que vive
-dentro da fronteira do aggregate `ServiceOrder` — não é acessada nem persistida isoladamente.
-`catalogServiceId` é uma referência por ID para `registration.serviceCatalog` (placeholder de pacote,
-ver `AGENTS.md` §"Bounded contexts"); nenhum pacote interno de outro módulo é importado por
-`serviceorder`.
+O baseline de atribuição, autoria, criação das execuções e `statusSnapshot = IN_DIAGNOSIS` permanece inalterado.
 
-## Estrutura existente
+## Contextos e fronteiras
 
-- `serviceorder/domain/model/ServiceOrder.java` (`performDiagnosis(List<DiagnosisItem>)`,
-  `openDiagnosisId`, `recomputeStatusSnapshot`)
-- `serviceorder/domain/model/ServiceExecution.java` (`start(...)`, `attachStockRequirement`,
-  `ServiceExecutionStatus`)
-- `serviceorder/domain/model/DiagnosisItem.java` (record de entrada do use case para o domínio)
-- `serviceorder/application/dto/PerformDiagnosisRequest.java`, `DiagnosisItemRequest.java`,
-  `StockRequirementRequest.java`, `ServiceOrderMapper.java` (`toDiagnosisItems`)
-- `serviceorder/application/usecase/PerformDiagnosisUseCase.java`
-- `serviceorder/infrastructure/web/ServiceOrderController.java`
-  (`POST /api/service-orders/{id}/diagnosis`)
+### Service Lifecycle
 
-## Domínio
+`ServiceOrder` continua sendo o aggregate root e `ServiceExecution`, sua entity interna. O novo snapshot pertence à
+execução porque descreve os requirements diagnosticados naquele instante; ele não é fonte de verdade para saldo nem
+substitui Stock Reservation.
 
-### `ServiceOrder.performDiagnosis(List<DiagnosisItem>)`
+`PerformDiagnosisUseCase` consumirá somente a named interface pública `purchase-demand-api`. Nenhum domínio, repository,
+entity JPA ou package interno de `stockprocurement` será importado.
 
-```java
-public UUID performDiagnosis(List<DiagnosisItem> items) {
-    if (openDiagnosisId != null) {
-        throw new IllegalStateException("A diagnosis is already open without an Estimate generated for it");
-    }
-    UUID diagnosisId = UUID.randomUUID();
-    for (DiagnosisItem item : items) {
-        ServiceExecution execution = ServiceExecution.start(diagnosisId, item.catalogServiceId(), item.name(), item.price());
-        item.stockRequirements().forEach(execution::attachStockRequirement);
-        serviceExecutions.add(execution);
-    }
-    this.openDiagnosisId = diagnosisId;
-    recomputeStatusSnapshot(false);
-    return diagnosisId;
-}
+### Stock & Procurement
+
+Stock & Procurement continua dono de `StockItem`, disponibilidade e `PurchaseDemand`. Sua API avalia necessidades,
+persiste as demandas insuficientes e devolve DTOs públicos. `serviceExecutionId` é recebido como UUID opaco e não possui
+foreign key ou navegação para Service Lifecycle.
+
+A dependência permanece `servicelifecycle -> stockprocurement`, já existente por Stock Reservation, e não cria ciclo no
+Spring Modulith.
+
+## Contrato interno consumido
+
+RF27 disponibilizará `RepairStockAssessmentApi` no named interface `purchase-demand-api`. O comando será em lote e
+conterá uma entrada para cada Service Execution, com `serviceExecutionId` e linhas `stockItemId + requestedQuantity`.
+
+O resultado terá uma avaliação por execução e item:
+
+- `stockItemId`;
+- `requestedQuantity` consolidada;
+- `observedAvailableQuantity`;
+- `shortageQuantity = max(requestedQuantity - observedAvailableQuantity, 0)`;
+- `status`: `AVAILABLE` ou `INSUFFICIENT_QUANTITY`;
+- `observedAt` em UTC com precisão de microssegundos.
+
+O provider valida todas as referências antes de persistir qualquer demanda. Item inexistente ou inativo invalida o lote
+inteiro. Para lotes válidos, cada insuficiência cria ou atualiza a demanda equivalente antes de devolver o resultado.
+O mapper de aplicação converte `RepairStockAvailabilityStatus` para o enum local; o domínio não armazena tipos do
+provider.
+
+## Modelo de domínio
+
+### `StockAvailabilitySnapshot`
+
+Adicionar value object imutável em `serviceorder.domain.model`:
+
+```text
+stockItemId: UUID
+requestedQuantity: int > 0
+observedAvailableQuantity: int >= 0
+shortageQuantity: int >= 0
+status: AVAILABLE | INSUFFICIENT_QUANTITY
+observedAt: Instant
 ```
 
-- Rejeita (`IllegalStateException`) quando já existe um `openDiagnosisId` não nulo — só há um
-  diagnóstico aberto por vez, até que um Estimate seja gerado sobre ele (fechamento de `openDiagnosisId`
-  é responsabilidade de `estimate-generation`, fora do escopo desta feature).
-- Gera um `diagnosisId` novo (`UUID.randomUUID()`), compartilhado por todos os `ServiceExecution`
-  criados nesta chamada.
-- Cada `DiagnosisItem` vira um `ServiceExecution` via `ServiceExecution.start(...)`, que começa em
-  `ServiceExecutionStatus.PENDING`.
-- `stockRequirements` de cada item são anexados ao `ServiceExecution` correspondente via
-  `attachStockRequirement` — sem validação de existência do `stockItemId` em `stockprocurement` neste
-  ponto (o `StockRequirement` é armazenado como snapshot, mesmo padrão de referência por ID + valor
-  copiado já usado no `VehicleSnapshot` de RF09).
-- `recomputeStatusSnapshot(false)` deriva `statusSnapshot = ServiceOrderStatus.IN_DIAGNOSIS` sempre que
-  `openDiagnosisId != null` (guarda anterior na cadeia de prioridade do método, não alterada por esta
-  feature).
+Invariantes:
 
-Método de domínio relacionado não coberto por este documento: `addServiceExecution(diagnosisId, ...)`
-adiciona um único `ServiceExecution` a um diagnóstico já aberto — existe no código mas não tem nenhum
-caller em `src/main` hoje; permanece fora de escopo (ver `functional-spec.md`).
+- `AVAILABLE` exige `shortageQuantity = 0` e saldo observado maior ou igual ao requerido;
+- `INSUFFICIENT_QUANTITY` exige diferença positiva exata;
+- IDs e instante são obrigatórios;
+- uma execução possui no máximo um snapshot por Stock Item.
 
-## Caso de uso: `PerformDiagnosisUseCase`
+### `ServiceExecution`
 
-Fluxo:
+Adicionar coleção de snapshots e o método package-private `replaceStockAvailability(...)`. O método:
 
-1. carregar `ServiceOrder` (`ServiceOrderFinder.getOrThrow`, mesmo padrão dos demais use cases de
-   `serviceorder`);
-2. mapear `PerformDiagnosisRequest.items()` → `List<DiagnosisItem>` via
-   `ServiceOrderMapper.toDiagnosisItems`;
-3. `serviceOrder.performDiagnosis(items)`;
-4. persistir via `ServiceOrderRepository.save(...)`;
-5. retornar `ServiceOrderResponse` (via `ServiceOrderMapper.toResponse`, já existente).
+- só aceita atualização enquanto a execução estiver `PENDING`;
+- exige exatamente os Stock Items e totais obtidos da consolidação dos requirements atuais;
+- substitui atomicamente a fotografia anterior;
+- não muda `status`, `reserved`, `stockReservationId` nem `stockRequirementsFrozen`.
 
-```java
-@Service
-public class PerformDiagnosisUseCase {
+`reconstitute(...)` e os getters de leitura passam a preservar a coleção. Execução sem requirements mantém coleção
+vazia.
 
-    private final ServiceOrderRepository repository;
+### `ServiceOrder`
 
-    public PerformDiagnosisUseCase(ServiceOrderRepository repository) {
-        this.repository = repository;
-    }
+Adicionar operação `recordStockAvailability(diagnosisId, assessments)` que localiza somente as execuções do Diagnosis
+recém-criado e delega a substituição. IDs ausentes, extras ou duplicados são erro de integridade e não produzem estado
+parcial.
 
-    @Transactional
-    public ServiceOrderResponse execute(UUID serviceOrderId, PerformDiagnosisRequest request) {
-        ServiceOrder serviceOrder = ServiceOrderFinder.getOrThrow(repository, serviceOrderId);
-        List<DiagnosisItem> items = ServiceOrderMapper.toDiagnosisItems(request.items());
-        serviceOrder.performDiagnosis(items);
-        repository.save(serviceOrder);
-        return ServiceOrderMapper.toResponse(serviceOrder);
-    }
-}
-```
+## Caso de uso e transação
 
-## Repository
+`PerformDiagnosisUseCase.execute(...)` continua `@Transactional` e seguirá esta ordem:
 
-Nenhuma mudança — `ServiceOrderRepository` já expõe `findById`/`save`, suficientes para este fluxo. Os
-`ServiceExecution` criados são persistidos como parte do agregado `ServiceOrder` (mesma transação,
-mesmo `save`), não têm tabela ou repository próprios.
+1. carregar a Service Order com `findByIdForUpdate`;
+2. validar responsável planejado, autor efetivo e request;
+3. chamar `serviceOrder.performDiagnosis(...)` e obter o novo `diagnosisId`;
+4. selecionar as novas execuções e consolidar requirements repetidos com `Math.addExact`;
+5. ordenar execuções e itens por UUID e chamar `RepairStockAssessmentApi.assessAndRecord(...)` uma vez;
+6. aplicar todos os snapshots retornados ao aggregate;
+7. persistir a Service Order e devolver `ServiceOrderResponse`.
 
-## Persistência
+Execuções sem requirements não são enviadas ao provider e recebem lista vazia. A API de RF27 participa da transação já
+aberta; falha de validação, referência, persistência ou lock reverte Service Order, snapshots e Purchase Demands. Não
+será usado `REQUIRES_NEW`, evento after-commit ou compensação.
 
-Nenhuma migration nova. `service_executions` já existe desde a migration de baseline
-(`V20260815000000__initial_schema.sql`) e já é usada pelas features de RF19+ (atribuição, início,
-progresso, conclusão) — este documento não introduz nem modifica schema.
+O use case não tenta reserva. A revalidação da Estimate e a reserva posterior à aprovação permanecem comandos distintos.
 
-## API
+## Persistência e dados
 
-`POST /api/service-orders/{id}/diagnosis`
+Criar migration Flyway aditiva com timestamp UTC da implementação e nome em lowercase `snake_case`. Nenhuma migration
+existente será modificada.
 
-Request (`PerformDiagnosisRequest`):
+Nova tabela `service_execution_stock_availability`:
+
+| Coluna | Regra |
+|---|---|
+| `service_execution_id BINARY(16)` | FK local para `service_executions` |
+| `stock_item_id BINARY(16)` | ID opaco, sem FK cross-module |
+| `requested_quantity INTEGER` | Positiva |
+| `observed_available_quantity INTEGER` | Não negativa |
+| `shortage_quantity INTEGER` | Não negativa |
+| `status VARCHAR(32)` | `AVAILABLE` ou `INSUFFICIENT_QUANTITY` |
+| `observed_at TIMESTAMP(6)` | Obrigatório |
+
+A primary key será `(service_execution_id, stock_item_id)`. Checks garantirão a coerência entre status e quantidades.
+Registros anteriores permanecem com coleção vazia; não haverá backfill inferido nem consulta automática no startup.
+
+Classificação de dados: **no seed required**. Testes usarão fixtures próprias.
+
+## Contrato HTTP
+
+O request de `POST /api/service-orders/{id}/diagnosis` não muda. `ServiceExecutionResponse` recebe o campo aditivo,
+obrigatório e não nulo `stockAvailability`, sempre como array.
+
+Exemplo de item:
+
 ```json
 {
-  "diagnosedByTechnicianId": "<UUID obrigatório>",
-  "items": [
-    {
-      "catalogServiceId": "<UUID>",
-      "name": "<string>",
-      "price": {"value": "<decimal >= 0>", "currency": "<string>"},
-      "stockRequirements": [
-        {
-          "stockItemId": "<UUID>",
-          "type": "<StockItemType>",
-          "quantity": "<int positivo>",
-          "nameSnapshot": "<string>",
-          "priceSnapshot": {"value": "<decimal >= 0>", "currency": "<string>"}
-        }
-      ]
-    }
-  ]
+  "stockItemId": "e9ce63a8-d9aa-449b-9e12-a1e87ce089ca",
+  "requestedQuantity": 3,
+  "observedAvailableQuantity": 1,
+  "shortageQuantity": 2,
+  "status": "INSUFFICIENT_QUANTITY",
+  "observedAt": "2026-08-25T15:30:00Z"
 }
 ```
 
-Validação via Bean Validation: `items` é `@NotEmpty`; cada item exige `catalogServiceId` (`@NotNull`),
-`name` (`@NotBlank`) e `price` (`@NotNull @Valid`); `stockRequirements` é opcional, mas cada elemento,
-quando presente, exige `stockItemId`, `type`, `quantity` (`@Positive`), `nameSnapshot` e
-`priceSnapshot`.
+O mesmo campo aparecerá nas leituras de Service Order que reutilizam `ServiceExecutionResponse`. Isso é aditivo, mas
+altera o schema OpenAPI e exige atualização conjunta de MockMvc, Postman e README.
 
-Resposta de sucesso: `200 OK` com `ServiceOrderResponse`, refletindo os novos `executions` (um por item
-informado, todos `PENDING`), seus `diagnosedByTechnicianId` e `diagnosedAt`, e `status = IN_DIAGNOSIS`.
+## Falhas esperadas
 
-## Tratamento de erros
+Além das falhas existentes:
 
-- `404 Not Found`, código `NOT_FOUND` — Service Order inexistente (`ServiceOrderFinder.getOrThrow`,
-  `GlobalExceptionHandler`).
-- `409 Conflict`, código `INVALID_STATE_TRANSITION` — já existe um diagnóstico aberto para a Service
-  Order (`ServiceLifecycleExceptionHandler`, mesmo mapeamento de `IllegalStateException` já usado por
-  RF10 e pelas transições de `ServiceExecution`).
-- `409 Conflict`, código `INVALID_STATE_TRANSITION` — não há responsável planejado para o próximo Diagnosis.
-- `404 Not Found`, código `NOT_FOUND` — o autor efetivo informado não identifica um Technician existente.
-- `400 Bad Request`, código `VALIDATION_ERROR` — `items` ausente/vazio ou campos obrigatórios de algum
-  item ausentes/inválidos.
+| Situação | HTTP | Código |
+|---|---:|---|
+| Stock Item inexistente | `404` | `STOCK_ITEM_NOT_FOUND` |
+| Stock Item inativo | `409` | `STOCK_ITEM_INACTIVE` |
+| Overflow na consolidação | `400` | `VALIDATION_ERROR` |
+| Resultado interno incompleto ou incoerente | erro técnico | não expor tipo interno |
 
-## Segurança e operação
+O adapter traduz somente resultados públicos de RF27 para erros já estáveis. Nenhuma mensagem inclui saldo de outros
+itens, SQL, packages internos ou stack trace.
 
-- Nenhum mecanismo de autenticação/autorização no projeto hoje; este endpoint segue o mesmo padrão dos
-  demais — risco pré-existente de plataforma, não introduzido por esta feature.
-- Nenhum dado pessoal exposto — `catalogServiceId`/`stockItemId` são IDs opacos; `name`/`nameSnapshot`
-  são nomes de serviço/peça, não de pessoas.
-- IDs tratados como UUID; nenhuma concatenação manual de entrada em SQL.
-- Superfície de abuso: qualquer chamador pode registrar diagnóstico para qualquer Service Order (sem
-  autenticação) e informar `catalogServiceId`/`stockItemId` arbitrários, não validados contra
-  `registration`/`stockprocurement` no momento do diagnóstico — mesmo padrão de risco já registrado em
-  RF09 (`service-order-creation/technical-spec.md`), não uma lacuna introduzida por esta feature.
+## Concorrência e consistência
+
+- o lock da Service Order serializa dois diagnósticos concorrentes;
+- RF27 bloqueia Stock Items e Purchase Demands em ordem determinística;
+- a mesma transação garante correspondência entre snapshot persistido e observação gravada na demanda;
+- disponibilidade é fotografia, não promessa: movimentações posteriores podem mudar o saldo;
+- a unique key da demanda impede duplicação em retries ou revalidações concorrentes.
+
+## Segurança
+
+- nenhum campo novo é aceito do cliente; disponibilidade e instante vêm do servidor;
+- o cliente não pode informar status, saldo observado, shortage ou Purchase Demand;
+- IDs e quantidades são validados antes de qualquer persistência;
+- o response não inclui Customer, Vehicle ou dados do fornecedor junto ao snapshot;
+- a ausência atual de autenticação permanece finding de plataforma; não será simulada por header ou campo de request.
 
 ## Estratégia de testes
 
-### Domínio
-- `ServiceOrderTest` (já existente) cobre: `performDiagnosis` move o status para `IN_DIAGNOSIS`;
-  registrar diagnóstico com um diagnóstico já aberto lança `IllegalStateException`.
+- domínio: invariantes, substituição completa, itens duplicados, mismatch e preservação de `PENDING`;
+- aplicação: item suficiente, insuficiente, vários itens, execução sem requirement, item inexistente/inativo e rollback;
+- integração modular: Diagnosis -> `RepairStockAssessmentApi` -> Purchase Demand na mesma transação;
+- persistência: round-trip da coleção, constraints e startup com Flyway + Hibernate `validate`;
+- concorrência: dois diagnósticos/revalidações sem demanda duplicada nem deadlock;
+- HTTP: array vazio/não vazio, schema, `404`, `409` e compatibilidade dos campos existentes;
+- estrutura: `ModuleStructureTest`, `make test`, `make verify` e cobertura do código alterado.
 
-### Application
-- `PerformDiagnosisUseCaseTest` (novo, fechando o gap desta feature): fluxo válido com múltiplos itens
-  (persiste e retorna um `ServiceExecution` por item); Service Order inexistente propaga
-  `NoSuchElementException`.
+## Documentação afetada
 
-### Web
-- `ServiceOrderControllerDiagnosisTest` (novo, fechando o gap desta feature): `200` com os
-  `ServiceExecution` refletidos na resposta; `404` para Service Order inexistente; `400` para `items`
-  vazio; `409`/`INVALID_STATE_TRANSITION` para diagnóstico já aberto.
+Na implementação, atualizar OpenAPI, coleção Postman e o fluxo manual do README para demonstrar que a demanda nasce no
+Diagnosis, antes da Estimate, sem alterar saldo ou status. O OpenAPI gerado permanece a fonte de verdade.
 
 ## Fora de escopo técnico
 
-- geração de Estimate a partir do diagnóstico e fechamento de `openDiagnosisId` (feature
-  `estimate-generation`, já especificada separadamente);
-- `addServiceExecution` (adicionar execução avulsa a diagnóstico já aberto);
-- validação de existência de `catalogServiceId`/`stockItemId` em outros módulos;
-- execução dos serviços diagnosticados (RF19+).
+- reservar unidades durante o Diagnosis;
+- alterar `AWAITING_ITEMS` antes da aprovação;
+- criar Purchase Order automaticamente;
+- resolver demanda por rejeição ou expiração da Estimate;
+- RF28, RF29, RF30 ou política de prioridade após recebimento;
+- corrigir os snapshots comerciais informados no request de Diagnosis, ainda registrado em BL-004.
 
-## Gates de validação
+## Gates
 
-Antes da implementação:
-
-- [x] Functional Spec aprovada.
-- [x] Technical Spec revisada e aprovada.
-
-Antes do PR:
-
-- [ ] testes unitários passando (novos: `PerformDiagnosisUseCaseTest`,
-  `ServiceOrderControllerDiagnosisTest`);
-- [ ] testes de integração aplicáveis passando;
-- [ ] `make verify` executado após esta spec ser aprovada;
-- [x] nenhuma migration nova necessária (schema já existente);
-- [x] OpenAPI já reflete o endpoint (`@Operation` em `performDiagnosis`, já presente antes deste gate);
-- [x] Postman já reflete o endpoint (`POST .../diagnosis` já presente na collection antes deste gate);
-- [x] nenhuma fronteira do Spring Modulith violada.
+- [x] Functional Spec aprovada em 2026-08-25.
+- [x] Technical Spec revisada e aprovada por humano em 2026-08-25.
+- [ ] Implementation Plan revisado somente depois da aprovação técnica.
+- [ ] Segurança, contratos, migration, Modulith, testes e documentação verificados no plano futuro.

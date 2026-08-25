@@ -5,326 +5,239 @@
 | Feature | `estimate-generation` |
 | Status | Approved |
 | Responsável | Matheus Campagnone |
-| Atualizado em | 2026-08-20 |
+| Atualizado em | 2026-08-25 |
 | Aprovado por | Matheus Apostulo |
-| Aprovado em | 2026-08-20 |
-| Especificação funcional | `docs/features/servicelifecycle/estimate-generation/functional-spec.md` |
+| Aprovado em | 2026-08-25 |
+| Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-25) |
 
-## Revisão proposta por `stock-item-reservation`
+## Gate de aprovação
 
-Esta revisão substitui a afirmação de que a criação da Estimate não modifica a Service Order. Em uma única
-transação de escrita, `GenerateEstimateUseCase` deve carregar a Service Order com lock, validar e persistir
-a Estimate e chamar `serviceOrder.freezeStockRequirements(diagnosisId)` para todas as Service Executions
-apresentadas. A falha técnica em qualquer etapa faz rollback de ambos os aggregates.
-
-O congelamento é idempotente, não cria `StockReservation`, não consulta Stock & Procurement e não muda
-preço, disponibilidade ou status de execução. Ele persiste `stockRequirementsFrozen = true` em cada
-execução do Diagnosis e impede anexo, remoção ou alteração posterior de requirement. Necessidade posterior
-exige novo Diagnosis, Service Execution e Estimate. A migration e o mapeamento JPA desse campo pertencem
-ao plano `stock-item-reservation`, que executará o delta sem reabrir checkpoints históricos.
-
-Além dos testes existentes, a revisão exige cobertura de persistência atômica Estimate + congelamento e da
-serialização entre geração e `AttachStockRequirementUseCase`; a primeira deve vencer ou o anexo deve
-ocorrer integralmente antes do congelamento, nunca depois dele.
+Esta revisão deriva da especificação funcional aprovada em 2026-08-25. Nenhum código, migration ou contrato HTTP deste
+delta pode ser alterado antes da aprovação humana explícita desta especificação técnica. O plano histórico permanece
+`Stale`.
 
 ## Objetivo técnico
 
-Implementar a geração de `Estimate` dentro do módulo `servicelifecycle`, a partir de um Diagnosis já realizado em uma `ServiceOrder`.
+Estender `GenerateEstimateUseCase` para revalidar a disponibilidade dos Stock Requirements congelados, reconciliar as
+Purchase Demands e persistir na Estimate a fotografia apresentada ao Customer.
 
-A feature deve:
+A geração continuará:
 
-- criar e persistir uma `Estimate` como Aggregate Root separado;
-- representar comercialmente as `ServiceExecution` pertencentes ao Diagnosis informado;
-- copiar para a Estimate snapshots comerciais suficientes para manter o orçamento estável;
-- impedir mais de uma Estimate para o mesmo ciclo de Diagnosis;
-- publicar o evento `EstimateGenerated` após a persistência válida da Estimate;
-- não implementar aprovação, rejeição, expiração automática, reserva de Stock ou Notification.
+- criando uma Estimate por Diagnosis;
+- congelando os requirements na mesma transação;
+- preservando snapshots comerciais;
+- publicando `EstimateGenerated`;
+- sem aprovar execução, reservar saldo ou criar Purchase Order.
 
-## Contexto e fronteiras
+## Contextos e fronteiras
 
-A implementação pertence a `servicelifecycle.estimate`.
+`Estimate` permanece aggregate root de `servicelifecycle.estimate`; `ServiceOrder` continua fonte de verdade das Service
+Executions. A geração já coordena os dois aggregates com lock da Service Order.
 
-`ServiceOrder` continua sendo Aggregate Root separado e fonte de verdade das `ServiceExecution`.
+O caso de uso consumirá somente `RepairStockAssessmentApi`, do named interface público `purchase-demand-api`. Nenhum
+tipo de domínio, repository ou persistência de Stock & Procurement será importado. A dependência entre módulos continua
+unidirecional `servicelifecycle -> stockprocurement`.
 
-A `Estimate` referencia a `ServiceOrder` e o Diagnosis por ID. Ela não contém nem modifica diretamente objetos internos do aggregate `ServiceOrder`.
+Stock & Procurement recebe apenas `serviceExecutionId`, `stockItemId` e quantidade. Não recebe Customer, Vehicle,
+Diagnosis, preço ou conteúdo comercial da Estimate.
 
-A geração é orquestrada na Application Layer.
+## Contrato interno consumido
 
-## Estrutura proposta
+É o mesmo contrato definido pela revisão de `perform-diagnosis` e provido por RF27:
 
-- `estimate/domain/model/Estimate.java`
-- `estimate/domain/model/EstimateLine.java`
-- `estimate/domain/event/EstimateGenerated.java`
-- `estimate/domain/repository/EstimateRepository.java`
-- `estimate/application/dto/EstimateResponse.java`
-- `estimate/application/usecase/GenerateEstimateUseCase.java`
-- `estimate/infrastructure/persistence/...`
+```text
+RepairStockAssessmentApi.assessAndRecord(command) -> result
+```
 
-## Aggregate Estimate
+O comando contém as execuções e requirements consolidados. O resultado retorna, por execução e Stock Item:
 
-A `Estimate` será Aggregate Root separado de `ServiceOrder`.
+- quantidade requerida;
+- quantidade disponível observada;
+- diferença positiva;
+- `AVAILABLE` ou `INSUFFICIENT_QUANTITY`;
+- `observedAt` definido pelo provider.
 
-### Estado mínimo
+Para itens válidos, a chamada cria ou atualiza somente demandas insuficientes. Uma observação suficiente não resolve uma
+demanda existente, pois não reserva as unidades; somente `StockReservationCreatedEvent` pode resolvê-la antes da compra.
+O mapper de aplicação converte o status público para o enum local; o domínio de Estimate não armazena tipos de RF27.
 
-- `id`
-- `serviceOrderId`
-- `diagnosisId`
-- `customerId`
-- `createdAt`
-- `expiresAt`
-- coleção imutável de `EstimateLine`
+## Modelo de domínio
 
-### Invariantes
+### `EstimateStockAvailability`
 
-- IDs obrigatórios não podem ser nulos.
-- A Estimate deve possuir ao menos uma linha.
-- Todas as linhas precisam pertencer ao mesmo Diagnosis usado na criação da Estimate.
-- Uma Estimate criada não altera as `ServiceExecution` correspondentes.
-- Alterações posteriores em ServiceOrder, Service Catalog ou Stock não alteram seus snapshots.
+Adicionar value object imutável em `estimate.domain.model`:
 
-## EstimateLine
+```text
+stockItemId: UUID
+requestedQuantity: int > 0
+observedAvailableQuantity: int >= 0
+shortageQuantity: int >= 0
+status: AVAILABLE | INSUFFICIENT_QUANTITY
+observedAt: Instant
+```
 
-Cada `EstimateLine` representa o snapshot comercial de uma `ServiceExecution`.
+As invariantes são iguais às de `StockAvailabilitySnapshot`: diferença zero quando disponível e diferença positiva
+exata quando insuficiente. A Estimate copia valores do resultado público; ela não referencia o objeto mantido pela
+Service Execution.
 
-### Estado mínimo
+### `EstimateLine`
 
-- `serviceExecutionId`
-- `serviceName`
-- preço do serviço
-- coleção dos Stock Requirements necessários àquela execução
+Cada linha continuará contendo serviço, preço e Stock Items comerciais. Adicionar uma coleção
+`stockAvailability`, com no máximo uma entrada por Stock Item consolidado naquela execução.
 
-Os Stock Requirements existentes em `ServiceExecution` já possuem:
+Separar a coleção de disponibilidade da lista comercial evita duplicar ou distribuir artificialmente o saldo quando
+existirem vários Stock Requirements para o mesmo item. Alterações posteriores no estoque ou na Service Order não mudam
+a fotografia persistida na Estimate.
 
-- `stockItemId`
-- `type`
-- `quantity`
-- `nameSnapshot`
-- `priceSnapshot`
+### `Estimate`
 
-A geração da Estimate deve copiar essas informações para seu próprio snapshot comercial conforme necessário, sem buscar dados vivos novamente no Stock.
+As invariantes existentes permanecem. A criação exige que todas as linhas tenham a avaliação correspondente ao conjunto
+consolidado de requirements; execução sem requirement usa coleção vazia. Resultado ausente, extra ou duplicado é erro de
+integridade e impede a criação inteira.
 
-## Fonte de dados da geração
+## Fluxo de aplicação e transação
 
-`GenerateEstimateUseCase` recebe o identificador da `ServiceOrder` e o `diagnosisId`.
+`GenerateEstimateUseCase.execute(...)` permanece `@Transactional`:
 
-Fluxo:
+1. carregar a Service Order com `findByIdForUpdate`;
+2. validar Diagnosis aberto e unicidade da Estimate;
+3. selecionar e ordenar as Service Executions do Diagnosis;
+4. congelar seus Stock Requirements;
+5. consolidar requirements repetidos por execução usando `Math.addExact`;
+6. chamar `RepairStockAssessmentApi.assessAndRecord(...)` uma vez para o lote não vazio;
+7. atualizar os snapshots informativos das Service Executions com o resultado mais recente;
+8. criar as linhas da Estimate copiando snapshots comerciais e de disponibilidade;
+9. persistir Service Order e Estimate;
+10. publicar `EstimateGenerated` e devolver a resposta.
 
-1. carregar `ServiceOrder` por `ServiceOrderRepository`;
-2. validar que o Diagnosis informado corresponde ao ciclo aberto;
-3. selecionar `ServiceExecution` cujo `diagnosisId` corresponda ao Diagnosis informado;
-4. exigir pelo menos uma execução;
-5. verificar no `EstimateRepository` se já existe Estimate para aquele Diagnosis;
-6. construir as linhas usando os snapshots existentes na `ServiceExecution`;
-7. criar a `Estimate`;
-8. persistir via `EstimateRepository`;
-9. publicar `EstimateGenerated`.
+A API de RF27 participa da mesma transação. Qualquer falha reverte congelamento, snapshot, Estimate e Purchase Demands.
+Não haverá `REQUIRES_NEW`, chamada after-commit nem compensação. Execuções sem requirements não acionam RF27.
 
-A geração da Estimate não limpa openDiagnosisId. O código existente somente encerra o Diagnosis aberto quando suas ServiceExecutions deixam de estar PENDING. Geração, envio e decisão da Estimate permanecem momentos distintos.
+O lock da Service Order preserva a serialização já exigida entre geração e `AttachStockRequirementUseCase`: o anexo
+termina antes do congelamento ou é rejeitado depois dele.
 
-## Repository
+## Persistência e dados
 
-Será criado `EstimateRepository`.
+Criar migration Flyway aditiva com timestamp UTC da implementação, sem modificar migrations existentes.
 
-Contrato mínimo:
+Nova tabela `estimate_line_stock_availability`:
 
-- `Optional<Estimate> findById(UUID id)`
-- `boolean existsByDiagnosisId(UUID diagnosisId)`
-- `void save(Estimate estimate)`
+| Coluna | Regra |
+|---|---|
+| `estimate_line_id BINARY(16)` | FK para `estimate_lines` |
+| `stock_item_id BINARY(16)` | ID opaco, sem FK cross-module |
+| `requested_quantity INTEGER` | Positiva |
+| `observed_available_quantity INTEGER` | Não negativa |
+| `shortage_quantity INTEGER` | Não negativa |
+| `status VARCHAR(32)` | `AVAILABLE` ou `INSUFFICIENT_QUANTITY` |
+| `observed_at TIMESTAMP(6)` | Obrigatório |
 
-Nenhum acesso direto à infraestrutura será feito pelo domínio.
+A primary key será `(estimate_line_id, stock_item_id)`. Checks garantirão coerência de status e quantidades. O mapper
+JPA fará cópia domínio ⇄ persistência sem reutilizar entities de Service Order.
 
-## Persistência
+Estimates legadas permanecem com coleção vazia. Não haverá backfill com o saldo atual, pois isso falsificaria a
+fotografia histórica.
 
-Criar migration Flyway adicional, sem modificar migrations anteriores.
+Classificação de dados: **no seed required**. Testes usam fixtures dedicadas.
 
-### estimates
+## Evento `EstimateGenerated`
 
-Campos mínimos:
+O contrato permanece inalterado: `eventId`, `occurredAt`, `estimateId`, `serviceOrderId`, `diagnosisId`, `customerId` e
+`expiresAt`. O evento representa a criação válida da Estimate, não Purchase Demand, disponibilidade, reserva ou envio de
+notificação.
 
-- `id`
-- `service_order_id`
-- `diagnosis_id`
-- `customer_id`
-- `created_at`
-- `expires_at`
+Ele continua publicado dentro da transação após as persistências. Consumers after-commit só observam o evento depois do
+commit; uma falha transacional anterior não produz notificação de Estimate inexistente.
 
-Deve existir unicidade para `diagnosis_id`, impedindo duas Estimates para o mesmo ciclo também no banco.
+## Contratos HTTP
 
-### estimate_lines
+Os endpoints permanecem:
 
-Campos mínimos:
+- `POST /api/service-orders/{serviceOrderId}/estimates`;
+- `GET /api/estimates/{estimateId}`.
 
-- `id`
-- `estimate_id`
-- `service_execution_id`
-- `service_name`
-- `service_price_value`
-- `service_price_currency`
+O request de geração não muda. Cada `LineResponse` recebe o campo aditivo e não nulo `stockAvailability`, sempre array.
 
-### estimate_line_stock_items
+Exemplo:
 
-Snapshot comercial dos materiais:
+```json
+{
+  "stockItemId": "e9ce63a8-d9aa-449b-9e12-a1e87ce089ca",
+  "requestedQuantity": 3,
+  "observedAvailableQuantity": 1,
+  "shortageQuantity": 2,
+  "status": "INSUFFICIENT_QUANTITY",
+  "observedAt": "2026-08-25T15:35:00Z"
+}
+```
 
-- `estimate_line_id`
-- `stock_item_id`
-- `type`
-- `quantity`
-- `name_snapshot`
-- `price_snapshot_value`
-- `price_snapshot_currency`
+`stockItems` continua sendo o snapshot comercial original; `stockAvailability` é a fotografia operacional consolidada.
+Nenhum preço, quantidade comercial ou campo existente será removido ou renomeado.
 
-## Evento EstimateGenerated
+## Falhas esperadas
 
-O evento representa apenas a criação válida da Estimate.
+Além das falhas atuais:
 
-Contrato mínimo:
+| Situação | HTTP | Código |
+|---|---:|---|
+| Stock Item inexistente | `404` | `STOCK_ITEM_NOT_FOUND` |
+| Stock Item inativo | `409` | `STOCK_ITEM_INACTIVE` |
+| Overflow na consolidação | `400` | `VALIDATION_ERROR` |
+| Resultado interno incompleto ou incoerente | erro técnico | não expor tipo interno |
 
-- `eventId`
-- `occurredAt`
-- `estimateId`
-- `serviceOrderId`
-- `diagnosisId`
-- `customerId`
-- `expiresAt`
+Uma falha não cria Estimate parcial, não congela requirements e não altera demanda. Respostas não expõem SQL, saldo de
+itens alheios ao orçamento ou packages internos.
 
-`expiresAt` representa o prazo já determinado pelo produtor. Notification não deve conhecer nem recalcular a regra de duração.
+## Concorrência e idempotência
 
-Enquanto a duração definitiva permanecer aberta, a feature não deve hard-code 24h ou 48h.
+- unicidade de `diagnosisId` continua protegida no domínio e banco;
+- lock da Service Order serializa geração, anexo e decisão concorrentes;
+- RF27 bloqueia Stock Items e Purchase Demands em ordem determinística;
+- repetir geração após rollback faz nova observação e não duplica a demanda equivalente;
+- repetir após commit continua falhando como Estimate já existente e não reavalia o snapshot histórico;
+- o snapshot não promete unidades e não substitui a revalidação atômica na aprovação.
 
-## Publicação do evento
+## Segurança
 
-O evento somente pode ser publicado depois que a Estimate tiver sido validamente criada e persistida.
+- saldo, status e instante são calculados pelo servidor e nunca aceitos no request;
+- RF27 recebe somente IDs e quantidades operacionais;
+- Estimate não expõe Customer ou Vehicle dentro da disponibilidade;
+- nenhum log contém payload completo, preço, saldo de itens não solicitados ou dados pessoais;
+- a ausência de autenticação permanece finding de plataforma e não será simulada nesta feature.
 
-O projeto ainda não possui infraestrutura compartilhada de publicação de eventos. Esta feature define e produz o contrato EstimateGenerated de forma testável, sem introduzir uma solução global de mensageria. A integração entre módulos poderá evoluir posteriormente sem alterar o significado do evento.
+## OpenAPI, Postman e README
 
-Nenhum consumidor de Notification será implementado nesta feature.
+Na implementação:
 
-## Integração com ServiceOrder
-
-O código existente de `ServiceOrder` já possui pontos de integração do Épico 2 para autorização e rejeição futuras.
-
-Esses comportamentos não fazem parte desta entrega.
-
-A geração utiliza apenas o estado público necessário da ServiceOrder e de suas ServiceExecutions.
-
-As execuções são selecionadas pelo `diagnosisId`.
-
-## Integração com Stock
-
-Nenhuma chamada ao `StockItemRepository` será necessária durante a geração da Estimate.
-
-O Diagnosis já registra os snapshots necessários dentro de cada `StockRequirement`.
-
-Isso evita leitura viva de Stock e mantém a Estimate aderente ao princípio de snapshot comercial.
-
-## API
-
-Expor operação REST para geração da Estimate.
-
-Contrato proposto:
-
-`POST /api/service-orders/{serviceOrderId}/estimates`
-
-Request:
-
-`{ "diagnosisId": "<UUID>" }`
-
-Consulta da Estimate criada:
-
-`GET /api/estimates/{estimateId}`
-
-Resposta de sucesso: `201 Created`.
-
-A resposta deve permitir identificar:
-
-- Estimate;
-- Service Order;
-- Diagnosis;
-- Customer;
-- linhas comerciais;
-- `createdAt`;
-- `expiresAt`.
-
-O contrato HTTP deverá ser refletido em OpenAPI e Postman antes da conclusão da feature.
-
-## Tratamento de erros
-
-Devem existir respostas coerentes para:
-
-- Service Order inexistente;
-- Diagnosis inexistente ou diferente do ciclo esperado;
-- Diagnosis sem Service Executions;
-- Estimate já existente para o mesmo Diagnosis;
-- dados inválidos na geração.
-
-Exceções internas não devem expor stack trace pela API.
+- documentar `stockAvailability`, enum, quantidades e semântica de snapshot no Springdoc;
+- atualizar testes do OpenAPI gerado;
+- atualizar `Get estimate` e o fluxo de geração na coleção Postman;
+- atualizar o README, pois a coleção muda, mostrando demanda criada no Diagnosis e revalidada na Estimate;
+- preservar `/swagger-ui.html` e `/v3/api-docs` como fontes executáveis.
 
 ## Estratégia de testes
 
-### Domínio
-
-Cobrir:
-
-- criação válida de Estimate;
-- rejeição de Estimate sem linhas;
-- preservação de snapshots;
-- imutabilidade dos dados expostos;
-- validações obrigatórias.
-
-### Application
-
-Cobrir:
-
-- geração com Diagnosis válido;
-- Service Order inexistente;
-- Diagnosis inválido;
-- Diagnosis sem execuções;
-- duplicidade por Diagnosis;
-- persistência;
-- publicação de `EstimateGenerated`.
-
-### Infrastructure e Web
-
-Cobrir:
-
-- `201 Created`;
-- payload esperado;
-- erros de entrada e conflito;
-- persistência quando aplicável.
-
-## Segurança e operação
-
-- IDs são tratados como UUID;
-- nenhuma regra de autorização nova será inventada nesta feature;
-- nenhum dado sensível adicional deve ser exposto;
-- persistência deve utilizar os mecanismos já adotados pelo projeto;
-- não haverá concatenação manual de entrada em SQL.
+- domínio: invariantes e cópia imutável da disponibilidade por linha;
+- aplicação: suficiente, insuficiente, itens repetidos, várias execuções, lista vazia e rollback integral;
+- integração modular: Estimate -> RF27 atualiza a mesma demanda criada no Diagnosis;
+- persistência: round-trip, Estimate legada vazia, constraints e Flyway + Hibernate `validate`;
+- concorrência: geração versus anexo e revalidação versus criação de Purchase Order sem deadlock;
+- HTTP/OpenAPI: campo aditivo, enum, `404`, `409` e preservação do contrato existente;
+- regressão: `EstimateGenerated`, Notification, decisão de linhas e Stock Reservation permanecem verdes;
+- qualidade: `ModuleStructureTest`, `make test`, `make verify` e cobertura do código alterado.
 
 ## Fora de escopo técnico
 
-- aprovação ou rejeição de EstimateLine;
-- atualização de `authorizedByEstimateId`;
-- reserva de Stock;
-- Notification Adapter;
-- scheduler de expiração;
-- regra fixa de 24h/48h;
-- revisão ou versionamento de Estimate;
-- execução ou tracking de ServiceExecution.
+- reservar ou prometer Stock Items na geração;
+- criar Purchase Order automaticamente;
+- resolver demanda por rejeição ou expiração;
+- modificar o contrato `EstimateGenerated`;
+- expiração automática ou regra de 24h/48h;
+- corrigir os snapshots comerciais recebidos no Diagnosis, ainda registrado em BL-004.
 
-## Gates de validação
+## Gates
 
-Antes da implementação:
-
-- [x] Functional Spec aprovada.
-- [x] Technical Spec revisada e aprovada.
-
-Antes do PR:
-
-- [x] testes unitários passando;
-- [x] testes de integração aplicáveis passando;
-- [x] `make verify` passando;
-- [x] migration Flyway validada;
-- [x] OpenAPI atualizado;
-- [x] Postman atualizado;
-- [x] evento `EstimateGenerated` testado;
-- [x] nenhuma fronteira do Spring Modulith violada.
+- [x] Functional Spec aprovada em 2026-08-25.
+- [x] Technical Spec revisada e aprovada por humano em 2026-08-25.
+- [ ] Implementation Plan revisado somente depois da aprovação técnica.
+- [ ] Segurança, contratos, migration, Modulith, testes e documentação verificados no plano futuro.

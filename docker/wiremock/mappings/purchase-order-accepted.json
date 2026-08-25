@@ -1,0 +1,23 @@
+{
+  "priority": 10,
+  "request": {
+    "method": "POST",
+    "urlPath": "/api/v1/purchase-orders",
+    "headers": {
+      "Idempotency-Key": {
+        "matches": "[0-9a-fA-F-]{36}"
+      }
+    }
+  },
+  "response": {
+    "status": 201,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "supplierOrderReference": "SUP-{{request.headers.Idempotency-Key}}",
+      "status": "ACCEPTED"
+    },
+    "transformers": ["response-template"]
+  }
+}

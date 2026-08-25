@@ -75,6 +75,40 @@ class SecurityAuthorizationTest {
     }
 
     @Test
+    void purchaseOrderEndpointsRejectRequestsWithoutAToken() throws Exception {
+        mockMvc.perform(get("/api/purchase-demands"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void purchaseOrderEndpointsRejectNonManagerRoles() throws Exception {
+        String token = tokenFor(Role.TECHNICIAN, UUID.randomUUID());
+
+        mockMvc.perform(get("/api/purchase-demands")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/purchase-orders")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void purchaseOrderEndpointsAllowManagerRole() throws Exception {
+        String token = tokenFor(Role.MANAGER, null);
+
+        mockMvc.perform(get("/api/purchase-demands")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/purchase-orders")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void loginEndpointIsReachableWithoutAToken() throws Exception {
         // An unknown username fails business validation (401 INVALID_CREDENTIALS from
         // AuthExceptionHandler), which is only reachable if the security layer let the request

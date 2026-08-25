@@ -20,6 +20,9 @@
     { "key": "archiveCatalogServiceId", "value": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" },
     { "key": "diagnosisId", "value": "88888888-8888-8888-8888-888888888888" },
     { "key": "estimateId", "value": "99999999-9999-9999-9999-999999999999" },
+    { "key": "purchaseDemandId", "value": "cccccccc-cccc-cccc-cccc-cccccccccccc" },
+    { "key": "purchaseOrderId", "value": "dddddddd-dddd-dddd-dddd-dddddddddddd" },
+    { "key": "purchaseOrderIdempotencyKey", "value": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" },
     { "key": "authToken", "value": "" }
   ],
   "item": [
@@ -803,17 +806,98 @@
             "url": "{{baseUrl}}/api/stock-reservations/{{stockReservationId}}/consume",
             "description": "Consome a reserva integralmente. Repetições são idempotentes e retornam a mesma reserva consumida."
           },
-          "response": [
+          "response": [{
+            "name": "Consumed reservation",
+            "status": "OK",
+            "code": 200,
+            "_postman_previewlanguage": "json",
+            "header": [],
+            "cookie": [],
+            "body": "{\n  \"id\": \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\n  \"serviceExecutionId\": \"66666666-6666-6666-6666-666666666666\",\n  \"status\": \"CONSUMED\",\n  \"lines\": [{\n    \"stockItemId\": \"44444444-4444-4444-4444-444444444444\",\n    \"quantity\": 2\n  }],\n  \"createdAt\": \"2026-08-20T12:00:00Z\",\n  \"consumedAt\": \"2026-08-20T14:30:00Z\"\n}"
+          }]
+        },
+        {
+          "name": "List open purchase demands",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["if (pm.response.code === 200 && pm.response.json().length > 0) { pm.collectionVariables.set('purchaseDemandId', pm.response.json()[0].id); }"] }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/purchase-demands?origin=PENDING_REPAIR&stockItemId={{stockItemId}}",
+            "description": "Lista apenas demandas OPEN. Diagnosis e Estimate registram ou atualizam PENDING_REPAIR ao observar INSUFFICIENT_QUANTITY; a falha de reserva após aprovação também pode reconciliar a mesma demanda."
+          }
+        },
+        {
+          "name": "Create Purchase Order from demand",
+          "event": [
             {
-              "name": "Consumed reservation",
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [],
-              "cookie": [],
-              "body": "{\n  \"id\": \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\n  \"serviceExecutionId\": \"66666666-6666-6666-6666-666666666666\",\n  \"status\": \"CONSUMED\",\n  \"lines\": [{\n    \"stockItemId\": \"44444444-4444-4444-4444-444444444444\",\n    \"quantity\": 2\n  }],\n  \"createdAt\": \"2026-08-20T12:00:00Z\",\n  \"consumedAt\": \"2026-08-20T14:30:00Z\"\n}"
+              "listen": "prerequest",
+              "script": { "exec": ["if (!pm.collectionVariables.get('purchaseOrderIdempotencyKey')) { pm.collectionVariables.set('purchaseOrderIdempotencyKey', pm.variables.replaceIn('{{$guid}}')); }"] }
+            },
+            {
+              "listen": "test",
+              "script": { "exec": ["if (pm.response.code === 201 || pm.response.code === 200) { pm.collectionVariables.set('purchaseOrderId', pm.response.json().id); }"] }
             }
-          ]
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{purchaseOrderIdempotencyKey}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"demandIds\": [\"{{purchaseDemandId}}\"],\n  \"lines\": [\n    {\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"quantity\": 10\n    }\n  ]\n}" },
+            "url": "{{baseUrl}}/api/purchase-orders",
+            "description": "Cria uma ordem orientada por demanda. Para um request misto, mantenha demandIds e acrescente outra linha ad hoc. A quantidade deve cobrir a soma sugerida das demandas selecionadas."
+          }
+        },
+        {
+          "name": "Retry same Purchase Order",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["if (pm.response.code === 200 || pm.response.code === 201) { pm.collectionVariables.set('purchaseOrderId', pm.response.json().id); }"] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{purchaseOrderIdempotencyKey}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"demandIds\": [\"{{purchaseDemandId}}\"],\n  \"lines\": [\n    {\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"quantity\": 10\n    }\n  ]\n}" },
+            "url": "{{baseUrl}}/api/purchase-orders",
+            "description": "Repete exatamente header e body. Retorna 200 para uma ordem OPEN já confirmada, sem nova compra externa; também recupera PENDING_SUBMISSION após 502/503."
+          }
+        },
+        {
+          "name": "Get Purchase Order",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/purchase-orders/{{purchaseOrderId}}",
+            "description": "Retorna apenas Purchase Orders funcionalmente confirmadas no estado OPEN."
+          }
+        },
+        {
+          "name": "Create ad hoc Purchase Order",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "exec": ["pm.collectionVariables.set('purchaseOrderIdempotencyKey', pm.variables.replaceIn('{{$guid}}'));"] }
+            },
+            {
+              "listen": "test",
+              "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('purchaseOrderId', pm.response.json().id); }"] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{purchaseOrderIdempotencyKey}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"demandIds\": [],\n  \"lines\": [\n    {\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"quantity\": 2\n    }\n  ]\n}" },
+            "url": "{{baseUrl}}/api/purchase-orders",
+            "description": "Criação livre pelo Stock Manager, sem Purchase Demand. O simulador confirma a ordem, mas RF27 não altera o saldo."
+          }
         }
       ]
     }

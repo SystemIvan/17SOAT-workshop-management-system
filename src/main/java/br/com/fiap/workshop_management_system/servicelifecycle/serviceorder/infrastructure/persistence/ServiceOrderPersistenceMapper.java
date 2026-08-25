@@ -4,6 +4,7 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.doma
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceExecution;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockRequirement;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockAvailabilitySnapshot;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.VehicleSnapshot;
 import org.springframework.stereotype.Component;
 
@@ -69,6 +70,8 @@ public class ServiceOrderPersistenceMapper {
         List<StockRequirementEmbeddable> stockRequirements = execution.stockRequirements().stream()
                 .map(this::toStockRequirementEmbeddable)
                 .toList();
+        List<StockAvailabilitySnapshotEmbeddable> stockAvailability = execution.stockAvailability().stream()
+                .map(this::toStockAvailabilityEmbeddable).toList();
         return new ServiceExecutionJpaEntity(
                 execution.id(),
                 owner,
@@ -84,13 +87,16 @@ public class ServiceOrderPersistenceMapper {
                 execution.diagnosedAt(),
                 execution.stockRequirementsFrozen(),
                 execution.stockReservationId(),
-                stockRequirements);
+                stockRequirements,
+                stockAvailability);
     }
 
     private ServiceExecution toExecutionDomain(ServiceExecutionJpaEntity entity) {
         List<StockRequirement> stockRequirements = entity.getStockRequirements().stream()
                 .map(this::toStockRequirementDomain)
                 .toList();
+        List<StockAvailabilitySnapshot> stockAvailability = entity.getStockAvailability().stream()
+                .map(this::toStockAvailabilitySnapshot).toList();
         return ServiceExecution.reconstitute(
                 entity.getId(),
                 entity.getDiagnosisId(),
@@ -104,7 +110,8 @@ public class ServiceOrderPersistenceMapper {
                 entity.getDiagnosedAt(),
                 entity.isStockRequirementsFrozen(),
                 entity.getStockReservationId(),
-                stockRequirements);
+                stockRequirements,
+                stockAvailability);
     }
 
     private StockRequirementEmbeddable toStockRequirementEmbeddable(StockRequirement stockRequirement) {
@@ -126,5 +133,16 @@ public class ServiceOrderPersistenceMapper {
                 embeddable.getNameSnapshot(),
                 new Money(embeddable.getPriceSnapshotValue(), embeddable.getPriceSnapshotCurrency()),
                 embeddable.isReserved());
+    }
+
+    private StockAvailabilitySnapshotEmbeddable toStockAvailabilityEmbeddable(StockAvailabilitySnapshot snapshot) {
+        return new StockAvailabilitySnapshotEmbeddable(snapshot.stockItemId(), snapshot.requestedQuantity(),
+                snapshot.observedAvailableQuantity(), snapshot.shortageQuantity(), snapshot.status(), snapshot.observedAt());
+    }
+
+    private StockAvailabilitySnapshot toStockAvailabilitySnapshot(StockAvailabilitySnapshotEmbeddable embeddable) {
+        return new StockAvailabilitySnapshot(embeddable.getStockItemId(), embeddable.getRequestedQuantity(),
+                embeddable.getObservedAvailableQuantity(), embeddable.getShortageQuantity(), embeddable.getStatus(),
+                embeddable.getObservedAt());
     }
 }

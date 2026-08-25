@@ -3,80 +3,59 @@
 | Campo | Valor |
 |---|---|
 | Feature | `perform-diagnosis` |
-| Status | Stale |
+| Status | Implemented |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-22 |
-| Especificação técnica | `./technical-spec.md` |
+| Atualizado em | 2026-08-25 |
+| Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-25) |
+| Especificação técnica | `./technical-spec.md` (`Approved` em 2026-08-25) |
 
-> **Nota:** plano retroativo. O domínio, a persistência e o contrato HTTP já estavam implementados em
-> produção antes deste gate SDD; os checkpoints abaixo registram o que já existia e o que foi
-> adicionado especificamente por este esforço de documentação (testes de application e web).
+## Objetivo
 
-> Está `Stale` desde 2026-08-22 porque a especificação funcional foi devolvida a `Draft` pelos deltas materiais de
-> `assign-diagnosis-assignee` e `diagnosis-authorship`; este plano histórico não autoriza sua implementação.
+No Diagnosis, avaliar em lote os Stock Requirements das novas Service Executions, persistir a fotografia de
+disponibilidade e registrar ou atualizar a Purchase Demand `PENDING_REPAIR` na mesma transação. Essa observação não
+reserva unidades nem muda a execução para `AWAITING_ITEMS`.
 
-## Checkpoints
+## Checkpoints ordenados
 
-- [x] Arquitetura e contratos implementados sem violação de fronteiras — `ServiceOrder.performDiagnosis`,
-  `ServiceExecution`, `PerformDiagnosisUseCase`, `ServiceOrderController` já existiam; nenhuma
-  importação de pacote interno de `registration`/`stockprocurement` em `serviceorder`.
-- [x] Persistência, migrations e classificação de seeds concluídas — tabela `service_executions` já
-  parte da migration de baseline (`V20260815000000__initial_schema.sql`); nenhuma migration nova
-  necessária por esta feature. Classificação: não se aplica (dado transacional, não seed); não há seed
-  automático de diagnóstico em produção.
-- [x] Comportamento de domínio e aplicação implementado — `performDiagnosis` cria um `ServiceExecution`
-  por item, guarda contra diagnóstico duplo aberto, deriva `status = IN_DIAGNOSIS`.
-- [x] Testes automatizados e `make verify` aprovados — ver "Evidências de verificação".
-- [x] Revisão de segurança concluída, com achados e mitigações registrados — ver seção abaixo.
-- [x] OpenAPI, Postman e documentação do projeto atualizados — endpoint já documentado via
-  `@Operation`/springdoc e já presente na collection Postman e no `OpenApiContractTest`; nenhuma mudança
-  de contrato nesta feature, então nenhuma atualização foi necessária.
+### 1. Contrato público e domínio
 
-## Revisão de segurança
+- [x] Expor `RepairStockAssessmentApi` no named interface `purchase-demand-api`, com comandos/resultados imutáveis
+  limitados a IDs, quantidades, status e instante.
+- [x] Criar `StockAvailabilitySnapshot` e invariantes, adicionando a substituição atômica na `ServiceExecution` e na
+  `ServiceOrder` sem alterar reserva, congelamento ou status.
+- [x] Cobrir domínio para disponibilidade, insuficiência, duplicidade, conjunto divergente e preservação de `PENDING`.
 
-- **Validação de entrada / mass assignment**: `PerformDiagnosisRequest`/`DiagnosisItemRequest`/
-  `StockRequirementRequest` usam Bean Validation (`@NotEmpty`, `@NotNull`, `@NotBlank`, `@Positive`,
-  `@Valid` em cascata); DTOs dedicados, sem exposição de entidade de domínio/JPA na API. OK.
-- **Autenticação/autorização**: não há mecanismo de autenticação no projeto; este endpoint segue o mesmo
-  padrão (sem controle de acesso) já presente nos demais endpoints. Risco pré-existente de plataforma,
-  já registrado em `service-order-creation/implementation-plan.md`, não agravado por esta feature.
-- **Exposição de dados**: a resposta expõe os novos `ServiceExecution` (nome, preço, status,
-  `stockRequirements`) — nenhum dado pessoal de Customer/Technician. OK.
-- **Segredos/logs sensíveis**: nenhum segredo manipulado; nenhum log novo introduzido por este fluxo.
-- **SQL/persistência/migration**: nenhuma migration nova; persistência via Spring Data JPA, sem SQL
-  manual. OK.
-- **Erros e disclosure**: `404`/`409`/`400` mapeados pelos handlers já existentes
-  (`GlobalExceptionHandler`, `ServiceLifecycleExceptionHandler`), sem stack trace nem detalhe de SQL.
-- **Dependências novas**: nenhuma.
-- **Abuso**: `catalogServiceId`/`stockItemId` arbitrários (não existentes em `registration`/
-  `stockprocurement`) são aceitos sem erro — mesmo padrão de risco já registrado em RF09/RF10, não uma
-  falha introduzida por esta feature. Qualquer chamador pode registrar diagnóstico para qualquer
-  Service Order (sem autenticação), mesmo padrão de risco de todos os outros endpoints de mutação do
-  projeto.
+### 2. Avaliação em Stock & Procurement
 
-Nenhum achado crítico/alto pendente.
+- [x] Implementar a avaliação e o registro síncronos: validar todo o lote antes de escrever, bloquear Stock Items e
+  Purchase Demands em ordem determinística e criar/atualizar somente insuficiências.
+- [x] Manter demanda aberta após leitura suficiente, rejeição ou expiração; resolver somente pela reserva criada.
+- [x] Cobrir item inexistente/inativo, rollback integral, deduplicação, atualização de `updatedAt` e concorrência.
 
-## Evidências de verificação
+### 3. Caso de uso, persistência e contrato HTTP
 
-- `./mvnw test -Dtest=PerformDiagnosisUseCaseTest` — 2 testes novos, 0 falhas (fluxo válido com
-  múltiplos itens; Service Order inexistente).
-- `./mvnw test -Dtest=ServiceOrderControllerDiagnosisTest` — 4 testes novos, 0 falhas (`200` com
-  execuções refletidas, `404` para Service Order inexistente, `400` para `items` vazio,
-  `409`/`INVALID_STATE_TRANSITION` para diagnóstico já aberto).
-- `./mvnw test -Dtest=ServiceOrderTest` — cobertura de domínio já existente para `performDiagnosis`
-  (movimentação para `IN_DIAGNOSIS`, rejeição de diagnóstico duplo aberto) revalidada, sem regressão.
-- `./mvnw verify` (equivalente a `make verify`) — 2026-08-20, `BUILD SUCCESS`, sem falhas, JaCoCo
-  executado.
-- `ModuleStructureTest` — verde; nenhuma fronteira de módulo violada pela feature.
-- Postman: entrada "Perform diagnosis" já presente em `Service Orders` antes deste gate; nenhuma
-  mudança de contrato necessária.
-- OpenAPI: endpoint já documentado via `@Operation` em `ServiceOrderController.performDiagnosis` e já
-  coberto por `OpenApiContractTest.documentEveryCurrentHttpOperation`
-  (`$.paths['/api/service-orders/{id}/diagnosis'].post`); nenhuma mudança necessária.
+- [x] Integrar a avaliação única em `PerformDiagnosisUseCase`, consolidando requisitos com overflow seguro e gravando
+  os snapshots antes do save.
+- [x] Criar migration aditiva e mapper/entidade da coleção de snapshots, com constraints e sem seed.
+- [x] Incluir `stockAvailability` não nulo em `ServiceExecutionResponse`, OpenAPI e testes MockMvc.
 
-## Rollback ou recuperação
+### 4. Documentação, segurança e evidências
 
-N/A — este gate SDD é documentação retroativa de código e schema já em produção; não há deploy nem
-migration novos associados a este plano. Os testes adicionados (`PerformDiagnosisUseCaseTest`,
-`ServiceOrderControllerDiagnosisTest`) podem ser revertidos isoladamente via `git revert` sem qualquer
-impacto em dado persistido.
+- [x] Atualizar Postman e README com Diagnosis -> Purchase Demand antes da Estimate.
+- [x] Registrar revisão de segurança: campos calculados pelo servidor, ausência de dados pessoais, locks/constraints e
+  lacuna conhecida de autenticação.
+- [x] Executar testes focados, `make test`, `make verify`, ModuleStructureTest e revisar cobertura.
+
+## Revisão de segurança e evidências
+
+Campos de disponibilidade são calculados no servidor e o contrato interno contém somente IDs e quantidades. Nenhum
+dado de Customer, Vehicle ou preço atravessa a fronteira. A ausência de autenticação é uma lacuna preexistente do
+baseline, sem simulação de papel nesta entrega. `make verify`, ModuleStructureTest, Flyway/Hibernate validate e os
+testes de domínio/aplicação passaram em 2026-08-25; não há finding crítico ou alto pendente.
+
+## Critérios de conclusão
+
+- [x] Snapshot e Purchase Demand persistidos atomicamente no Diagnosis.
+- [x] `AWAITING_ITEMS` continua dependente de aprovação e falha de reserva.
+- [x] Migration, OpenAPI, Postman, README, testes e fronteiras Modulith verificados.
+- [x] Nenhum finding crítico/alto de segurança pendente.

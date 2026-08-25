@@ -18,5 +18,6 @@ public record ServiceExecutionResponse(
         UUID diagnosedByTechnicianId,
         Instant diagnosedAt,
         UUID stockReservationId,
-        List<StockRequirementResponse> stockRequirements) {
+        List<StockRequirementResponse> stockRequirements,
+        List<StockAvailabilityResponse> stockAvailability) {
 }
