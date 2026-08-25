@@ -11,7 +11,7 @@
 ## Context and design
 
 **Owning module:** `servicelifecycle` (specifically `servicelifecycle.serviceorder`). Per
-`docs/adr/ADR-003-notifications-boundary.md`, Notifications is not a bounded context — `servicelifecycle` defines an
+`../../adr/ADR-004-notifications-boundary.md`, Notifications is not a bounded context — `servicelifecycle` defines an
 outbound port in its **application layer** for this notification and an infrastructure adapter implements the
 chosen channel. No shared/generic notification module or abstraction is introduced.
 
@@ -42,7 +42,7 @@ annotate that package with `@org.springframework.modulith.NamedInterface` to exp
 boundary as the finalize operation (see failure handling below) — not a domain event. The codebase has no existing
 `ApplicationEventPublisher`/`@ApplicationModuleListener` usage anywhere; introducing event-driven notification
 infrastructure for a single, best-effort, one-directional read is a disproportionate change for this story and is
-left for a future ADR if/when Notifications needs to react to activity across many modules (per ADR-003's own
+left for a future ADR if/when Notifications needs to react to activity across many modules (per ADR-004's own
 "reconsider as a bounded context" trigger).
 
 ## Interfaces and data flow

@@ -5,6 +5,10 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
         .CatalogServiceArchivedForNewWorkException;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
         .CatalogServiceNotFoundForNewWorkException;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .ServiceOrderVehicleArchivedException;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .ServiceOrderVehicleNotFoundException;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.InvalidServiceOrderException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +35,18 @@ class ServiceLifecycleExceptionHandler {
     ResponseEntity<ErrorResponse> handleCatalogServiceArchived(CatalogServiceArchivedForNewWorkException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse("CATALOG_SERVICE_ARCHIVED", ex.getMessage()));
+    }
+
+    @ExceptionHandler(ServiceOrderVehicleNotFoundException.class)
+    ResponseEntity<ErrorResponse> handleVehicleNotFound(ServiceOrderVehicleNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse("VEHICLE_NOT_FOUND", exception.getMessage()));
+    }
+
+    @ExceptionHandler(ServiceOrderVehicleArchivedException.class)
+    ResponseEntity<ErrorResponse> handleVehicleArchived(ServiceOrderVehicleArchivedException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("VEHICLE_ARCHIVED", exception.getMessage()));
     }
 
     @ExceptionHandler(InvalidServiceOrderException.class)

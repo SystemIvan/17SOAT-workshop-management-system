@@ -7,6 +7,7 @@ import br.com.fiap.workshop_management_system.registration.vehicle.application.e
 import br.com.fiap.workshop_management_system.registration.vehicle.application.exception.VehicleNotFoundException;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.ChassisNumber;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.LicensePlate;
+import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.Mileage;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.Vehicle;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.VehicleArchivedException;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.VehicleYear;
@@ -98,6 +99,19 @@ class UpdateVehicleUseCaseTest {
     }
 
     @Test
+    void preservesMileageWhileUpdatingDescriptiveData() {
+        UUID id = UUID.randomUUID();
+        Vehicle vehicle = vehicle(id, true, null);
+        vehicle.recordMileage(new Mileage(42_500));
+        when(repository.findByIdForUpdate(id)).thenReturn(Optional.of(vehicle));
+
+        VehicleResponse response = useCase.execute(id, request(null));
+
+        assertEquals(42_500L, response.mileage());
+        verify(repository).save(vehicle);
+    }
+
+    @Test
     void rejectsMissingAndArchivedVehicleWithoutSaving() {
         UUID missingId = UUID.randomUUID();
         when(repository.findByIdForUpdate(missingId)).thenReturn(Optional.empty());
@@ -148,6 +162,6 @@ class UpdateVehicleUseCaseTest {
     private static Vehicle vehicle(UUID id, boolean active, String chassis) {
         ChassisNumber chassisNumber = chassis == null ? null : new ChassisNumber(chassis);
         return Vehicle.reconstitute(id, UUID.randomUUID(), new LicensePlate("ABC1234"), chassisNumber,
-                "Volkswagen", "Gol", VehicleYear.create(2026, 2026), "Prata", active);
+                "Volkswagen", "Gol", VehicleYear.create(2026, 2026), "Prata", null, active);
     }
 }

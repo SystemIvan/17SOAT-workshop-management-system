@@ -1,5 +1,6 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.estimate.infrastructure.persistence;
 
+import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateStatus;
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -35,6 +36,10 @@ public class EstimateJpaEntity {
     @Column(name = "expires_at")
     private Instant expiresAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private EstimateStatus status;
+
     @OneToMany(
             mappedBy = "estimate",
             cascade = CascadeType.ALL,
@@ -51,13 +56,15 @@ public class EstimateJpaEntity {
             UUID diagnosisId,
             UUID customerId,
             Instant createdAt,
-            Instant expiresAt) {
+            Instant expiresAt,
+            EstimateStatus status) {
         this.id = id;
         this.serviceOrderId = serviceOrderId;
         this.diagnosisId = diagnosisId;
         this.customerId = customerId;
         this.createdAt = createdAt;
         this.expiresAt = expiresAt;
+        this.status = status;
     }
 
     public void addLine(EstimateLineJpaEntity line) {
@@ -71,5 +78,6 @@ public class EstimateJpaEntity {
     public UUID getCustomerId() { return customerId; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getExpiresAt() { return expiresAt; }
+    public EstimateStatus getStatus() { return status; }
     public List<EstimateLineJpaEntity> getLines() { return lines; }
 }

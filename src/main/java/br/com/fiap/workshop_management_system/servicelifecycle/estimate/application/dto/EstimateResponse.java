@@ -16,6 +16,7 @@ public record EstimateResponse(
         UUID customerId,
         Instant createdAt,
         Instant expiresAt,
+        String status,
         List<LineResponse> lines
 ) {
 
@@ -27,6 +28,7 @@ public record EstimateResponse(
                 estimate.customerId(),
                 estimate.createdAt(),
                 estimate.expiresAt(),
+                estimate.status().name(),
                 estimate.lines().stream()
                         .map(LineResponse::from)
                         .toList()

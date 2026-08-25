@@ -14,6 +14,7 @@ public class Estimate {
     private final Instant createdAt;
     private final Instant expiresAt;
     private final List<EstimateLine> lines;
+    private EstimateStatus status;
 
     private Estimate(
             UUID id,
@@ -22,7 +23,8 @@ public class Estimate {
             UUID customerId,
             Instant createdAt,
             Instant expiresAt,
-            List<EstimateLine> lines) {
+            List<EstimateLine> lines,
+            EstimateStatus status) {
 
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.serviceOrderId = Objects.requireNonNull(serviceOrderId, "serviceOrderId must not be null");
@@ -30,6 +32,7 @@ public class Estimate {
         this.customerId = Objects.requireNonNull(customerId, "customerId must not be null");
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt must not be null");
         this.expiresAt = expiresAt;
+        this.status = Objects.requireNonNull(status, "status must not be null");
 
         if (lines == null || lines.isEmpty()) {
             throw new IllegalArgumentException("Estimate must contain at least one line");
@@ -53,7 +56,9 @@ public class Estimate {
                 customerId,
                 createdAt,
                 expiresAt,
-                lines);
+                lines,
+                EstimateStatus.DRAFT
+        );
     }
 
     public static Estimate reconstitute(
@@ -63,7 +68,8 @@ public class Estimate {
             UUID customerId,
             Instant createdAt,
             Instant expiresAt,
-            List<EstimateLine> lines) {
+            List<EstimateLine> lines,
+            EstimateStatus status) {
 
         return new Estimate(
                 id,
@@ -72,7 +78,39 @@ public class Estimate {
                 customerId,
                 createdAt,
                 expiresAt,
-                lines);
+                lines,
+                status
+        );
+    }
+
+    public void markSent() {
+        if (status != EstimateStatus.DRAFT) {
+            throw new IllegalStateException(
+                    "Estimate must be DRAFT to be sent: " + id
+            );
+        }
+
+        status = EstimateStatus.SENT;
+    }
+
+    public void close() {
+        if (status != EstimateStatus.SENT) {
+            throw new IllegalStateException(
+                    "Estimate must be SENT to be closed: " + id
+            );
+        }
+
+        status = EstimateStatus.CLOSED;
+    }
+
+    public void expire() {
+        if (status != EstimateStatus.SENT) {
+            throw new IllegalStateException(
+                    "Estimate must be SENT to expire: " + id
+            );
+        }
+
+        status = EstimateStatus.EXPIRED;
     }
 
     public UUID id() {
@@ -101,5 +139,9 @@ public class Estimate {
 
     public List<EstimateLine> lines() {
         return lines;
+    }
+
+    public EstimateStatus status() {
+        return status;
     }
 }

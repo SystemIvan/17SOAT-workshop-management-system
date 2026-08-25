@@ -36,6 +36,9 @@ public class VehicleJpaEntity implements Persistable<UUID> {
     @Column(nullable = false, length = 50)
     private String color;
 
+    @Column
+    private Long mileage;
+
     @Column(nullable = false)
     private boolean active;
 
@@ -51,6 +54,7 @@ public class VehicleJpaEntity implements Persistable<UUID> {
             String model,
             int modelYear,
             String color,
+            Long mileage,
             boolean active) {
         this.id = id;
         this.customerId = customerId;
@@ -60,6 +64,7 @@ public class VehicleJpaEntity implements Persistable<UUID> {
         this.model = model;
         this.modelYear = modelYear;
         this.color = color;
+        this.mileage = mileage;
         this.active = active;
     }
 
@@ -99,6 +104,10 @@ public class VehicleJpaEntity implements Persistable<UUID> {
 
     public String getColor() {
         return color;
+    }
+
+    public Long getMileage() {
+        return mileage;
     }
 
     public boolean isActive() {

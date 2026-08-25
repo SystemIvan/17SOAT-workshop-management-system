@@ -20,7 +20,8 @@ public class EstimatePersistenceMapper {
                 estimate.diagnosisId(),
                 estimate.customerId(),
                 estimate.createdAt(),
-                estimate.expiresAt()
+                estimate.expiresAt(),
+                estimate.status()
         );
 
         for (int lineIndex = 0; lineIndex < estimate.lines().size(); lineIndex++) {
@@ -72,7 +73,8 @@ public class EstimatePersistenceMapper {
                 entity.getCustomerId(),
                 entity.getCreatedAt(),
                 entity.getExpiresAt(),
-                lines
+                lines,
+                entity.getStatus()
         );
     }
 

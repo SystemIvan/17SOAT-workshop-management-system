@@ -1,6 +1,7 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.estimate.application.usecase;
 
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.Estimate;
+import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateStatus;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.repository.EstimateRepository;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.DiagnosisItem;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Money;
@@ -62,7 +63,11 @@ class GenerateEstimateUseCaseTest {
         );
 
         serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
-        serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), java.time.Instant.EPOCH);
+        serviceOrder.performDiagnosis(
+                List.of(item),
+                UUID.randomUUID(),
+                java.time.Instant.EPOCH
+        );
 
         UUID diagnosisId = serviceOrder.openDiagnosisId();
 
@@ -89,30 +94,67 @@ class GenerateEstimateUseCaseTest {
         assertEquals(diagnosisId, estimate.diagnosisId());
         assertEquals(customerId, estimate.customerId());
         assertEquals(NOW, estimate.createdAt());
-        assertEquals(NOW.plusSeconds(48 * 60 * 60), estimate.expiresAt());
+        assertEquals(
+                NOW.plusSeconds(48 * 60 * 60),
+                estimate.expiresAt()
+        );
 
         assertEquals(1, estimate.lines().size());
-        assertEquals("Troca de oleo", estimate.lines().getFirst().serviceName());
+        assertEquals(
+                "Troca de oleo",
+                estimate.lines().getFirst().serviceName()
+        );
         assertEquals(
                 Money.brl(new BigDecimal("120.00")),
                 estimate.lines().getFirst().servicePrice()
         );
 
-        assertEquals(1, estimate.lines().getFirst().stockItems().size());
+        assertEquals(
+                1,
+                estimate.lines().getFirst().stockItems().size()
+        );
         assertEquals(
                 "Filtro de oleo",
-                estimate.lines().getFirst().stockItems().getFirst().nameSnapshot()
+                estimate.lines()
+                        .getFirst()
+                        .stockItems()
+                        .getFirst()
+                        .nameSnapshot()
         );
 
-        assertEquals(estimate.id(), result.event().estimateId());
-        assertEquals(customerId, result.event().customerId());
-        assertEquals(estimate.expiresAt(), result.event().expiresAt());
+        assertEquals(
+                estimate.id(),
+                result.event().estimateId()
+        );
+        assertEquals(
+                customerId,
+                result.event().customerId()
+        );
+        assertEquals(
+                estimate.expiresAt(),
+                result.event().expiresAt()
+        );
 
-        assertTrue(estimates.findById(estimate.id()).isPresent());
+        assertTrue(
+                estimates.findById(estimate.id()).isPresent()
+        );
+        assertEquals(
+                EstimateStatus.SENT,
+                estimates.findById(estimate.id())
+                        .orElseThrow()
+                        .status()
+        );
 
         // Gerar orçamento não significa aprovação do cliente.
-        assertEquals(diagnosisId, serviceOrder.openDiagnosisId());
-        assertTrue(serviceOrder.serviceExecutions().getFirst().stockRequirementsFrozen());
+        assertEquals(
+                diagnosisId,
+                serviceOrder.openDiagnosisId()
+        );
+        assertTrue(
+                serviceOrder.serviceExecutions()
+                        .getFirst()
+                        .stockRequirementsFrozen()
+        );
     }
 
     @Test
@@ -120,7 +162,8 @@ class GenerateEstimateUseCaseTest {
         ServiceOrder serviceOrder = diagnosedServiceOrder();
         UUID diagnosisId = serviceOrder.openDiagnosisId();
 
-        ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+        ApplicationEventPublisher eventPublisher =
+                mock(ApplicationEventPublisher.class);
 
         GenerateEstimateUseCase useCase =
                 new GenerateEstimateUseCase(
@@ -159,7 +202,10 @@ class GenerateEstimateUseCaseTest {
 
         assertThrows(
                 IllegalStateException.class,
-                () -> useCase.execute(serviceOrder.id(), diagnosisId)
+                () -> useCase.execute(
+                        serviceOrder.id(),
+                        diagnosisId
+                )
         );
     }
 
@@ -205,7 +251,12 @@ class GenerateEstimateUseCaseTest {
         ServiceOrder serviceOrder = ServiceOrder.create(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015),
+                new VehicleSnapshot(
+                        "ABC1D23",
+                        "Fiat",
+                        "Uno",
+                        2015
+                ),
                 "Initial assessment"
         );
 
@@ -216,8 +267,15 @@ class GenerateEstimateUseCaseTest {
                 List.of()
         );
 
-        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
-        serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), java.time.Instant.EPOCH);
+        serviceOrder.assignDiagnosisAssignee(
+                UUID.randomUUID()
+        );
+
+        serviceOrder.performDiagnosis(
+                List.of(item),
+                UUID.randomUUID(),
+                java.time.Instant.EPOCH
+        );
 
         return serviceOrder;
     }
@@ -225,9 +283,12 @@ class GenerateEstimateUseCaseTest {
     private static final class InMemoryServiceOrderRepository
             implements ServiceOrderRepository {
 
-        private final Map<UUID, ServiceOrder> data = new HashMap<>();
+        private final Map<UUID, ServiceOrder> data =
+                new HashMap<>();
 
-        private InMemoryServiceOrderRepository(ServiceOrder... orders) {
+        private InMemoryServiceOrderRepository(
+                ServiceOrder... orders) {
+
             for (ServiceOrder order : orders) {
                 data.put(order.id(), order);
             }
@@ -247,7 +308,8 @@ class GenerateEstimateUseCaseTest {
     private static final class InMemoryEstimateRepository
             implements EstimateRepository {
 
-        private final Map<UUID, Estimate> data = new HashMap<>();
+        private final Map<UUID, Estimate> data =
+                new HashMap<>();
 
         @Override
         public Optional<Estimate> findById(UUID id) {
@@ -258,7 +320,24 @@ class GenerateEstimateUseCaseTest {
         public boolean existsByDiagnosisId(UUID diagnosisId) {
             return data.values().stream()
                     .anyMatch(estimate ->
-                            estimate.diagnosisId().equals(diagnosisId));
+                            estimate.diagnosisId()
+                                    .equals(diagnosisId));
+        }
+
+        @Override
+        public List<Estimate> findSentExpiredAtOrBefore(
+                Instant now) {
+
+            return data.values().stream()
+                    .filter(estimate ->
+                            estimate.status()
+                                    == EstimateStatus.SENT)
+                    .filter(estimate ->
+                            estimate.expiresAt() != null)
+                    .filter(estimate ->
+                            !estimate.expiresAt()
+                                    .isAfter(now))
+                    .toList();
         }
 
         @Override

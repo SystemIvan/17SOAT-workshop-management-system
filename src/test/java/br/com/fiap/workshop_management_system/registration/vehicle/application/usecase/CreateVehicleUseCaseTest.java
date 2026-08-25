@@ -70,6 +70,7 @@ class CreateVehicleUseCaseTest {
         assertEquals(customerId, response.customerId());
         assertEquals("ABC1234", response.licensePlate());
         assertNull(response.chassis());
+        assertNull(response.mileage());
         assertTrue(response.active());
         assertTrue(customer.active());
         verify(vehicleRepository, never()).existsByChassisNumber(org.mockito.ArgumentMatchers.any());
@@ -85,6 +86,19 @@ class CreateVehicleUseCaseTest {
         assertEquals("ABC1D23", response.licensePlate());
         assertEquals("9BWZZZ377VT004251", response.chassis());
         verify(vehicleRepository).existsByChassisNumber(new ChassisNumber("9BWZZZ377VT004251"));
+    }
+
+    @Test
+    void createsVehicleWithOptionalInitialMileage() {
+        UUID customerId = UUID.randomUUID();
+        when(customerRepository.findByIdForUpdate(customerId)).thenReturn(Optional.of(customer()));
+
+        VehicleResponse response = useCase.execute(request(customerId, "ABC1234", null, 42_500L));
+
+        assertEquals(42_500L, response.mileage());
+        ArgumentCaptor<Vehicle> captor = ArgumentCaptor.forClass(Vehicle.class);
+        verify(vehicleRepository).save(captor.capture());
+        assertEquals(42_500, captor.getValue().mileage().orElseThrow().value());
     }
 
     @Test
@@ -133,7 +147,7 @@ class CreateVehicleUseCaseTest {
     @Test
     void validatesVehicleBeforeConsultingRepositories() {
         CreateVehicleRequest invalidRequest = new CreateVehicleRequest(UUID.randomUUID(), "invalid", null,
-                "Brand", "Model", 2026, "Color");
+                "Brand", "Model", 2026, "Color", null);
 
         assertThrows(IllegalArgumentException.class, () -> useCase.execute(invalidRequest));
 
@@ -141,7 +155,12 @@ class CreateVehicleUseCaseTest {
     }
 
     private static CreateVehicleRequest request(UUID customerId, String plate, String chassis) {
-        return new CreateVehicleRequest(customerId, plate, chassis, "Volkswagen", "Gol", 2026, "Prata");
+        return request(customerId, plate, chassis, null);
+    }
+
+    private static CreateVehicleRequest request(UUID customerId, String plate, String chassis, Long mileage) {
+        return new CreateVehicleRequest(customerId, plate, chassis,
+                "Volkswagen", "Gol", 2026, "Prata", mileage);
     }
 
     private static Customer customer() {

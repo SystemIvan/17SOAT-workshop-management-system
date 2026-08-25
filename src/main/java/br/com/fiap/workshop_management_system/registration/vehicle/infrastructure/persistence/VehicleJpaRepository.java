@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,6 +17,8 @@ public interface VehicleJpaRepository extends JpaRepository<VehicleJpaEntity, UU
     boolean existsByChassisNumber(String chassisNumber);
 
     boolean existsByChassisNumberAndIdNot(String chassisNumber, UUID id);
+
+    List<VehicleJpaEntity> findAllByActiveTrue();
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select vehicle from VehicleJpaEntity vehicle where vehicle.id = :id")

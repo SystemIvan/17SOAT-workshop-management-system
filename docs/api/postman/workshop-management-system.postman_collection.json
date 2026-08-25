@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "c0d4f6e8-0f31-4d2f-9ba8-17f0b5fe2026",
     "name": "Workshop Management System",
-    "description": "Coleção da API REST agrupada por contexto delimitado.",
+    "description": "REST API collection grouped by bounded context.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -37,8 +37,9 @@
               "request": {
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Maria Silva\",\n  \"document\": \"529.982.247-25\",\n  \"contactInfo\": {\n    \"email\": \"maria@example.test\",\n    \"phone\": \"+5511999999999\"\n  }\n}" },
-                "url": "{{baseUrl}}/api/customers"
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Maria Silva\",\n  \"document\": \"529.982.247-25\",\n  \"contactInfo\": {\n    \"email\": \"maria@example.test\",\n    \"phone\": \"+5511999999999\",\n    \"address\": {\n      \"street\": \"Avenida Paulista\",\n      \"number\": \"1000\",\n      \"complement\": \"Conjunto 101\",\n      \"neighborhood\": \"Bela Vista\",\n      \"city\": \"São Paulo\",\n      \"state\": \"SP\",\n      \"postalCode\": \"01310-100\"\n    }\n  }\n}" },
+                "url": "{{baseUrl}}/api/customers",
+                "description": "Shows every accepted field. The complete address object is optional."
               }
             },
             { "name": "Get customer", "request": { "method": "GET", "url": "{{baseUrl}}/api/customers/{{customerId}}" } },
@@ -54,21 +55,13 @@
               }
             },
             {
-              "name": "Update customer email",
+              "name": "Update customer contact information",
               "request": {
                 "method": "PATCH",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"contactInfo\": {\n    \"email\": \"maria.souza@example.test\"\n  }\n}" },
-                "url": "{{baseUrl}}/api/customers/{{customerId}}/contact-info"
-              }
-            },
-            {
-              "name": "Add or replace customer address",
-              "request": {
-                "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"contactInfo\": {\n    \"address\": {\n      \"street\": \"Avenida Paulista\",\n      \"number\": \"1000\",\n      \"complement\": \"Conjunto 101\",\n      \"neighborhood\": \"Bela Vista\",\n      \"city\": \"São Paulo\",\n      \"state\": \"SP\",\n      \"postalCode\": \"01310-100\"\n    }\n  }\n}" },
-                "url": "{{baseUrl}}/api/customers/{{customerId}}/contact-info"
+                "body": { "mode": "raw", "raw": "{\n  \"contactInfo\": {\n    \"email\": \"maria.souza@example.test\",\n    \"phone\": \"+5511988887777\",\n    \"address\": {\n      \"street\": \"Avenida Paulista\",\n      \"number\": \"1000\",\n      \"complement\": \"Conjunto 101\",\n      \"neighborhood\": \"Bela Vista\",\n      \"city\": \"São Paulo\",\n      \"state\": \"SP\",\n      \"postalCode\": \"01310-100\"\n    }\n  }\n}" },
+                "url": "{{baseUrl}}/api/customers/{{customerId}}/contact-info",
+                "description": "Shows every accepted field in one partial update. At least one field is required; omitted fields are preserved, and an address must be complete when provided."
               }
             },
             {
@@ -84,7 +77,7 @@
           "name": "Vehicle",
           "item": [
             {
-              "name": "Create vehicle with chassis",
+              "name": "Create vehicle",
               "event": [{
                 "listen": "test",
                 "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('vehicleId', pm.response.json().id); }"] }
@@ -92,51 +85,53 @@
               "request": {
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"licensePlate\": \"ABC-1234\",\n  \"chassis\": \"9BWZZZ377VT004251\",\n  \"brand\": \"Volkswagen\",\n  \"model\": \"Gol\",\n  \"year\": 2026,\n  \"color\": \"Prata\"\n}" },
-                "url": "{{baseUrl}}/api/vehicles"
+                "body": { "mode": "raw", "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"licensePlate\": \"ABC-1234\",\n  \"chassis\": \"9BWZZZ377VT004251\",\n  \"brand\": \"Volkswagen\",\n  \"model\": \"Gol\",\n  \"year\": 2026,\n  \"color\": \"Prata\",\n  \"mileage\": 42500\n}" },
+                "url": "{{baseUrl}}/api/vehicles",
+                "description": "Shows every accepted field. Chassis and mileage are optional."
               }
             },
             {
-              "name": "Create vehicle without chassis",
-              "event": [{
-                "listen": "test",
-                "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('vehicleId', pm.response.json().id); }"] }
-              }],
+              "name": "Get vehicle",
               "request": {
-                "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"licensePlate\": \"BRA2E19\",\n  \"brand\": \"Fiat\",\n  \"model\": \"Argo\",\n  \"year\": 2025,\n  \"color\": \"Branco\"\n}" },
-                "url": "{{baseUrl}}/api/vehicles"
+                "method": "GET",
+                "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
+                "description": "Returns the complete historical representation of an active or archived vehicle."
               }
             },
             {
-              "name": "Atualizar veículo preservando chassi",
+              "name": "List vehicles",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/vehicles",
+                "description": "Returns a non-paginated array containing only active vehicles."
+              }
+            },
+            {
+              "name": "Update vehicle details",
               "request": {
                 "method": "PATCH",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"brand\": \"Volkswagen\",\n  \"model\": \"Polo\",\n  \"year\": 2026,\n  \"color\": \"Azul\"\n}" },
+                "body": { "mode": "raw", "raw": "{\n  \"brand\": \"Volkswagen\",\n  \"model\": \"Polo\",\n  \"year\": 2026,\n  \"color\": \"Azul\",\n  \"chassis\": \"9BWZZZ377VT009999\"\n}" },
                 "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
-                "description": "Atualiza os dados descritivos. Chassi omitido, nulo, vazio ou em branco preserva o valor atual."
+                "description": "Shows every accepted field. Brand, model, year and color are required; an omitted, null, empty or blank chassis preserves the current value."
               }
             },
             {
-              "name": "Atualizar veículo incluindo chassi",
+              "name": "Update vehicle mileage",
               "request": {
                 "method": "PATCH",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"brand\": \"Fiat\",\n  \"model\": \"Argo\",\n  \"year\": 2025,\n  \"color\": \"Branco\",\n  \"chassis\": \"9BD17164G72999999\"\n}" },
-                "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
-                "description": "Inclui um chassi válido quando o veículo ainda não possui esse dado."
+                "body": { "mode": "raw", "raw": "{\n  \"mileage\": 43000\n}" },
+                "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}/mileage",
+                "description": "Records the first mileage reading or a greater value. Repeating the current value is idempotent; lower values return 409."
               }
             },
             {
-              "name": "Atualizar veículo substituindo chassi",
+              "name": "Archive vehicle",
               "request": {
-                "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"brand\": \"Honda\",\n  \"model\": \"City\",\n  \"year\": 2024,\n  \"color\": \"Cinza\",\n  \"chassis\": \"93HGM2630DZ999999\"\n}" },
+                "method": "DELETE",
                 "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
-                "description": "Substitui o chassi atual quando o novo valor é válido e não pertence a outro veículo."
+                "description": "Archives a vehicle without deleting its history. Repeating the request is idempotent."
               }
             }
           ]
@@ -417,7 +412,8 @@
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"decisions\": [\n    { \"serviceExecutionId\": \"{{executionId}}\", \"decision\": \"APPROVED\" }\n  ]\n}" },
-            "url": "{{baseUrl}}/api/estimates/{{estimateId}}/decisions"
+            "url": "{{baseUrl}}/api/estimates/{{estimateId}}/decisions",
+            "description": "Retorna 409/INVALID_STATE_TRANSITION se a service execution não estiver PENDING ou se a estimate não estiver SENT (ex.: já CLOSED por uma decisão anterior ter fechado todas as linhas)."
           }
         }
       ]

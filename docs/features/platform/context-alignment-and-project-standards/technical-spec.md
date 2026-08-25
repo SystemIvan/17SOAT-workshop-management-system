@@ -14,7 +14,7 @@ The direct application modules become `registration`, `servicelifecycle` and `st
 below their owner without changing behavior. Nested documented packages reserve the remaining aggregates from the board.
 
 Technician remains an internal Service Lifecycle capability because it supports assignment and execution but is not a
-separate context in the map. Notification delivery follows the consumer-owned port decision in ADR 002.
+separate context in the map. Notification delivery follows the consumer-owned port decision in ADR-004.
 
 ## Interfaces and data flow
 

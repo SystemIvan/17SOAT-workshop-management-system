@@ -1,5 +1,7 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.estimate.infrastructure.web;
 
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.infrastructure.web
+        .ServiceOrderHttpTestFixture;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +38,9 @@ class EstimateControllerDecideLinesTest {
     }
 
     private String createServiceOrder() throws Exception {
+        UUID customerId = UUID.randomUUID();
+        UUID vehicleId = UUID.randomUUID();
+        ServiceOrderHttpTestFixture.persistActiveVehicle(context, customerId, vehicleId);
         String body = """
                 {
                   "customerId": "%s",
@@ -43,7 +48,7 @@ class EstimateControllerDecideLinesTest {
                   "vehicleSnapshot": {"licensePlate": "ABC1D23", "brand": "Fiat", "model": "Uno", "year": 2015},
                   "priority": "NORMAL", "initialAssessment": "Initial assessment"
                 }
-                """.formatted(UUID.randomUUID(), UUID.randomUUID());
+                """.formatted(customerId, vehicleId);
         MvcResult result = mockMvc.perform(post("/api/service-orders")
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated())
@@ -71,6 +76,34 @@ class EstimateControllerDecideLinesTest {
         String content = result.getResponse().getContentAsString();
         return new DiagnosedExecution(
                 JsonPath.read(content, "$.executions[0].id"),
+                JsonPath.read(content, "$.executions[0].diagnosisId"));
+    }
+
+    private record DiagnosedExecutionPair(String firstExecutionId, String secondExecutionId, String diagnosisId) {
+    }
+
+    private DiagnosedExecutionPair diagnoseWithTwoExecutions(String serviceOrderId) throws Exception {
+        String technicianId = assignDiagnosisAssignee(serviceOrderId);
+        String body = """
+                {
+                  "diagnosedByTechnicianId": "%s",
+                  "items": [
+                    {"catalogServiceId": "%s", "name": "Troca de óleo", "price": {"value": 100.00, "currency": "BRL"}},
+                    {"catalogServiceId": "%s", "name": "Alinhamento", "price": {"value": 80.00, "currency": "BRL"}}
+                  ]
+                }
+                """.formatted(
+                        technicianId,
+                        createActiveCatalogService(mockMvc),
+                        createActiveCatalogService(mockMvc));
+        MvcResult result = mockMvc.perform(post("/api/service-orders/{id}/diagnosis", serviceOrderId)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andReturn();
+        String content = result.getResponse().getContentAsString();
+        return new DiagnosedExecutionPair(
+                JsonPath.read(content, "$.executions[0].id"),
+                JsonPath.read(content, "$.executions[1].id"),
                 JsonPath.read(content, "$.executions[0].diagnosisId"));
     }
 
@@ -157,6 +190,29 @@ class EstimateControllerDecideLinesTest {
 
     @Test
     void returnsConflictWhenServiceExecutionIsNotPending() throws Exception {
+        // Two lines so the Estimate stays SENT (not CLOSED) after the first decision, isolating the
+        // per-ServiceExecution PENDING check from the Estimate-status check covered by
+        // returnsConflictWhenEstimateIsAlreadyClosed.
+        String serviceOrderId = createServiceOrder();
+        DiagnosedExecutionPair executions = diagnoseWithTwoExecutions(serviceOrderId);
+        String estimateId = generateEstimate(serviceOrderId, executions.diagnosisId());
+
+        String body = """
+                {"decisions":[{"serviceExecutionId":"%s","decision":"APPROVED"}]}
+                """.formatted(executions.firstExecutionId());
+
+        mockMvc.perform(post("/api/estimates/{estimateId}/decisions", estimateId)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/estimates/{estimateId}/decisions", estimateId)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_STATE_TRANSITION"));
+    }
+
+    @Test
+    void returnsConflictWhenEstimateIsAlreadyClosed() throws Exception {
         String serviceOrderId = createServiceOrder();
         DiagnosedExecution execution = diagnoseWithOneExecution(serviceOrderId);
         String estimateId = generateEstimate(serviceOrderId, execution.diagnosisId());
@@ -165,6 +221,7 @@ class EstimateControllerDecideLinesTest {
                 {"decisions":[{"serviceExecutionId":"%s","decision":"APPROVED"}]}
                 """.formatted(execution.executionId());
 
+        // The only line is decided, so this first call also closes the Estimate.
         mockMvc.perform(post("/api/estimates/{estimateId}/decisions", estimateId)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk());

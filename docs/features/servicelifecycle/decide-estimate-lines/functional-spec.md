@@ -37,15 +37,17 @@ não pode ser decidida de novo (nem `APPROVED` nem `REJECTED`) — `IllegalState
 ## Nota sobre AD-008
 
 `docs/Architecture-Decisions.md` lista **AD-008** (granularidade de aprovação da Estimate) como
-`Team Decision Required`, com a Option A recomendada (decisão por linha, `ServiceExecution` a
-`ServiceExecution`, em vez da Estimate inteira de uma vez). O **código já implementa a Option A** hoje:
+`Resolved` (ratificada pelo time em 2026-08-23): Option A — decisão por linha, `ServiceExecution` a
+`ServiceExecution`, com a Estimate rastreada por status (`draft`/`sent`/`closed`/`expired`) em vez de um
+único approve/reject na Estimate inteira. O **código já implementa a metade "por linha" da Option A**:
 `ServiceOrder.authorizeExecutionFromEstimate(estimateId, serviceExecutionId)` e
 `ServiceOrder.rejectExecutionFromEstimate(estimateId, serviceExecutionId)` já existem e já operam por
-`ServiceExecution`, não pela Estimate como um todo — só não têm nenhum caso de uso ou endpoint HTTP que
-os chame ainda. Esta feature expõe essa capacidade já modelada; **não** introduz um campo de status na
-Estimate (`draft`/`sent`/`closed`/`expired`, o restante do escopo de AD-008), que continua em aberto e
-fora desta entrega. A fonte de verdade da decisão continua sendo o status do `ServiceExecution` dentro
-da `ServiceOrder` — o mesmo princípio já registrado em `estimate-generation`.
+`ServiceExecution`, não pela Estimate como um todo. Esta feature expõe essa capacidade já modelada; **não**
+introduz o campo de status na Estimate (`draft`/`sent`/`closed`/`expired`) — essa parte de AD-008, embora já
+aprovada, permanece um gap de implementação separado (fora desta entrega; ver `Fora de escopo` abaixo) e
+precisa de sua própria feature sob o gate de SDD do `AGENTS.md`. A fonte de verdade da decisão continua
+sendo o status do `ServiceExecution` dentro da `ServiceOrder` — o mesmo princípio já registrado em
+`estimate-generation`.
 
 ## Problema e resultado esperado
 
@@ -108,7 +110,8 @@ Ao final da decisão:
 
 ## Fora de escopo
 
-- introduzir um campo de status na Estimate (`draft`/`sent`/`closed`/`expired` — AD-008 continua aberto);
+- introduzir um campo de status na Estimate (`draft`/`sent`/`closed`/`expired` — parte de AD-008 já aprovada,
+  mas ainda não implementada; requer feature própria);
 - fechar a Estimate automaticamente quando todas as linhas forem decididas;
 - expiração da Estimate (AD-013, feature `send-estimate`/RF14, ainda não implementada);
 - consumo, liberação, reserva parcial ou reposição de estoque; a tentativa integral automática é o único
