@@ -10,8 +10,13 @@ public record EstimateLine(
         UUID serviceExecutionId,
         String serviceName,
         Money servicePrice,
-        List<EstimateStockItem> stockItems
+        List<EstimateStockItem> stockItems,
+        List<EstimateStockAvailability> stockAvailability
 ) {
+    public EstimateLine(UUID serviceExecutionId, String serviceName, Money servicePrice, List<EstimateStockItem> stockItems) {
+        this(serviceExecutionId, serviceName, servicePrice, stockItems, List.of());
+    }
+
     public EstimateLine {
         Objects.requireNonNull(serviceExecutionId, "serviceExecutionId must not be null");
         Objects.requireNonNull(serviceName, "serviceName must not be null");
@@ -22,5 +27,6 @@ public record EstimateLine(
         }
 
         stockItems = stockItems == null ? List.of() : List.copyOf(stockItems);
+        stockAvailability = stockAvailability == null ? List.of() : List.copyOf(stockAvailability);
     }
 }

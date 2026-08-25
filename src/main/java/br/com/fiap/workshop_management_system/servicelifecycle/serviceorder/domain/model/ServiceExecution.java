@@ -19,6 +19,7 @@ public class ServiceExecution {
     private final UUID diagnosedByTechnicianId;
     private final Instant diagnosedAt;
     private final List<StockRequirement> stockRequirements = new ArrayList<>();
+    private final List<StockAvailabilitySnapshot> stockAvailability = new ArrayList<>();
 
     private ServiceExecutionStatus status;
     private UUID authorizedByEstimateId;
@@ -67,7 +68,8 @@ public class ServiceExecution {
             Instant diagnosedAt,
             boolean stockRequirementsFrozen,
             UUID stockReservationId,
-            List<StockRequirement> stockRequirements) {
+            List<StockRequirement> stockRequirements,
+            List<StockAvailabilitySnapshot> stockAvailability) {
         ServiceExecution execution = new ServiceExecution(
                 id, diagnosisId, catalogServiceId, name, price, diagnosedByTechnicianId, diagnosedAt);
         execution.status = status;
@@ -76,6 +78,7 @@ public class ServiceExecution {
         execution.stockRequirementsFrozen = stockRequirementsFrozen;
         execution.stockReservationId = stockReservationId;
         execution.stockRequirements.addAll(stockRequirements);
+        execution.stockAvailability.addAll(stockAvailability);
         return execution;
     }
 
@@ -102,7 +105,8 @@ public class ServiceExecution {
                 null,
                 false,
                 null,
-                stockRequirements);
+                stockRequirements,
+                List.of());
     }
 
     void attachStockRequirement(StockRequirement requirement) {
@@ -139,6 +143,18 @@ public class ServiceExecution {
 
     void freezeStockRequirements() {
         stockRequirementsFrozen = true;
+    }
+
+    void replaceStockAvailability(List<StockAvailabilitySnapshot> snapshots) {
+        if (status != ServiceExecutionStatus.PENDING) {
+            throw new IllegalStateException("Stock availability can only be recorded while execution is PENDING");
+        }
+        List<StockAvailabilitySnapshot> normalized = snapshots == null ? List.of() : List.copyOf(snapshots);
+        if (normalized.stream().map(StockAvailabilitySnapshot::stockItemId).distinct().count() != normalized.size()) {
+            throw new IllegalArgumentException("Stock availability cannot contain duplicate stock items");
+        }
+        stockAvailability.clear();
+        stockAvailability.addAll(normalized);
     }
 
     void confirmStockReservation(UUID reservationId) {
@@ -244,5 +260,9 @@ public class ServiceExecution {
 
     public List<StockRequirement> stockRequirements() {
         return List.copyOf(stockRequirements);
+    }
+
+    public List<StockAvailabilitySnapshot> stockAvailability() {
+        return List.copyOf(stockAvailability);
     }
 }

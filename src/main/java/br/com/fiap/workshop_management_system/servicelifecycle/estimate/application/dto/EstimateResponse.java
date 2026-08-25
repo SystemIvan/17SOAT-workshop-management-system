@@ -3,6 +3,7 @@ package br.com.fiap.workshop_management_system.servicelifecycle.estimate.applica
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.Estimate;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateLine;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateStockItem;
+import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateStockAvailability;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -39,7 +40,8 @@ public record EstimateResponse(
             UUID serviceExecutionId,
             String serviceName,
             MoneyResponse servicePrice,
-            List<StockItemResponse> stockItems
+            List<StockItemResponse> stockItems,
+            List<StockAvailabilityResponse> stockAvailability
     ) {
         private static LineResponse from(EstimateLine line) {
             return new LineResponse(
@@ -51,8 +53,23 @@ public record EstimateResponse(
                     ),
                     line.stockItems().stream()
                             .map(StockItemResponse::from)
-                            .toList()
+                            .toList(),
+                    line.stockAvailability().stream().map(StockAvailabilityResponse::from).toList()
             );
+        }
+    }
+
+    public record StockAvailabilityResponse(
+            UUID stockItemId,
+            int requestedQuantity,
+            int observedAvailableQuantity,
+            int shortageQuantity,
+            String status,
+            Instant observedAt) {
+        private static StockAvailabilityResponse from(EstimateStockAvailability availability) {
+            return new StockAvailabilityResponse(availability.stockItemId(), availability.requestedQuantity(),
+                    availability.observedAvailableQuantity(), availability.shortageQuantity(),
+                    availability.status().name(), availability.observedAt());
         }
     }
 

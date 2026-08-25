@@ -50,6 +50,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/technicians/**").hasAnyAuthority("MANAGER", "ADMIN")
                         .requestMatchers("/api/stock-items/**").hasAnyAuthority("MANAGER", "ADMIN")
                         .requestMatchers("/api/stock-reservations/**").hasAnyAuthority("MANAGER", "ADMIN")
+                        .requestMatchers("/api/purchase-demands/**").hasAnyAuthority("MANAGER", "ADMIN")
+                        .requestMatchers("/api/purchase-orders/**").hasAnyAuthority("MANAGER", "ADMIN")
 
                         // Customer tracking: any authenticated role, no resource-ownership check (out of
                         // scope, see functional-spec.md). Declared before the general service-orders rule.

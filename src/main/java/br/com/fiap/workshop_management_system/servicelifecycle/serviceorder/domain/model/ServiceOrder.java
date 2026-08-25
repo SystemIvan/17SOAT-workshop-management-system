@@ -169,6 +169,12 @@ public class ServiceOrder {
                 .forEach(ServiceExecution::freezeStockRequirements);
     }
 
+    public void recordStockAvailability(UUID diagnosisId, java.util.Map<UUID, List<StockAvailabilitySnapshot>> snapshots) {
+        serviceExecutions.stream()
+                .filter(execution -> execution.diagnosisId().equals(diagnosisId))
+                .forEach(execution -> execution.replaceStockAvailability(snapshots.getOrDefault(execution.id(), List.of())));
+    }
+
     /**
      * Triggered by the policy "EstimateLineService decision == approved" (Epic 2).
      * Also marks the owning diagnosis as no longer open, since an Estimate now covers it.

@@ -249,8 +249,10 @@ frente ao código real.
 
 - **ADR-003:** Authentication Strategy (Spring Security + JWT)
 - **ADR-004:** Notifications Are an Outbound Capability
-- **ADR-005:** (Futuro, número provisório) WebSocket Implementation Strategy
-- **ADR-006:** (Futuro, número provisório) Caching Strategy (SimpleCache → Redis)
+- **ADR-005:** Inter-Module Integration Contract — não relacionada à migração WebSocket; o número foi
+  usado para essa decisão. Uma futura ADR de WebSocket Implementation Strategy deve confirmar o próximo
+  número livre em `docs/adr/` no momento da criação, não reutilizar este.
+- **(Futuro, número provisório):** Caching Strategy (SimpleCache → Redis)
 
 ---
 

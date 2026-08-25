@@ -51,7 +51,10 @@ public final class ServiceOrderMapper {
                 execution.diagnosedByTechnicianId(),
                 execution.diagnosedAt(),
                 execution.stockReservationId(),
-                execution.stockRequirements().stream().map(ServiceOrderMapper::toStockRequirementResponse).toList());
+                execution.stockRequirements().stream().map(ServiceOrderMapper::toStockRequirementResponse).toList(),
+                execution.stockAvailability().stream().map(snapshot -> new StockAvailabilityResponse(
+                        snapshot.stockItemId(), snapshot.requestedQuantity(), snapshot.observedAvailableQuantity(),
+                        snapshot.shortageQuantity(), snapshot.status(), snapshot.observedAt())).toList());
     }
 
     public static VehicleSnapshot toVehicleSnapshot(VehicleSnapshotRequest request) {

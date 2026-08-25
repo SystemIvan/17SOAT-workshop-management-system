@@ -1,4 +1,16 @@
 services:
+  supplier-simulator:
+    image: wiremock/wiremock:3.13.1
+    container_name: workshop-supplier-simulator
+    command: ["--global-response-templating"]
+    ports:
+      - "${SUPPLIER_SIMULATOR_PORT:-8089}:8080"
+    volumes:
+      - ./docker/wiremock:/home/wiremock:ro
+    networks:
+      - workshop-network
+    restart: unless-stopped
+
   # MySQL Database
   mysql:
     image: mysql:8.0
@@ -40,6 +52,9 @@ services:
       SPRING_JPA_SHOW_SQL: ${SHOW_SQL:-false}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       APP_SEED_ENABLED: ${APP_SEED_ENABLED:-true}
+      SUPPLIER_BASE_URL: http://supplier-simulator:8080
+      SUPPLIER_CONNECT_TIMEOUT: ${SUPPLIER_CONNECT_TIMEOUT:-2s}
+      SUPPLIER_READ_TIMEOUT: ${SUPPLIER_READ_TIMEOUT:-5s}
       APP_SECURITY_JWT_SECRET: ${APP_SECURITY_JWT_SECRET:-change-me-to-a-random-secret-with-at-least-32-bytes}
       SERVER_PORT: 8080
       TZ: 'America/Sao_Paulo'
@@ -48,6 +63,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      supplier-simulator:
+        condition: service_started
     networks:
       - workshop-network
     restart: unless-stopped

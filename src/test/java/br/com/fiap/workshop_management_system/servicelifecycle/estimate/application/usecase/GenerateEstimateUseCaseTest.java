@@ -10,6 +10,12 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.doma
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockRequirement;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.VehicleSnapshot;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentApi;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentCommand;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentExecutionResult;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentResult;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentResultLine;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAvailabilityStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
@@ -158,6 +164,30 @@ class GenerateEstimateUseCaseTest {
     }
 
     @Test
+    void revalidatesAndCopiesAvailabilityToTheEstimate() {
+        ServiceOrder serviceOrder = diagnosedServiceOrderWithStockRequirement();
+        UUID diagnosisId = serviceOrder.openDiagnosisId();
+        UUID stockItemId = serviceOrder.serviceExecutions().getFirst().stockRequirements().getFirst().stockItemId();
+        RepairStockAssessmentApi assessmentApi = command -> assessmentResult(command, stockItemId);
+        GenerateEstimateUseCase useCase = new GenerateEstimateUseCase(
+                new InMemoryServiceOrderRepository(serviceOrder), new InMemoryEstimateRepository(), Clock.fixed(NOW, ZoneOffset.UTC),
+                event -> { }, assessmentApi);
+
+        Estimate estimate = useCase.execute(serviceOrder.id(), diagnosisId).estimate();
+
+        assertEquals(1, estimate.lines().getFirst().stockAvailability().size());
+        assertEquals(2, estimate.lines().getFirst().stockAvailability().getFirst().shortageQuantity());
+        assertEquals(2, serviceOrder.serviceExecutions().getFirst().stockAvailability().getFirst().shortageQuantity());
+    }
+
+    private static RepairStockAssessmentResult assessmentResult(RepairStockAssessmentCommand command, UUID stockItemId) {
+        UUID executionId = command.executions().getFirst().serviceExecutionId();
+        return new RepairStockAssessmentResult(List.of(new RepairStockAssessmentExecutionResult(executionId, List.of(
+                new RepairStockAssessmentResultLine(stockItemId, 3, 1, 2,
+                        RepairStockAvailabilityStatus.INSUFFICIENT_QUANTITY, NOW)))));
+    }
+
+    @Test
     void publishesEstimateGeneratedEventOnSuccess() {
         ServiceOrder serviceOrder = diagnosedServiceOrder();
         UUID diagnosisId = serviceOrder.openDiagnosisId();
@@ -277,6 +307,14 @@ class GenerateEstimateUseCaseTest {
                 java.time.Instant.EPOCH
         );
 
+        return serviceOrder;
+    }
+
+    private ServiceOrder diagnosedServiceOrderWithStockRequirement() {
+        ServiceOrder serviceOrder = diagnosedServiceOrder();
+        UUID executionId = serviceOrder.serviceExecutions().getFirst().id();
+        serviceOrder.attachStockRequirement(executionId, new StockRequirement(
+                UUID.randomUUID(), StockItemType.PART, 3, "Filtro", Money.brl(BigDecimal.ONE), false));
         return serviceOrder;
     }
 
