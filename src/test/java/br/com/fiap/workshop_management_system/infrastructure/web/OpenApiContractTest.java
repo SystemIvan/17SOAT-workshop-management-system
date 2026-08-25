@@ -60,6 +60,9 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.paths['/api/stock-items/{id}'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/stock-items/{id}'].patch").exists())
                 .andExpect(jsonPath("$.paths['/api/stock-items/{id}'].delete").exists())
+                .andExpect(jsonPath("$.paths['/api/purchase-demands'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/purchase-orders'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/purchase-orders/{purchaseOrderId}'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/parts']").doesNotExist())
                 .andExpect(jsonPath("$.paths['/api/service-orders'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}'].get").exists())
@@ -79,6 +82,36 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/finalize'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{serviceOrderId}/estimates'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/estimates/{estimateId}'].get").exists());
+    }
+
+    @Test
+    void documentPurchaseOrderCreationContract() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/purchase-demands'].get.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/api/purchase-orders'].post.responses['201']").exists())
+                .andExpect(jsonPath("$.paths['/api/purchase-orders'].post.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/api/purchase-orders'].post.responses['409']").exists())
+                .andExpect(jsonPath("$.paths['/api/purchase-orders'].post.responses['422']").exists())
+                .andExpect(jsonPath("$.paths['/api/purchase-orders'].post.responses['503']").exists())
+                .andExpect(jsonPath("$.paths['/api/purchase-orders'].post.parameters[0].name")
+                        .value("Idempotency-Key"))
+                .andExpect(jsonPath("$.paths['/api/purchase-orders'].post.parameters[0].required")
+                        .value(true))
+                .andExpect(jsonPath("$.components.schemas.CreatePurchaseOrderRequest.properties.demandIds")
+                        .exists())
+                .andExpect(jsonPath("$.components.schemas.CreatePurchaseOrderRequest.properties.lines")
+                        .exists())
+                .andExpect(jsonPath("$.components.schemas.CreatePurchaseOrderRequest.properties.status")
+                        .doesNotExist())
+                .andExpect(jsonPath("$.components.schemas.PurchaseOrderResponse.properties.externalReference")
+                        .exists())
+                .andExpect(jsonPath("$.components.schemas.PurchaseOrderResponse.properties.status.enum",
+                        not(hasItem("PENDING_SUBMISSION"))))
+                .andExpect(jsonPath("$.paths['/api/purchase-orders/{purchaseOrderId}'].get.responses['200']")
+                        .exists())
+                .andExpect(jsonPath("$.paths['/api/purchase-orders/{purchaseOrderId}'].get.responses['404']")
+                        .exists());
     }
 
     @Test
