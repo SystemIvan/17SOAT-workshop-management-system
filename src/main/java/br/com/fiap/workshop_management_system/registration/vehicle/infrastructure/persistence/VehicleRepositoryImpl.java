@@ -11,6 +11,7 @@ import br.com.fiap.workshop_management_system.registration.vehicle.domain.reposi
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,6 +43,18 @@ public class VehicleRepositoryImpl implements VehicleRepository {
     @Override
     public Optional<Vehicle> findByIdForUpdate(UUID id) {
         return jpaRepository.findByIdForUpdate(id).map(mapper::toDomain);
+    }
+
+    @Override
+    public Optional<Vehicle> findById(UUID id) {
+        return jpaRepository.findById(id).map(mapper::toDomain);
+    }
+
+    @Override
+    public List<Vehicle> findAllActive() {
+        return jpaRepository.findAllByActiveTrue().stream()
+                .map(mapper::toDomain)
+                .toList();
     }
 
     @Override

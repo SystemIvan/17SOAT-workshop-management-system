@@ -57,7 +57,8 @@ public class Estimate {
                 createdAt,
                 expiresAt,
                 lines,
-                EstimateStatus.DRAFT);
+                EstimateStatus.DRAFT
+        );
     }
 
     public static Estimate reconstitute(
@@ -78,12 +79,15 @@ public class Estimate {
                 createdAt,
                 expiresAt,
                 lines,
-                status);
+                status
+        );
     }
 
     public void markSent() {
         if (status != EstimateStatus.DRAFT) {
-            throw new IllegalStateException("Estimate must be DRAFT to be sent: " + id);
+            throw new IllegalStateException(
+                    "Estimate must be DRAFT to be sent: " + id
+            );
         }
 
         status = EstimateStatus.SENT;
@@ -91,10 +95,22 @@ public class Estimate {
 
     public void close() {
         if (status != EstimateStatus.SENT) {
-            throw new IllegalStateException("Estimate must be SENT to be closed: " + id);
+            throw new IllegalStateException(
+                    "Estimate must be SENT to be closed: " + id
+            );
         }
 
         status = EstimateStatus.CLOSED;
+    }
+
+    public void expire() {
+        if (status != EstimateStatus.SENT) {
+            throw new IllegalStateException(
+                    "Estimate must be SENT to expire: " + id
+            );
+        }
+
+        status = EstimateStatus.EXPIRED;
     }
 
     public UUID id() {

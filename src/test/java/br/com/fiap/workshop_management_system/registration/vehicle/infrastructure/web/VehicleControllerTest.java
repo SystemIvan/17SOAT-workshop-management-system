@@ -21,6 +21,7 @@ import java.time.Year;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -73,6 +74,7 @@ class VehicleControllerTest {
                 .andExpect(jsonPath("$.customerId").value(customer.id().toString()))
                 .andExpect(jsonPath("$.licensePlate").value("ABC1234"))
                 .andExpect(jsonPath("$.chassis").value(chassis))
+                .andExpect(jsonPath("$.mileage").value(nullValue()))
                 .andExpect(jsonPath("$.active").value(true))
                 .andReturn();
 
@@ -89,7 +91,44 @@ class VehicleControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bodyWithoutChassis(customer.id().toString(), nextPlate())))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.chassis").value(org.hamcrest.Matchers.nullValue()));
+                .andExpect(jsonPath("$.chassis").value(nullValue()))
+                .andExpect(jsonPath("$.mileage").value(nullValue()));
+    }
+
+    @Test
+    void createsVehicleWithInitialMileageAndAcceptsExplicitNull() throws Exception {
+        Customer customer = persistCustomer(false);
+
+        MvcResult withMileage = mockMvc.perform(post("/api/vehicles")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bodyWithMileage(customer.id().toString(), nextPlate(), "42500")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mileage").value(42_500))
+                .andReturn();
+        String id = com.jayway.jsonpath.JsonPath.read(withMileage.getResponse().getContentAsString(), "$.id");
+        assertEquals(42_500L, vehicleRepository.findById(java.util.UUID.fromString(id)).orElseThrow().getMileage());
+
+        mockMvc.perform(post("/api/vehicles")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bodyWithMileage(customer.id().toString(), nextPlate(), "null")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mileage").value(nullValue()));
+    }
+
+    @Test
+    void rejectsInvalidInitialMileageRepresentations() throws Exception {
+        Customer customer = persistCustomer(false);
+        String[] invalidMileageValues = {
+                "-1", "1.5", "\"42500\"", "true", "[]", "{}", "9223372036854775808"
+        };
+
+        for (String mileage : invalidMileageValues) {
+            mockMvc.perform(post("/api/vehicles")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(bodyWithMileage(customer.id().toString(), nextPlate(), mileage)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        }
     }
 
     @Test
@@ -192,6 +231,20 @@ class VehicleControllerTest {
                   "color": "Prata"
                 }
                 """.formatted(customerId, licensePlate, Year.now().getValue());
+    }
+
+    private static String bodyWithMileage(String customerId, String licensePlate, String mileageJson) {
+        return """
+                {
+                  "customerId": "%s",
+                  "licensePlate": "%s",
+                  "brand": "Volkswagen",
+                  "model": "Gol",
+                  "year": %d,
+                  "color": "Prata",
+                  "mileage": %s
+                }
+                """.formatted(customerId, licensePlate, Year.now().getValue(), mileageJson);
     }
 
     private static String nextPlate() {

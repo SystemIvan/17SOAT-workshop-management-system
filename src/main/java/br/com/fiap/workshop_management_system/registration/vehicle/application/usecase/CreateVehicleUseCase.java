@@ -13,6 +13,7 @@ import br.com.fiap.workshop_management_system.registration.vehicle.application.e
         .VehicleLicensePlateAlreadyExistsException;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.ChassisNumber;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.LicensePlate;
+import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.Mileage;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.Vehicle;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.model.VehicleYear;
 import br.com.fiap.workshop_management_system.registration.vehicle.domain.repository.VehicleRepository;
@@ -43,8 +44,9 @@ public class CreateVehicleUseCase {
         LicensePlate licensePlate = new LicensePlate(request.licensePlate());
         ChassisNumber chassisNumber = request.chassis() == null ? null : new ChassisNumber(request.chassis());
         VehicleYear vehicleYear = VehicleYear.create(request.year(), Year.now(clock).getValue());
+        Mileage mileage = request.mileage() == null ? null : new Mileage(request.mileage());
         Vehicle vehicle = Vehicle.create(request.customerId(), licensePlate, chassisNumber,
-                request.brand(), request.model(), vehicleYear, request.color());
+                request.brand(), request.model(), vehicleYear, request.color(), mileage);
 
         Customer customer = customerRepository.findByIdForUpdate(request.customerId())
                 .orElseThrow(CustomerNotFoundException::new);

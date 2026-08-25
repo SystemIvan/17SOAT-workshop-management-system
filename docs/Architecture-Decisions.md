@@ -703,14 +703,9 @@ with idempotent handlers and document the reliability limitation.
 
 ### AD-013 — Define Estimate expiration duration and mechanism
 
-**Status:** Team Decision Required
+**Status:** Resolved (2026-08-24)
 
 **Scope:** Another team member's scope
-
-**Blocking:**
-
-- Blocks RF17 and Estimate expiry tests.
-- Does not block Ivan.
 
 **Related Epic / responsibility:** Epic 2.
 
@@ -719,29 +714,41 @@ with idempotent handlers and document the reliability limitation.
 **Why this is a decision rather than an implementation gap:** Both the duration rule and scheduler semantics are
 business/architecture choices, not missing boilerplate.
 
-**Conflicting evidence:** Miro contains 24 h, 48 h and 48 h + estimated restock time. Refinement marks scheduling
-as pending (job, delayed messaging, etc.).
+**Conflicting evidence (resolved):** Miro contained three candidate rules (24 h, 48 h, 48 h + estimated restock
+time). The Miro board's official rule, confirmed 2026-08-24, is **availability-dependent**: notify the Customer
+with an approval window of **24 hours when every quoted stock item is available**, or **48 hours plus the
+estimated restock lead time when any quoted stock item is unavailable**. This matches Option B below, not the
+flat-duration Option A.
 
 **Options:**
 
 Option A — Fixed deadline with a Spring scheduled job.
 
 - Advantages: simple, testable and adequate for the MVP.
-- Disadvantages: scan latency and multi-instance coordination considerations.
+- Disadvantages: does not match the official Miro rule; scan latency and multi-instance coordination
+  considerations.
 
-Option B — Availability-dependent deadline with delayed messages.
+Option B — Availability-dependent deadline with a scheduled job. — **Chosen**
 
-- Advantages: matches richer Miro rules and scales asynchronously.
-- Disadvantages: depends on ETA and messaging not otherwise required.
+- Advantages: matches the official Miro rule (24 h fully available / 48 h + restock ETA otherwise).
+- Disadvantages: depends on `EstimateLinePart` exposing stock availability/restock ETA at generation time, which
+  in turn depends on **AD-009** (not yet resolved) and on cross-module data from `stockprocurement`.
 
-**Recommended option:** Option A with one team-approved duration for Phase 1; record richer timing as deferred.
+**Chosen option:** Option B — availability-dependent deadline (24 h / 48 h + restock ETA), computed at Estimate
+generation and enforced by a scheduled job (mechanism unchanged from the existing scheduler design).
 
 **Impact of the decision:** Estimate fields/invariants, clock abstraction, scheduler, persistence query, events,
 tests, API display and Jira criteria.
 
 **Can work continue without resolving it?** Estimate draft/generation can; send/expire behavior cannot finalize.
 
-**Temporary safe assumption, if any:** Inject a clock and store `expiresAt`; do not hard-code the duration yet.
+**Implementation status (2026-08-24):** `PR #29` (`feat/servicelifecycle-estimate-expiration-rf17`,
+commit `3a8f4ee`) implemented the scheduler mechanism (`ExpireEstimatesUseCase` +
+`EstimateExpirationScheduler`, `@Scheduled` every 60 s by default) but **still computes a flat 48 h duration**
+(`GenerateEstimateUseCase.DEFAULT_EXPIRATION = Duration.ofHours(48)`), regardless of stock availability. This
+diverges from the rule ratified above and is tracked as an open implementation gap in RF17
+(see `GAPS-EPIC2-EPIC3.md`), blocked on **AD-009**. Do not treat RF17 as fully closed until the duration
+calculation is corrected.
 
 ### AD-014 — Define Notification boundary and MVP channel
 
@@ -1060,10 +1067,9 @@ AD-001 and must not be treated as approval of the shared context mapping.
   not block pure domain/use-case work while the module is implemented.
 - **AD-017 — schema migration policy:** does not block model/story planning or short-lived local work; it must be
   resolved before several epics integrate shared schema changes.
-- **AD-010 — status computation:** does not block Ivan; preserve the implemented `statusSnapshot` behavior while
-  team ratification remains pending.
-- **AD-006 through AD-009, AD-013 through AD-015, AD-018 and AD-019:** belong to the team or other owners and do not
+- **AD-006 through AD-009, AD-014, AD-015, AD-018 and AD-019:** belong to the team or other owners and do not
   block Ivan's registration backlog except through the specific integration dependencies already identified.
+  AD-010 and AD-013 are resolved (see above) and no longer part of this pending group.
 - **AD-012 — event delivery guarantees:** remains deferred and does not block registration work.
 
 ### Blocking
@@ -1087,7 +1093,6 @@ The following decisions must not be made by Ivan alone:
 | AD-007 | Owns Epic 4 aggregate/transaction boundary | Yes |
 | AD-009 | Couples Epic 2 pricing to Epic 4 stock | Yes |
 | AD-011 | Establishes all inter-module contracts | Yes with mocks |
-| AD-013 | Owns Estimate business time and scheduling | Yes |
 | AD-014 | Owns Notification module/channel | Yes |
 | AD-017 | Establishes shared database change policy | Yes briefly |
 | AD-018 | Changes external-integration/delivery scope | Yes |
@@ -1103,8 +1108,9 @@ These items do not need a new architecture decision once their related decision,
 - Implement Vehicle CRUD/validation after AD-001/AD-003.
 - Implement ServiceCatalog registration and price update after AD-001/AD-004.
 - Add ServiceOrder list endpoint and administrative filters.
-- Implement Estimate code under the resolved AD-008 per-line/`draft`-`sent`-`closed`-`expired` model, after
-  AD-009/AD-013.
+- Implement Estimate code under the resolved AD-008 per-line/`draft`-`sent`-`closed`-`expired` model. The
+  scheduler mechanism from AD-013 is implemented; correcting the expiration duration to the AD-013
+  availability-dependent rule (24 h / 48 h + restock ETA) still depends on AD-009.
 - Implement PurchaseOrder and stock reservation after AD-007.
 - Implement Notification handlers after AD-014.
 - Add Spring Security/JWT dependencies and filters after AD-016; the technology choice itself is already accepted.

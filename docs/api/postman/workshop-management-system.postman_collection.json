@@ -2,66 +2,25 @@
   "info": {
     "_postman_id": "c0d4f6e8-0f31-4d2f-9ba8-17f0b5fe2026",
     "name": "Workshop Management System",
-    "description": "Coleção da API REST agrupada por contexto delimitado.",
+    "description": "REST API collection grouped by bounded context.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:8080"
-    },
-    {
-      "key": "customerId",
-      "value": "11111111-1111-1111-1111-111111111111"
-    },
-    {
-      "key": "customerTaxId",
-      "value": "52998224725"
-    },
-    {
-      "key": "vehicleId",
-      "value": "22222222-2222-2222-2222-222222222222"
-    },
-    {
-      "key": "technicianId",
-      "value": "33333333-3333-3333-3333-333333333333"
-    },
-    {
-      "key": "stockItemId",
-      "value": "44444444-4444-4444-4444-444444444444"
-    },
-    {
-      "key": "stockReservationId",
-      "value": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    },
-    {
-      "key": "serviceOrderId",
-      "value": "55555555-5555-5555-5555-555555555555"
-    },
-    {
-      "key": "executionId",
-      "value": "66666666-6666-6666-6666-666666666666"
-    },
-    {
-      "key": "serviceExecutionId",
-      "value": "66666666-6666-6666-6666-666666666666"
-    },
-    {
-      "key": "catalogServiceId",
-      "value": "77777777-7777-7777-7777-777777777777"
-    },
-    {
-      "key": "diagnosisId",
-      "value": "88888888-8888-8888-8888-888888888888"
-    },
-    {
-      "key": "estimateId",
-      "value": "99999999-9999-9999-9999-999999999999"
-    },
-    {
-      "key": "authToken",
-      "value": ""
-    }
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "customerId", "value": "11111111-1111-1111-1111-111111111111" },
+    { "key": "customerTaxId", "value": "52998224725" },
+    { "key": "vehicleId", "value": "22222222-2222-2222-2222-222222222222" },
+    { "key": "technicianId", "value": "33333333-3333-3333-3333-333333333333" },
+    { "key": "stockItemId", "value": "44444444-4444-4444-4444-444444444444" },
+    { "key": "stockReservationId", "value": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" },
+    { "key": "serviceOrderId", "value": "55555555-5555-5555-5555-555555555555" },
+    { "key": "executionId", "value": "66666666-6666-6666-6666-666666666666" },
+    { "key": "serviceExecutionId", "value": "66666666-6666-6666-6666-666666666666" },
+    { "key": "catalogServiceId", "value": "77777777-7777-7777-7777-777777777777" },
+    { "key": "archiveCatalogServiceId", "value": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" },
+    { "key": "diagnosisId", "value": "88888888-8888-8888-8888-888888888888" },
+    { "key": "estimateId", "value": "99999999-9999-9999-9999-999999999999" },
+    { "key": "authToken", "value": "" }
   ],
   "item": [
     {
@@ -136,17 +95,10 @@
               ],
               "request": {
                 "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"name\": \"Maria Silva\",\n  \"document\": \"529.982.247-25\",\n  \"contactInfo\": {\n    \"email\": \"maria@example.test\",\n    \"phone\": \"+5511999999999\"\n  }\n}"
-                },
-                "url": "{{baseUrl}}/api/customers"
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Maria Silva\",\n  \"document\": \"529.982.247-25\",\n  \"contactInfo\": {\n    \"email\": \"maria@example.test\",\n    \"phone\": \"+5511999999999\",\n    \"address\": {\n      \"street\": \"Avenida Paulista\",\n      \"number\": \"1000\",\n      \"complement\": \"Conjunto 101\",\n      \"neighborhood\": \"Bela Vista\",\n      \"city\": \"São Paulo\",\n      \"state\": \"SP\",\n      \"postalCode\": \"01310-100\"\n    }\n  }\n}" },
+                "url": "{{baseUrl}}/api/customers",
+                "description": "Shows every accepted field. The complete address object is optional."
               }
             },
             {
@@ -188,37 +140,13 @@
               }
             },
             {
-              "name": "Update customer email",
+              "name": "Update customer contact information",
               "request": {
                 "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"contactInfo\": {\n    \"email\": \"maria.souza@example.test\"\n  }\n}"
-                },
-                "url": "{{baseUrl}}/api/customers/{{customerId}}/contact-info"
-              }
-            },
-            {
-              "name": "Add or replace customer address",
-              "request": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"contactInfo\": {\n    \"address\": {\n      \"street\": \"Avenida Paulista\",\n      \"number\": \"1000\",\n      \"complement\": \"Conjunto 101\",\n      \"neighborhood\": \"Bela Vista\",\n      \"city\": \"São Paulo\",\n      \"state\": \"SP\",\n      \"postalCode\": \"01310-100\"\n    }\n  }\n}"
-                },
-                "url": "{{baseUrl}}/api/customers/{{customerId}}/contact-info"
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"contactInfo\": {\n    \"email\": \"maria.souza@example.test\",\n    \"phone\": \"+5511988887777\",\n    \"address\": {\n      \"street\": \"Avenida Paulista\",\n      \"number\": \"1000\",\n      \"complement\": \"Conjunto 101\",\n      \"neighborhood\": \"Bela Vista\",\n      \"city\": \"São Paulo\",\n      \"state\": \"SP\",\n      \"postalCode\": \"01310-100\"\n    }\n  }\n}" },
+                "url": "{{baseUrl}}/api/customers/{{customerId}}/contact-info",
+                "description": "Shows every accepted field in one partial update. At least one field is required; omitted fields are preserved, and an address must be complete when provided."
               }
             },
             {
@@ -234,111 +162,135 @@
           "name": "Vehicle",
           "item": [
             {
-              "name": "Create vehicle with chassis",
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "exec": [
-                      "if (pm.response.code === 201) { pm.collectionVariables.set('vehicleId', pm.response.json().id); }"
-                    ]
-                  }
-                }
-              ],
+              "name": "Create vehicle",
+              "event": [{
+                "listen": "test",
+                "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('vehicleId', pm.response.json().id); }"] }
+              }],
               "request": {
                 "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"licensePlate\": \"ABC-1234\",\n  \"chassis\": \"9BWZZZ377VT004251\",\n  \"brand\": \"Volkswagen\",\n  \"model\": \"Gol\",\n  \"year\": 2026,\n  \"color\": \"Prata\"\n}"
-                },
-                "url": "{{baseUrl}}/api/vehicles"
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"licensePlate\": \"ABC-1234\",\n  \"chassis\": \"9BWZZZ377VT004251\",\n  \"brand\": \"Volkswagen\",\n  \"model\": \"Gol\",\n  \"year\": 2026,\n  \"color\": \"Prata\",\n  \"mileage\": 42500\n}" },
+                "url": "{{baseUrl}}/api/vehicles",
+                "description": "Shows every accepted field. Chassis and mileage are optional."
               }
             },
             {
-              "name": "Create vehicle without chassis",
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "exec": [
-                      "if (pm.response.code === 201) { pm.collectionVariables.set('vehicleId', pm.response.json().id); }"
-                    ]
-                  }
-                }
-              ],
+              "name": "Get vehicle",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
+                "description": "Returns the complete historical representation of an active or archived vehicle."
+              }
+            },
+            {
+              "name": "List vehicles",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/vehicles",
+                "description": "Returns a non-paginated array containing only active vehicles."
+              }
+            },
+            {
+              "name": "Update vehicle details",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"brand\": \"Volkswagen\",\n  \"model\": \"Polo\",\n  \"year\": 2026,\n  \"color\": \"Azul\",\n  \"chassis\": \"9BWZZZ377VT009999\"\n}" },
+                "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
+                "description": "Shows every accepted field. Brand, model, year and color are required; an omitted, null, empty or blank chassis preserves the current value."
+              }
+            },
+            {
+              "name": "Update vehicle mileage",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"mileage\": 43000\n}" },
+                "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}/mileage",
+                "description": "Records the first mileage reading or a greater value. Repeating the current value is idempotent; lower values return 409."
+              }
+            },
+            {
+              "name": "Archive vehicle",
+              "request": {
+                "method": "DELETE",
+                "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
+                "description": "Archives a vehicle without deleting its history. Repeating the request is idempotent."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Service Catalog",
+          "item": [
+            {
+              "name": "Create catalog service",
+              "event": [{
+                "listen": "test",
+                "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('catalogServiceId', pm.response.json().id); }"] }
+              }],
               "request": {
                 "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"licensePlate\": \"BRA2E19\",\n  \"brand\": \"Fiat\",\n  \"model\": \"Argo\",\n  \"year\": 2025,\n  \"color\": \"Branco\"\n}"
-                },
-                "url": "{{baseUrl}}/api/vehicles"
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Troca de óleo\",\n  \"basePrice\": {\n    \"value\": 150.00,\n    \"currency\": \"BRL\"\n  }\n}" },
+                "url": "{{baseUrl}}/api/catalog-services"
               }
             },
             {
-              "name": "Atualizar veículo preservando chassi",
+              "name": "Get catalog service",
               "request": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"brand\": \"Volkswagen\",\n  \"model\": \"Polo\",\n  \"year\": 2026,\n  \"color\": \"Azul\"\n}"
-                },
-                "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
-                "description": "Atualiza os dados descritivos. Chassi omitido, nulo, vazio ou em branco preserva o valor atual."
+                "method": "GET",
+                "url": "{{baseUrl}}/api/catalog-services/{{catalogServiceId}}"
               }
             },
             {
-              "name": "Atualizar veículo incluindo chassi",
+              "name": "Rename catalog service",
               "request": {
                 "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"brand\": \"Fiat\",\n  \"model\": \"Argo\",\n  \"year\": 2025,\n  \"color\": \"Branco\",\n  \"chassis\": \"9BD17164G72999999\"\n}"
-                },
-                "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
-                "description": "Inclui um chassi válido quando o veículo ainda não possui esse dado."
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Troca de óleo premium\"\n}" },
+                "url": "{{baseUrl}}/api/catalog-services/{{catalogServiceId}}",
+                "description": "Atualiza somente o nome de exibição de um serviço ativo."
               }
             },
             {
-              "name": "Atualizar veículo substituindo chassi",
+              "name": "Update catalog service base price",
               "request": {
                 "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"brand\": \"Honda\",\n  \"model\": \"City\",\n  \"year\": 2024,\n  \"color\": \"Cinza\",\n  \"chassis\": \"93HGM2630DZ999999\"\n}"
-                },
-                "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
-                "description": "Substitui o chassi atual quando o novo valor é válido e não pertence a outro veículo."
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"basePrice\": {\n    \"value\": 180.00,\n    \"currency\": \"BRL\"\n  }\n}" },
+                "url": "{{baseUrl}}/api/catalog-services/{{catalogServiceId}}/base-price",
+                "description": "Atualiza somente o preço-base BRL de um serviço ativo."
+              }
+            },
+            {
+              "name": "List active catalog services",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/catalog-services"
+              }
+            },
+            {
+              "name": "Create catalog service for archive",
+              "event": [{
+                "listen": "test",
+                "script": { "exec": ["if (pm.response.code === 201) { pm.collectionVariables.set('archiveCatalogServiceId', pm.response.json().id); }"] }
+              }],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Serviço temporário para arquivamento\",\n  \"basePrice\": {\n    \"value\": 75.00,\n    \"currency\": \"BRL\"\n  }\n}" },
+                "url": "{{baseUrl}}/api/catalog-services",
+                "description": "Cria um registro separado para demonstrar o archive sem invalidar o catalogServiceId usado no fluxo de diagnóstico."
+              }
+            },
+            {
+              "name": "Archive catalog service",
+              "request": {
+                "method": "DELETE",
+                "url": "{{baseUrl}}/api/catalog-services/{{archiveCatalogServiceId}}",
+                "description": "Arquiva logicamente o serviço de forma idempotente. O registro continua disponível por ID, deixa a listagem de ativos, não pode ser usado em novos diagnósticos e libera seu nome para um novo serviço."
               }
             }
           ]
@@ -503,17 +455,10 @@
               ],
               "request": {
                 "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"diagnosedByTechnicianId\": \"{{technicianId}}\",\n  \"items\": [{\n    \"catalogServiceId\": \"{{catalogServiceId}}\",\n    \"name\": \"Oil and filter change\",\n    \"price\": { \"value\": 150.00, \"currency\": \"BRL\" },\n    \"stockRequirements\": [{\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"type\": \"PART\",\n      \"quantity\": 1,\n      \"nameSnapshot\": \"Oil filter\",\n      \"priceSnapshot\": { \"value\": 45.90, \"currency\": \"BRL\" }\n    }]\n  }]\n}"
-                },
-                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/diagnosis"
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"diagnosedByTechnicianId\": \"{{technicianId}}\",\n  \"items\": [{\n    \"catalogServiceId\": \"{{catalogServiceId}}\",\n    \"name\": \"Oil and filter change\",\n    \"price\": { \"value\": 150.00, \"currency\": \"BRL\" },\n    \"stockRequirements\": [{\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"type\": \"PART\",\n      \"quantity\": 1,\n      \"nameSnapshot\": \"Oil filter\",\n      \"priceSnapshot\": { \"value\": 45.90, \"currency\": \"BRL\" }\n    }]\n  }]\n}" },
+                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/diagnosis",
+                "description": "Cada catalogServiceId deve identificar um serviço ativo no início do diagnóstico. Serviços arquivados ou inexistentes rejeitam todo o lote sem persistência parcial; execuções já criadas preservam seus snapshots."
               }
             },
             {

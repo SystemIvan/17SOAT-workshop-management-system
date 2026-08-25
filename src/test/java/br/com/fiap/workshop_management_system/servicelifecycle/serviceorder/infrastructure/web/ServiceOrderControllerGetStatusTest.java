@@ -17,6 +17,8 @@ import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static br.com.fiap.workshop_management_system.testsupport.CatalogServiceHttpFixture
+        .createActiveCatalogService;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -82,6 +84,9 @@ class ServiceOrderControllerGetStatusTest {
     }
 
     private String createServiceOrder() throws Exception {
+        UUID customerId = UUID.randomUUID();
+        UUID vehicleId = UUID.randomUUID();
+        ServiceOrderHttpTestFixture.persistActiveVehicle(context, customerId, vehicleId);
         String body = """
                 {
                   "customerId": "%s",
@@ -89,7 +94,7 @@ class ServiceOrderControllerGetStatusTest {
                   "vehicleSnapshot": {"licensePlate": "ABC1D23", "brand": "Fiat", "model": "Uno", "year": 2015},
                   "priority": "NORMAL", "initialAssessment": "Initial assessment"
                 }
-                """.formatted(UUID.randomUUID(), UUID.randomUUID());
+                """.formatted(customerId, vehicleId);
         MvcResult result = mockMvc.perform(post("/api/service-orders")
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated())
@@ -106,7 +111,7 @@ class ServiceOrderControllerGetStatusTest {
                     {"catalogServiceId": "%s", "name": "Troca de óleo", "price": {"value": 100.00, "currency": "BRL"}}
                   ]
                 }
-                """.formatted(technicianId, UUID.randomUUID());
+                """.formatted(technicianId, createActiveCatalogService(mockMvc));
         MvcResult result = mockMvc.perform(post("/api/service-orders/{id}/diagnosis", serviceOrderId)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk())

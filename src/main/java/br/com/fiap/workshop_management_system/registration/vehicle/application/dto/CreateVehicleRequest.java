@@ -5,7 +5,9 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
+import tools.jackson.databind.annotation.JsonDeserialize;
 
 import java.util.UUID;
 
@@ -32,5 +34,15 @@ public record CreateVehicleRequest(
         Integer year,
         @NotBlank(message = "A cor não pode estar em branco")
         @Size(max = 50, message = "A cor deve possuir no máximo 50 caracteres")
-        String color) {
+        String color,
+        @JsonDeserialize(using = StrictLongDeserializer.class)
+        @PositiveOrZero(message = "A quilometragem deve ser maior ou igual a zero")
+        @Schema(
+                description = "Quilometragem inicial opcional em quilômetros inteiros",
+                nullable = true,
+                types = {"integer", "null"},
+                format = "int64",
+                minimum = "0",
+                example = "42500")
+        Long mileage) {
 }

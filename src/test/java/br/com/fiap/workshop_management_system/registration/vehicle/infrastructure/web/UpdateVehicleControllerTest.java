@@ -206,7 +206,7 @@ class UpdateVehicleControllerTest {
 
         ChassisNumber chassisNumber = chassis == null ? null : new ChassisNumber(chassis);
         Vehicle vehicle = Vehicle.reconstitute(UUID.randomUUID(), customer.id(), new LicensePlate(nextPlate()),
-                chassisNumber, "Volkswagen", "Gol", VehicleYear.create(2026, 2026), "Prata", active);
+                chassisNumber, "Volkswagen", "Gol", VehicleYear.create(2026, 2026), "Prata", null, active);
         vehicleRepository.save(vehicle);
         return vehicle;
     }
