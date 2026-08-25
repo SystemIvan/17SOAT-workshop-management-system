@@ -154,7 +154,7 @@ class PurchaseOrderFlowIntegrationTest {
 
     private UUID createStockItem(String prefix, int availableQuantity) throws Exception {
         String sku = prefix + System.nanoTime();
-        String body = "{\"sku\":\"%s\",\"name\":\"Purchase item\",\"type\":\"PART\"," 
+        String body = "{\"sku\":\"%s\",\"name\":\"Purchase item\",\"type\":\"PART\","
                 + "\"price\":{\"value\":10.00,\"currency\":\"BRL\"},\"availableQuantity\":%d}";
         MvcResult result = mockMvc.perform(post("/api/stock-items")
                         .contentType(MediaType.APPLICATION_JSON)
