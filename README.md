@@ -23,6 +23,11 @@ make docker-up
 The local Docker environment uses the `dev` profile and loads idempotent demonstration Customer and Stock Item records.
 Copy `.env.example` to `.env` to override this behavior. Seeds are disabled in the default application profile.
 
+All administrative endpoints require a JWT (see `docs/adr/ADR-003-authentication-strategy.md`). Set
+`APP_SECURITY_JWT_SECRET` in `.env` for any real deployment; the default in `.env.example` is for local development
+only. A bootstrap `admin`/`ADMIN` account is mandatory reference data (Flyway-seeded) and is the entry point to
+obtain a token and create further accounts — see the Postman walkthrough below.
+
 Useful URLs:
 
 - API base: `http://localhost:8080/api`
@@ -62,12 +67,15 @@ make docker-up
 ```
 
 Espere a aplicação estar disponível em `http://localhost:8080/swagger-ui.html`, importe a coleção e mantenha as
-variáveis no escopo da coleção. Não há autenticação configurada para essas requisições. `baseUrl` deve conter apenas a
-origem, sem `/api`: para a execução local, use `http://localhost:8080`.
+variáveis no escopo da coleção. Todos os endpoints administrativos exigem um JWT (`AD-016`,
+`docs/adr/ADR-003-authentication-strategy.md`); a coleção já está configurada com autenticação `Bearer {{authToken}}`
+no nível de collection, então basta executar o login do passo 0 antes do restante do roteiro. `baseUrl` deve conter
+apenas a origem, sem `/api`: para a execução local, use `http://localhost:8080`.
 
 | Variável | Como preencher |
 | --- | --- |
 | `baseUrl` | `http://localhost:8080` localmente. |
+| `authToken` | Preenchida automaticamente pelo passo 0 (`Login (bootstrap admin)`); as demais requisições a usam via `Authorization: Bearer {{authToken}}`. |
 | `customerId`, `vehicleId`, `technicianId`, `stockItemId`, `serviceOrderId`, `executionId`, `serviceExecutionId`, `diagnosisId` e `estimateId` | A coleção as atualiza automaticamente quando a respectiva requisição de criação/diagnóstico obtém sucesso. |
 | `stockReservationId` | É preenchida pelo script de `Retry stock reservation` quando houver `reservationId`; se a reserva já ocorreu na decisão, copie `executions[0].stockReservationId` da resposta da decisão para consultar ou consumir a reserva. |
 | `customerTaxId` | Informe o CPF/CNPJ sem formatação usado para o Customer; é utilizado somente por `Identify customer by CPF/CNPJ`. |
@@ -78,6 +86,19 @@ por valores únicos antes de criar Customer, Vehicle e Stock Item, e ajuste `cus
 Os IDs retornados em respostas `201 Created` são os que devem ser usados no restante do teste.
 
 ### Sequência executável
+
+0. Em `Auth`, envie `Login (bootstrap admin)`:
+
+   ```http
+   POST {{baseUrl}}/api/auth/login
+   ```
+
+   com `{"username":"admin","password":"changeme123"}` — a conta `admin`/`ADMIN` é dado de referência
+   obrigatório, criado por migração Flyway (`V20260824120001__seed_bootstrap_admin_account.sql`), disponível em
+   qualquer ambiente, não só `dev`. Espere `200 OK`; o script grava o `token` retornado em `authToken`, usado pelo
+   restante da coleção. Se quiser testar outros papéis (`CUSTOMER`, `TECHNICIAN`, `MANAGER`), use `Create user
+   account (ADMIN only)` (`POST {{baseUrl}}/api/auth/users`) autenticado como `admin` e depois faça login com a
+   nova conta.
 
 1. Em `Registrations / Customer`, envie `Create customer`:
 

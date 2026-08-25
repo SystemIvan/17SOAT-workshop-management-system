@@ -8,7 +8,7 @@
 | Atualizado em | 2026-08-24 |
 | Aprovado por | Santiago Silvestre |
 | Aprovado em | 2026-08-24 |
-| Referências | Tech Challenge Fase 1 (requisito obrigatório "Implementação de autenticação JWT para APIs administrativas"); `docs/Architecture-Decisions.md` (AD-016, `Resolved` em 2026-08-24); `docs/adr/ADR-003-authentication-strategy.md` (`Status: Proposed`, ainda não promovida a `Accepted`); `GAPS-TECH-CHALLENGE.md` §4 |
+| Referências | Tech Challenge Fase 1 (requisito obrigatório "Implementação de autenticação JWT para APIs administrativas"); `docs/Architecture-Decisions.md` (AD-016, `Resolved` em 2026-08-24); `docs/adr/ADR-003-authentication-strategy.md` (`Status: Proposed` no momento em que esta especificação foi escrita; promovida a `Accepted` no checkpoint 6 de `implementation-plan.md`); `GAPS-TECH-CHALLENGE.md` §4 |
 
 ## Problema e resultado esperado
 
