@@ -5,9 +5,9 @@
 | Feature | `purchase-order-creation` |
 | Status | Approved |
 | Responsável | Matheus Apostulo |
-| Atualizado em | 2026-08-24 |
+| Atualizado em | 2026-08-25 |
 | Aprovado por | Matheus Apostulo |
-| Aprovado em | 2026-08-24 |
+| Aprovado em | 2026-08-25 |
 | Referências | RF27, Miro, specs de Stock Item e Stock Reservation (links abaixo) |
 
 Referências:
@@ -16,6 +16,7 @@ Referências:
 - [Domain Storytelling de Stock no Miro](https://miro.com/app/board/uXjVH9faCu4=/?moveToWidget=3458764678560725831);
 - [Pivotal Events no Miro](https://miro.com/app/board/uXjVH9faCu4=/?moveToWidget=3458764678817744720),
   especialmente o read model de pedidos de compra, o comando de criação e o External Supplier System;
+- [recorte do Event Storming que verifica disponibilidade antes da Estimate](./image.png);
 - [Context Map no Miro](https://miro.com/app/board/uXjVH9faCu4=/?moveToWidget=3458764679684515255),
   especialmente a relação `External Supplier System [U] → Stock & Procurement [D]`;
 - [Modelo tático atualizado no Miro](https://miro.com/app/board/uXjVH9faCu4=/?moveToWidget=3458764680870224027);
@@ -28,9 +29,9 @@ Referências:
 
 ## Estado desta descoberta
 
-Esta especificação define o recorte funcional aprovado de RF27 — Criar Purchase Order por nível baixo de estoque ou por
-reparo pendente. A aprovação funcional autoriza a criação da especificação técnica, mas ainda não autoriza a
-implementação.
+Esta revisão material, aprovada em 2026-08-25, substitui a aprovação funcional de 2026-08-24 ao incluir a detecção
+antecipada de falta de estoque no Diagnosis. A especificação técnica e o plano anteriores permanecem inválidos até a
+aprovação da nova revisão técnica e a elaboração de um novo plano.
 
 O Miro contém duas representações que poderiam levar a comportamentos diferentes:
 
@@ -38,10 +39,11 @@ O Miro contém duas representações que poderiam levar a comportamentos diferen
 - o fluxo detalhado mais recente estabelece um read model de pedidos de compra e registra que podem existir demandas
   originadas por Service Orders e por baixo estoque, cabendo ao usuário selecionar quais virarão Purchase Orders.
 
-Este Draft adota o segundo comportamento: nenhum gatilho cria ou envia uma Purchase Order automaticamente. Os gatilhos
-criam demandas de compra; o Stock Manager decide quais demandas atender, pode adicionar livremente outros Stock Items e
-confirma a criação no External Supplier System. Uma Purchase Order também pode ser criada inteiramente ad hoc, sem
-depender de um gatilho ou de uma Purchase Demand anterior.
+Esta revisão aprovada adota o segundo comportamento e antecipa o primeiro gatilho de demanda de reparo: nenhum gatilho
+cria ou envia uma Purchase Order automaticamente. A insuficiência observada ao confrontar os Stock Requirements no
+Diagnosis com o saldo disponível cria ou atualiza uma Purchase Demand; o Stock Manager decide quais demandas atender,
+pode adicionar livremente outros Stock Items e confirma a criação no External Supplier System. Uma Purchase Order
+também pode ser criada inteiramente ad hoc, sem depender de um gatilho ou de uma Purchase Demand anterior.
 
 ### Recorte recomendado das histórias relacionadas
 
@@ -59,14 +61,17 @@ precisam ser especificadas agora para que o contrato funcional de criação seja
 
 ## Problema e resultado esperado
 
-Uma tentativa de reserva pode identificar material insuficiente para uma Service Execution, e uma futura política de
+O próprio Diagnosis pode identificar uma necessidade concreta maior que o saldo disponível, antes de o Customer decidir
+a Estimate. Uma tentativa posterior de reserva pode confirmar ou atualizar essa insuficiência, e uma futura política de
 inventário poderá identificar Stock Items abaixo do nível mínimo. Sem um fluxo de Procurement, essas necessidades ficam
-somente em notificações ou observações operacionais, podem ser duplicadas por retries e não chegam de forma controlada
-ao fornecedor.
+somente em snapshots, notificações ou observações operacionais, podem ser duplicadas por revalidações e não chegam de
+forma controlada ao fornecedor.
 
 O resultado esperado é um fluxo rastreável de criação:
 
-- cada necessidade de compra válida gera ou atualiza uma demanda identificável sem duplicação;
+- cada insuficiência identificada no Diagnosis gera ou atualiza imediatamente uma demanda identificável sem duplicação;
+- a demanda continua selecionável mesmo que a linha da Estimate seja rejeitada ou expire, pois representa falta concreta
+  de estoque e não autorização para executar o reparo;
 - o Stock Manager consulta demandas abertas originadas por reparos pendentes e por baixo estoque;
 - o Stock Manager pode selecionar demandas, escolher diretamente Stock Items ou combinar as duas formas;
 - o Stock Manager informa quanto deseja comprar de cada Stock Item;
@@ -86,7 +91,8 @@ uma Purchase Order, sua criação não envia nada ao fornecedor e sua existênci
 Cada demanda possui identidade, Stock Item, origem, quantidade sugerida, instante de criação e situação atual. As
 origens canônicas propostas são:
 
-- `PENDING_REPAIR`: insuficiência observada ao tentar reservar todos os Stock Requirements de uma Service Execution;
+- `PENDING_REPAIR`: insuficiência concreta observada ao confrontar os Stock Requirements de uma Service Execution
+  diagnosticada com o saldo disponível, ainda que a Estimate não tenha sido decidida;
 - `LOW_STOCK`: necessidade publicada pela feature que identifica Stock Items abaixo do nível mínimo.
 
 Uma demanda de reparo mantém `serviceExecutionId` somente como origem e rastreabilidade. Uma demanda de baixo estoque
@@ -111,10 +117,16 @@ não transforma Supplier em aggregate interno.
 
 ## Escopo funcional desta entrega
 
-### Registrar demanda por reparo pendente
+### Registrar demanda por necessidade de reparo
 
-Quando a tentativa atômica de reserva falhar por `INSUFFICIENT_QUANTITY`, o sistema registra uma demanda
-`PENDING_REPAIR` para cada Stock Item insuficiente.
+Depois que um Diagnosis registra as Service Executions e seus Stock Requirements, o sistema verifica a disponibilidade
+dos Stock Items. Para cada item cuja quantidade consolidada exigida pela Service Execution exceda a quantidade
+disponível observada, registra uma demanda `PENDING_REPAIR`. Essa verificação é informativa: não cria Stock Reservation,
+não compromete nem altera `availableQuantity` e não muda o estado `PENDING` da execução.
+
+Ao gerar a Estimate, o sistema revalida os requirements congelados para apresentar uma fotografia atual da
+disponibilidade. Ao aprovar uma linha, revalida novamente para tentar a reserva atômica. Uma insuficiência observada em
+qualquer desses momentos atualiza a mesma demanda aberta por Service Execution e Stock Item, sem duplicá-la.
 
 A demanda registra:
 
@@ -128,9 +140,11 @@ A demanda registra:
 Falhas `STOCK_ITEM_NOT_FOUND`, `STOCK_ITEM_INACTIVE` ou quantidade inválida são problemas de referência ou integridade e
 não geram demanda de compra automaticamente.
 
-Retries da mesma Service Execution para o mesmo Stock Item não criam demandas abertas duplicadas. Se a nova tentativa
-for bem-sucedida antes da compra, a demanda deixa de ser selecionável. Se continuar insuficiente, a informação observada
-e a sugestão podem ser atualizadas sem perder a identidade e a origem.
+Revalidações da mesma Service Execution para o mesmo Stock Item não criam demandas abertas duplicadas. Se uma tentativa
+de reserva posterior for bem-sucedida antes da compra, a demanda deixa de ser selecionável. Se continuar insuficiente,
+a informação observada e a sugestão são atualizadas sem perder identidade e origem. Rejeição ou expiração da Estimate
+não resolve a demanda: o trabalho não foi autorizado, mas a falta de estoque diagnosticada continua disponível para
+decisão do Stock Manager.
 
 ### Receber demanda por baixo estoque
 
@@ -152,7 +166,7 @@ O Stock Manager consulta as Purchase Demands ainda selecionáveis. A visão perm
 - ID, SKU, nome e tipo do Stock Item;
 - quantidade sugerida e informações de saldo observadas na origem;
 - `serviceExecutionId`, somente quando a origem for `PENDING_REPAIR`;
-- instante da detecção.
+- instante da primeira detecção e da observação mais recente.
 
 A consulta pode ser filtrada por origem e Stock Item. Ela não expõe Customer, Vehicle, preço da Estimate ou outros
 dados pessoais/comerciais de Service Lifecycle.
@@ -214,8 +228,11 @@ genérico nem permite editar ou apagar uma Purchase Order aberta.
 
 ## Atores e cenários
 
-- O sistema falha ao reservar um item ativo por quantidade insuficiente e registra uma única Purchase Demand de reparo.
-- Um retry ainda insuficiente atualiza a observação sem duplicar a demanda aberta.
+- O Diagnosis identifica quantidade insuficiente e registra uma única Purchase Demand por Service Execution e Stock
+  Item antes da decisão do Customer.
+- A Estimate usa a disponibilidade revalidada para informar a falta sem reservar saldo.
+- A rejeição ou expiração da Estimate não elimina a demanda de compra já identificada.
+- Uma tentativa de reserva ainda insuficiente atualiza a observação sem duplicar a demanda aberta.
 - Um retry reserva os itens antes da compra e torna a demanda de reparo não selecionável.
 - RF30 publica uma necessidade de baixo estoque e RF27 a torna selecionável sem conhecer a regra do nível mínimo.
 - O Stock Manager consulta demandas das duas origens, escolhe quais comprar e informa as quantidades finais.
@@ -245,6 +262,7 @@ genérico nem permite editar ou apagar uma Purchase Order aberta.
 - demanda aberta pode ser selecionada;
 - demanda já incluída em Purchase Order não pode ser reutilizada;
 - demanda de reparo resolvida por reserva anterior à compra não pode ser selecionada;
+- rejeição ou expiração da Estimate não resolve nem torna indisponível uma demanda de reparo;
 - resolução de uma demanda não apaga seu histórico;
 - uma condição repetida usa a demanda aberta existente em vez de multiplicar pedidos equivalentes;
 - falha externa mantém as demandas abertas e disponíveis para retry.
@@ -298,9 +316,14 @@ O fluxo deve distinguir pelo menos:
 As falhas não expõem payload externo, credenciais, stack trace ou detalhes internos. Códigos HTTP e códigos de erro
 estáveis serão definidos na especificação técnica.
 
-## Decisões funcionais propostas para aprovação
+## Decisões funcionais aprovadas
 
 - [x] A criação é manual: gatilhos apenas registram Purchase Demands e nunca enviam uma ordem automaticamente.
+- [x] A insuficiência observada no Diagnosis cria ou atualiza `PENDING_REPAIR` antes da decisão da Estimate.
+- [x] Rejeição ou expiração da Estimate não resolve a demanda, pois a insuficiência diagnosticada independe da
+      autorização do reparo.
+- [x] Geração da Estimate e tentativa de reserva revalidam a disponibilidade e reconciliam a mesma demanda, sem
+      duplicação.
 - [x] O Stock Manager pode criar uma Purchase Order ad hoc, selecionar demandas ou combinar as duas formas.
 - [x] `PENDING_REPAIR` e `LOW_STOCK` são as duas origens canônicas de demanda.
 - [x] RF30 continua separada e fornece as demandas `LOW_STOCK`; RF27 não introduz nível mínimo por conta própria.
@@ -331,8 +354,11 @@ estáveis serão definidos na especificação técnica.
 
 ## Critérios de aceite
 
-- [ ] Insuficiência de quantidade em uma tentativa de reserva cria ou atualiza uma única demanda `PENDING_REPAIR` por
-  Service Execution e Stock Item.
+- [ ] Insuficiência identificada no Diagnosis cria ou atualiza uma única demanda `PENDING_REPAIR` por Service Execution
+      e Stock Item antes da decisão da Estimate.
+- [ ] A Estimate apresenta a disponibilidade revalidada como snapshot informativo, sem reservar ou alterar saldo.
+- [ ] Rejeitar ou expirar a Estimate preserva a demanda aberta e não muda o estoque.
+- [ ] Uma tentativa de reserva insuficiente atualiza a demanda existente em vez de criar outra.
 - [ ] Item inexistente, inativo ou entrada inválida não gera demanda de compra automática.
 - [ ] Uma reserva concluída antes da compra torna a demanda de reparo correspondente não selecionável.
 - [ ] Uma demanda `LOW_STOCK` emitida por RF30 aparece na mesma visão operacional sem acoplar RF27 à regra de mínimo.

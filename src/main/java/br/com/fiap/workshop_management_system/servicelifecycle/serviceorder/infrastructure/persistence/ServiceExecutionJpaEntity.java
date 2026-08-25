@@ -58,6 +58,10 @@ public class ServiceExecutionJpaEntity {
     @CollectionTable(name = "service_execution_stock_requirements", joinColumns = @JoinColumn(name = "service_execution_id"))
     private List<StockRequirementEmbeddable> stockRequirements = new ArrayList<>();
 
+    @ElementCollection
+    @CollectionTable(name = "service_execution_stock_availability", joinColumns = @JoinColumn(name = "service_execution_id"))
+    private List<StockAvailabilitySnapshotEmbeddable> stockAvailability = new ArrayList<>();
+
     protected ServiceExecutionJpaEntity() {
     }
 
@@ -76,7 +80,8 @@ public class ServiceExecutionJpaEntity {
             Instant diagnosedAt,
             boolean stockRequirementsFrozen,
             UUID stockReservationId,
-            List<StockRequirementEmbeddable> stockRequirements) {
+            List<StockRequirementEmbeddable> stockRequirements,
+            List<StockAvailabilitySnapshotEmbeddable> stockAvailability) {
         this.id = id;
         this.serviceOrder = serviceOrder;
         this.diagnosisId = diagnosisId;
@@ -92,6 +97,7 @@ public class ServiceExecutionJpaEntity {
         this.stockRequirementsFrozen = stockRequirementsFrozen;
         this.stockReservationId = stockReservationId;
         this.stockRequirements = stockRequirements;
+        this.stockAvailability = stockAvailability;
     }
 
     public UUID getId() {
@@ -153,4 +159,6 @@ public class ServiceExecutionJpaEntity {
     public List<StockRequirementEmbeddable> getStockRequirements() {
         return stockRequirements;
     }
+
+    public List<StockAvailabilitySnapshotEmbeddable> getStockAvailability() { return stockAvailability; }
 }

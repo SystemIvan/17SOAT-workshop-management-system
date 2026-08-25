@@ -188,8 +188,9 @@ Os IDs retornados em respostas `201 Created` são os que devem ser usados no res
    ```
 
    Espere `200 OK`. O script define `executionId`, `serviceExecutionId` e `diagnosisId` a partir da primeira execução.
-   Confirme que a execução mostra `diagnosedByTechnicianId` (autor efetivo) e consulte `/status`: o status esperado é
-   `IN_DIAGNOSIS`.
+   Confirme que a execução mostra `diagnosedByTechnicianId` (autor efetivo), `stockAvailability` e consulte `/status`:
+   o status esperado é `IN_DIAGNOSIS`. Se a quantidade observada for insuficiente, a Purchase Demand `PENDING_REPAIR`
+   já é criada neste passo; isso não reserva saldo nem antecipa `AWAITING_ITEMS`.
 
 8. Em `Estimates`, envie `Generate estimate`:
 
@@ -200,8 +201,8 @@ Os IDs retornados em respostas `201 Created` são os que devem ser usados no res
    com `{"diagnosisId":"{{diagnosisId}}"}`. O script de pré-requisição usa o `diagnosisId` salvo pela coleção, mesmo
    que exista uma variável de ambiente com o mesmo nome. Espere `201 Created`, guarde o `estimateId` definido pelo
    script e use `Get estimate` (`GET {{baseUrl}}/api/estimates/{{estimateId}}`) para conferir `lines`, seus
-   `serviceExecutionId`, preço do serviço e eventuais itens de estoque. Os requisitos ficam congelados ao gerar o
-   orçamento.
+   `serviceExecutionId`, preço do serviço, itens comerciais e `stockAvailability`. Os requisitos ficam congelados e a
+   disponibilidade é revalidada ao gerar o orçamento, atualizando a mesma demanda quando ainda houver insuficiência.
 
 9. Decida todas as linhas consultadas em `Decide estimate lines`:
 
@@ -269,27 +270,34 @@ Os IDs retornados em respostas `201 Created` são os que devem ser usados no res
     atual, `ServiceOrderResponse.status` está marcado como obsoleto; para a leitura completa, use
     `statusSnapshot` como o campo de acompanhamento.
 
-### Fluxo executável de Purchase Order (RF27)
+### Fluxo executável de Purchase Order
+
+Use este roteiro como uma bifurcação do fluxo principal, não como um fluxo que libera a execução. O ponto de entrada é
+o **passo 7 — Perform diagnosis**: com `availableQuantity: 1` e requirement de `3` ou mais, o Diagnosis cria a
+Purchase Demand `PENDING_REPAIR` imediatamente. A Estimate ainda pode ser enviada, aprovada, rejeitada ou expirar; a
+necessidade de compra continua concreta.
+
+Onde você está no fluxo principal:
+
+| Situação | Próximo ponto do roteiro principal |
+|---|---|
+| A demanda acabou de nascer no Diagnosis | Continue no **passo 8** para gerar a Estimate. |
+| A Estimate foi aprovada e a reserva falhou | Você está no **passo 10**, com a execução em `AWAITING_ITEMS`. |
+| A Purchase Order foi criada com sucesso | Continue parado no **passo 10**: RF27 não recebe item nem repõe estoque. RF29 é que permitirá nova tentativa de reserva. |
+
+Para registrar a Purchase Order:
+
+1. Execute `Stock & Procurement / List open purchase demands`. Espere `200 OK`, confira a diferença em
+   `suggestedQuantity` e deixe a coleção guardar `purchaseDemandId`.
+2. Gere um novo `purchaseOrderIdempotencyKey` e execute `Create Purchase Order from demand`. A quantidade da linha deve
+   ser pelo menos a sugerida. Espere `201 Created`, `status: "OPEN"` e `Location` com o ID da ordem.
+3. Execute `Retry same Purchase Order` sem alterar header ou body. Espere `200 OK` e a mesma referência externa.
+   Alterar o body com a mesma chave retorna `409 PURCHASE_ORDER_IDEMPOTENCY_CONFLICT`.
+4. Execute `Get Purchase Order`. A demanda deixa de aparecer na listagem aberta porque está `ORDERED`.
 
 O `make docker-up` também inicia o WireMock na porta `8089`; a aplicação usa o endereço interno
-`http://supplier-simulator:8080`. Não configure um fornecedor real neste MVP: os endpoints ainda não possuem
-autenticação/autorização, portanto a restrição ao Stock Manager é funcional e não está tecnicamente aplicada.
-
-Para exercitar a Purchase Order por reparo pendente:
-
-1. Crie um Stock Item ativo com `availableQuantity: 1` e use seu `stockItemId` em um diagnóstico que solicite quantidade
-   `3` ou maior. Gere e aprove o orçamento. A reserva insuficiente deixa a execução `AWAITING_ITEMS` e registra uma
-   Purchase Demand `PENDING_REPAIR`; repetir a tentativa atualiza a mesma demanda em vez de duplicá-la.
-2. Execute `Stock & Procurement / List open purchase demands`. Espere `200 OK`, confirme
-   `suggestedQuantity = requestedQuantity - observedAvailableQuantity` e deixe o script preencher
-   `purchaseDemandId`.
-3. Gere um UUID novo em `purchaseOrderIdempotencyKey` e execute `Create Purchase Order from demand`. Ajuste a quantidade
-   da linha para ser pelo menos a sugestão da demanda. Espere `201 Created`, `status: "OPEN"`, referência iniciada por
-   `SUP-` e `Location: /api/purchase-orders/{id}`.
-4. Execute `Retry same Purchase Order` sem mudar header nem body. Espere `200 OK`, o mesmo `purchaseOrderId` e a mesma
-   referência externa. Mudar o body mantendo a chave retorna `409 PURCHASE_ORDER_IDEMPOTENCY_CONFLICT`.
-5. Execute `Get Purchase Order` e confirme o snapshot de SKU, nome e tipo. Liste as demandas novamente: a demanda
-   comprada não aparece porque passou a `ORDERED`.
+`http://supplier-simulator:8080`. Não configure fornecedor real no MVP: a restrição ao Stock Manager ainda é apenas
+funcional, pois não há autenticação/autorização.
 
 Para criação livre do Stock Manager, crie qualquer Stock Item ativo e execute `Create ad hoc Purchase Order`. O request
 usa `demandIds: []`, gera uma chave nova e deve retornar `201 Created`. Uma ordem mista mantém um ou mais `demandIds` e

@@ -5,10 +5,10 @@
 | Feature | `purchase-order-creation` |
 | Status | Approved |
 | Responsável | Matheus Apostulo |
-| Atualizado em | 2026-08-24 |
+| Atualizado em | 2026-08-25 |
 | Aprovado por | Matheus Apostulo |
-| Aprovado em | 2026-08-24 |
-| Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-24) |
+| Aprovado em | 2026-08-25 |
+| Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-25) |
 
 ## Gate de aprovação
 
@@ -21,9 +21,11 @@ por RF27 para estabilizar o ponto de integração, mas nenhum campo de nível m�
 
 ## Objetivo técnico
 
-Substituir o placeholder `stockprocurement.purchaseorder` por uma capability que:
+Evoluir a capability já implementada de Purchase Order para que:
 
-- registre Purchase Demands idempotentes a partir da indisponibilidade de uma Stock Reservation;
+- avalie requirements de reparo no Diagnosis e na geração da Estimate por API pública síncrona;
+- registre Purchase Demands idempotentes desde a primeira insuficiência observada;
+- reconcilie a mesma demanda quando a Estimate ou a Stock Reservation revalidarem a disponibilidade;
 - aceite futuramente demandas `LOW_STOCK` por uma API interna pequena;
 - liste demandas abertas para decisão do Stock Manager;
 - crie Purchase Orders ad hoc, orientadas por demandas ou mistas;
@@ -38,7 +40,7 @@ não introduz preço de compra.
 
 ## Diagnóstico do código atual
 
-O baseline em `dev` oferece os elementos necessários para a origem `PENDING_REPAIR`:
+O baseline implementado oferece os elementos necessários para o delta:
 
 - `StockItem` possui ID, SKU imutável, nome, tipo, estado ativo e quantidade disponível;
 - `StockItemRepository.findAllByIdForUpdate` permite validar itens com lock e ordem determinística;
@@ -46,8 +48,12 @@ O baseline em `dev` oferece os elementos necessários para a origem `PENDING_REP
   solicitada, quantidade disponível e motivo;
 - o mesmo caso de uso publica `StockReservationCreatedEvent` somente na primeira reserva efetiva;
 - `INSUFFICIENT_QUANTITY`, `STOCK_ITEM_NOT_FOUND` e `STOCK_ITEM_INACTIVE` já são resultados distintos;
-- o pacote `stockprocurement.purchaseorder` contém somente `package-info.java`, sem modelo ou persistência;
-- não existe `minimumQuantity`, evento de baixo estoque, Supplier, cliente HTTP externo ou infraestrutura WireMock;
+- `PurchaseDemand`, Purchase Order, integração do fornecedor, WireMock e contratos HTTP de RF27 estão implementados;
+- `PENDING_REPAIR` nasce hoje somente de `StockReservationNotReservedEvent`;
+- `PurchaseDemandApi` existe para `LOW_STOCK`, mas seu package ainda não é named interface entre módulos;
+- a resposta da demanda ainda não expõe `updatedAt`;
+- não existe snapshot persistido de disponibilidade em Service Execution ou Estimate;
+- continua inexistente `minimumQuantity` ou detector de baixo estoque de RF30;
 - os endpoints atuais não possuem autenticação ou autorização implementada no baseline local.
 
 O listener de notificação de Stock Reservation é after-commit e continuará independente. A criação ou resolução de
@@ -65,11 +71,12 @@ Purchase Order, demandas e Stock Items acontecerá nos casos de uso de aplicaç�
 
 ### Service Lifecycle
 
-Nenhum pacote de Service Lifecycle será importado ou alterado. `serviceExecutionId` será tratado como UUID opaco e não
-terá foreign key para `service_executions`.
+Nenhum pacote de Service Lifecycle será importado por Stock & Procurement. `serviceExecutionId` será tratado como UUID
+opaco e não terá foreign key para `service_executions`.
 
-RF27 reage aos eventos já publicados por Stock Reservation, dentro do módulo `stockprocurement`. Ela não consulta
-Service Order, Estimate, Customer, Vehicle ou prioridade. A priorização após recebimento permanece em RF29.
+RF27 será chamada por Diagnosis e Estimate através de uma API pública que recebe apenas IDs e quantidades, e continuará
+reagindo aos eventos de Stock Reservation. Ela não consulta Service Order, Estimate, Customer, Vehicle ou prioridade.
+A priorização após recebimento permanece em RF29.
 
 ### External Supplier System
 
@@ -86,9 +93,9 @@ catálogo/mapeamento antes da substituição do simulador.
 Nenhum novo módulo direto será criado. `ModuleStructureTest` deve continuar encontrando somente `registration`,
 `servicelifecycle` e `stockprocurement`.
 
-A API de demanda de baixo estoque fica em `purchaseorder.application.api`, mas não recebe `@NamedInterface`: seu futuro
-consumidor RF30 pertence ao mesmo módulo. Nenhum tipo de domínio, JPA, web ou integração externa será exposto como API
-entre módulos.
+O package `purchaseorder.application.api` receberá `@NamedInterface("purchase-demand-api")` porque passa a ser consumido
+por Service Lifecycle. Somente interfaces, commands, results e enums imutáveis desse package serão expostos; nenhum tipo
+de domínio, JPA, web ou integração externa atravessará a fronteira.
 
 ## Modelo de domínio
 
@@ -177,9 +184,69 @@ copiado ou enviado.
 
 ## Contratos internos e eventos
 
+### Avaliação antecipada de requirements
+
+Adicionar ao named interface `purchase-demand-api`:
+
+```java
+public interface RepairStockAssessmentApi {
+    RepairStockAssessmentResult assessAndRecord(RepairStockAssessmentCommand command);
+}
+```
+
+Todos os tipos ficarão em `purchaseorder.application.api`:
+
+- `RepairStockAssessmentCommand(List<RepairExecutionStockRequirements> executions)`;
+- `RepairExecutionStockRequirements(UUID serviceExecutionId, List<RepairStockRequirement> requirements)`;
+- `RepairStockRequirement(UUID stockItemId, int requestedQuantity)`;
+- `RepairStockAssessmentResult(List<RepairExecutionStockAssessment> assessments,
+  List<RepairStockAssessmentIssue> issues)`;
+- `RepairExecutionStockAssessment(UUID serviceExecutionId, List<RepairStockItemAssessment> items)`;
+- `RepairStockItemAssessment` com item, quantidades, status e `observedAt`;
+- `RepairStockAssessmentIssue(UUID serviceExecutionId, UUID stockItemId, RepairStockAssessmentIssueReason reason)`;
+- enums `RepairStockAvailabilityStatus` e `RepairStockAssessmentIssueReason` com os valores definidos abaixo.
+
+O comando em lote contém uma ou mais Service Executions. Cada entrada possui `serviceExecutionId` e uma ou mais linhas
+`stockItemId + requestedQuantity`. Os records públicos rejeitam IDs nulos, listas nulas/vazias, quantidade não positiva,
+duplicatas não consolidadas e overflow. Diagnosis e Estimate consolidam antes da chamada, e o provider valida novamente.
+
+O resultado de sucesso contém avaliações ordenadas por `serviceExecutionId` e `stockItemId`:
+
+```text
+serviceExecutionId
+stockItemId
+requestedQuantity
+observedAvailableQuantity
+shortageQuantity
+status = AVAILABLE | INSUFFICIENT_QUANTITY
+observedAt
+```
+
+O provider usa um único `observedAt` por lote, em UTC e truncado em microssegundos. `shortageQuantity` é zero quando o
+saldo é suficiente e a diferença positiva exata quando insuficiente.
+
+Item inexistente ou inativo produz resultado inválido com `issues` ordenadas, contendo IDs e reason
+`STOCK_ITEM_NOT_FOUND` ou `STOCK_ITEM_INACTIVE`. Nesse caso, `assessments` fica vazio e nenhuma demanda é criada ou
+atualizada. Os consumidores traduzem o primeiro issue determinístico para seus erros HTTP locais.
+
+`AssessRepairStockNeedsUseCase` implementará a API com `@Transactional(propagation = MANDATORY)`, garantindo que
+Diagnosis ou Estimate, snapshots e demandas confirmem ou revertam juntos. O algoritmo:
+
+1. normaliza e valida o lote inteiro;
+2. bloqueia todos os Stock Items únicos em ordem de UUID;
+3. retorna issues sem escrita se alguma referência estiver ausente ou inativa;
+4. calcula cada avaliação sem alterar `availableQuantity`;
+5. para insuficiências, bloqueia a demanda equivalente e cria ou atualiza `OPEN`;
+6. deixa `CLAIMED`, `ORDERED` ou `RESOLVED` imutáveis;
+7. não resolve demanda em observação suficiente, pois nenhuma unidade foi reservada;
+8. persiste todas as mudanças e devolve a fotografia usada pelos consumidores.
+
+A equivalência continua `PENDING_REPAIR + serviceExecutionId + stockItemId`. Revalidações no Diagnosis, Estimate e
+Stock Reservation convergem para a mesma identidade. Rejeição ou expiração da Estimate não chama `resolve`.
+
 ### Origem `PENDING_REPAIR`
 
-Um listener síncrono participa da transação que publicou os eventos:
+O listener síncrono existente continua participando da transação que publicou os eventos:
 
 - em `StockReservationNotReservedEvent`, filtra somente issues `INSUFFICIENT_QUANTITY`;
 - calcula `suggestedQuantity = requestedQuantity - availableQuantity` com resultado estritamente positivo;
@@ -193,6 +260,9 @@ after-commit de Notification existente não será alterado.
 
 O fluxo já mantém locks dos Stock Items até o fim da tentativa de reserva. Reações concorrentes para o mesmo item ficam
 serializadas por esses locks; o listener ainda consultará a demanda equivalente com lock antes de criar ou atualizar.
+
+`RecordPendingRepairDemandUseCase` reutilizará a mesma operação de aplicação que grava uma observação insuficiente, para
+que cálculo, estado e idempotência não sejam duplicados entre API e listener.
 
 Uma demanda `CLAIMED` não é resolvida por reserva concorrente: a submissão externa já iniciou e deve concluir ou ser
 reconciliada. Esse caso pode gerar reposição adicional, coerente com a decisão de não prometer material futuro a uma
@@ -223,6 +293,7 @@ o contrato diretamente; RF30 será o primeiro consumidor real depois do próprio
 
 | Caso de uso | Transação | Responsabilidade |
 |---|---|---|
+| `AssessRepairStockNeedsUseCase` | `MANDATORY` | Avaliar saldo e reconciliar demandas antecipadas |
 | `RecordPendingRepairDemandUseCase` | participa da atual | Criar, atualizar ou resolver demanda por eventos |
 | `RecordLowStockPurchaseDemandUseCase` | escrita | Implementar `PurchaseDemandApi` |
 | `SearchOpenPurchaseDemandsUseCase` | `readOnly` | Listar e filtrar demandas abertas |
@@ -244,12 +315,13 @@ distintos para que os proxies transacionais sejam efetivos e nenhuma chamada HTT
 3. calcular SHA-256 sobre a representação canônica de IDs e quantidades já normalizados;
 4. procurar `PurchaseOrder` pela `idempotencyKey`;
 5. se existir, comparar o hash: conflito para conteúdo diferente; retorno idempotente para conteúdo igual;
-6. bloquear demandas selecionadas em ordem de UUID e exigir estado `OPEN`;
-7. bloquear Stock Items das linhas em ordem de UUID e exigir existência e estado ativo;
-8. exigir que toda demanda selecionada possua linha correspondente;
-9. somar as sugestões por item e exigir quantidade final maior ou igual ao total selecionado;
-10. criar `PurchaseOrder` `PENDING_SUBMISSION`, snapshots de linhas e links de auditoria;
-11. fazer `claim` de todas as demandas e confirmar a transação.
+6. ler uma projeção sem lock das demandas selecionadas apenas para descobrir seus Stock Items;
+7. bloquear todos os Stock Items envolvidos em ordem de UUID e exigir existência e estado ativo;
+8. bloquear as demandas selecionadas em ordem de UUID, recarregar e exigir estado `OPEN`;
+9. exigir que toda demanda selecionada possua linha correspondente;
+10. somar as sugestões por item e exigir quantidade final maior ou igual ao total selecionado;
+11. criar `PurchaseOrder` `PENDING_SUBMISSION`, snapshots de linhas e links de auditoria;
+12. fazer `claim` de todas as demandas e confirmar a transação.
 
 Uma criação ad hoc usa `demandIds` vazio e passa pelas mesmas validações de Stock Item e linhas. Duas operações com
 idempotency keys diferentes são compras distintas mesmo quando o conteúdo é igual.
@@ -390,12 +462,14 @@ Resposta:
     "observedAvailableQuantity": 2,
     "suggestedQuantity": 3,
     "serviceExecutionId": "a49e8d8a-cbd4-4e1f-92d0-6b7fe733023f",
-    "createdAt": "2026-08-24T15:30:00Z"
+    "createdAt": "2026-08-24T15:30:00Z",
+    "updatedAt": "2026-08-25T15:35:00Z"
   }
 ]
 ```
 
-Para `LOW_STOCK`, `requestedQuantity` e `serviceExecutionId` serão `null`. Dados do Stock Item são obtidos pela porta do
+Para `LOW_STOCK`, `requestedQuantity` e `serviceExecutionId` serão `null`. A resposta também incluirá `updatedAt`,
+permitindo distinguir a primeira detecção da observação mais recente. Dados do Stock Item são obtidos pela porta do
 aggregate canônico; a demanda não replica preço, Customer, Vehicle, Estimate ou prioridade.
 
 ### Criação
@@ -484,9 +558,10 @@ sem retornar SQL, nome de constraint, URL interna, payload ou tipo de exception.
 
 ## Persistência
 
-Uma migration Flyway versionada, com timestamp UTC obtido na implementação e nome
-`VyyyyMMddHHmmss__create_purchase_orders.sql`, criará as estruturas abaixo. Ela será somente aditiva e não alterará
-migrations aplicadas.
+As tabelas abaixo já existem na migration operacional de RF27 e não serão alteradas para a detecção antecipada. O delta
+reutiliza `origin_reference_id = serviceExecutionId`, `updated_at` e a unique key existentes. As novas tabelas de
+snapshot pertencem às migrations de `perform-diagnosis` e `estimate-generation`; nenhuma migration aplicada será
+modificada.
 
 ### `purchase_demands`
 
@@ -544,7 +619,9 @@ Specifications ou entidades de persistência.
 
 ## Concorrência e consistência
 
-- demandas e Stock Items serão bloqueados por UUID em ordem global para reduzir deadlocks;
+- todo fluxo que usa ambos bloqueia primeiro Stock Items e depois Purchase Demands, cada conjunto em ordem de UUID;
+- preparação de Purchase Order usa leitura inicial sem lock apenas para descobrir Stock Items e revalida as demandas
+  depois de adquirir os locks;
 - criação/atualização por gatilho consultará a demanda equivalente com lock enquanto o Stock Item de origem está
   bloqueado, e a unique constraint permanecerá como proteção final;
 - a preparação fará claim de todas as demandas ou de nenhuma;
@@ -642,10 +719,10 @@ Na mesma implementação:
 
 - anotar operações, headers, filtros, schemas, exemplos e respostas com Springdoc;
 - ampliar `OpenApiContractTest` para os três endpoints e códigos relevantes;
-- adicionar pasta de Purchase Orders à coleção Postman;
-- adicionar variáveis `purchaseDemandId`, `purchaseOrderId` e `purchaseOrderIdempotencyKey`;
-- cobrir criação ad hoc, criação após reparo pendente, consulta, rejeição e retry idempotente;
-- atualizar o README com pré-requisitos do WireMock, ordem executável, variáveis e resultados esperados;
+- preservar a pasta e variáveis existentes de Purchase Orders na coleção Postman;
+- atualizar a listagem para validar `updatedAt` e a demanda criada já no Diagnosis;
+- preservar criação ad hoc, consulta, rejeição e retry idempotente;
+- atualizar o README com a nova ordem executável Diagnosis -> demanda -> Estimate -> revalidação;
 - esclarecer que RF27 termina em `OPEN` e ainda não recebe materiais nem libera `AWAITING_ITEMS`.
 
 O OpenAPI gerado continua sendo a fonte de verdade; nenhum YAML manual será criado.
@@ -661,6 +738,11 @@ O OpenAPI gerado continua sendo a fonte de verdade; nenhum YAML manual será cri
 
 ### Aplicação
 
+- avaliação antecipada suficiente não cria nem resolve demanda;
+- avaliação antecipada insuficiente cria ou atualiza uma única demanda com a diferença correta;
+- lote com item inexistente/inativo retorna issues ordenadas e não persiste parcialmente;
+- revalidação na Estimate atualiza `updatedAt` sem mudar `createdAt` ou identidade;
+- rejeição/expiração da Estimate não chama `resolve`;
 - evento insuficiente cria e atualiza uma única demanda com a diferença correta;
 - issues inexistente/inativo não criam demanda;
 - evento de reserva criada resolve apenas demanda `OPEN`;
@@ -683,6 +765,8 @@ O OpenAPI gerado continua sendo a fonte de verdade; nenhum YAML manual será cri
 
 - migration parte de schema vazio com Hibernate `validate`;
 - repositories cobrem round-trip, snapshots, filtros e locks;
+- avaliação e preparação concorrentes respeitam Stock Item -> Purchase Demand sem deadlock;
+- Diagnosis e Estimate concorrentes convergem para a unique key da mesma demanda;
 - duas criações concorrentes com a mesma demanda produzem uma claim e um conflito estável;
 - duas chamadas concorrentes com a mesma idempotency key convergem para uma ordem;
 - hash diferente não chama o gateway;
@@ -694,9 +778,9 @@ Docker Compose, especialmente locks, unique constraints e recuperação após ti
 
 ### Módulos e qualidade
 
-- `@ApplicationModuleTest` cobre o fluxo Stock Reservation event → Purchase Demand dentro de `stockprocurement`;
+- `@ApplicationModuleTest` cobre Diagnosis/Estimate API -> Purchase Demand e Stock Reservation event -> demanda;
 - `ModuleStructureTest` confirma fronteiras e ausência de novo módulo;
-- busca de imports confirma que Purchase Order não depende de Service Lifecycle;
+- busca de imports confirma que Stock & Procurement não depende de packages de Service Lifecycle;
 - `make test` durante os checkpoints;
 - `make verify` e revisão do relatório JaCoCo antes da conclusão;
 - cobertura do código alterado não reduz a meta de 80%.
@@ -704,7 +788,15 @@ Docker Compose, especialmente locks, unique constraints e recuperação após ti
 ## Impacto em documentação e features futuras
 
 - `docs/features/stockprocurement/README.md` será atualizado com os contratos técnicos aprovados;
+- `perform-diagnosis` e `estimate-generation` consumirão `RepairStockAssessmentApi` pela named interface;
 - RF30 consumirá `PurchaseDemandApi`, mas continuará dona de mínimo, alvo e ocorrência;
 - RF28 adicionará a transição de `OPEN` para fechamento sem alterar a composição da ordem;
 - RF29 será dona da movimentação de entrada e do retry priorizado das Service Executions;
 - nenhuma spec de RF28–RF30 é aprovada ou criada por este documento.
+
+## Gates
+
+- [x] Functional Spec aprovada em 2026-08-25.
+- [x] Technical Spec revisada e aprovada por humano em 2026-08-25.
+- [ ] Implementation Plan revisado somente depois da aprovação técnica.
+- [ ] Segurança, contratos, migrations consumidoras, Modulith, testes e documentação verificados no plano futuro.

@@ -5,42 +5,57 @@
 | Feature | `estimate-generation` |
 | Status | Approved |
 | Responsável | Matheus Campagnone |
-| Atualizado em | 2026-08-20 |
+| Atualizado em | 2026-08-25 |
 | Aprovado por | Matheus Apostulo |
-| Aprovado em | 2026-08-20 |
-| Referências | `docs/Architecture.md`, `docs/Architecture-Decisions.md`, DDD/Event Storming do Miro, `stock-domain-foundation` |
+| Aprovado em | 2026-08-25 |
+| Referências | Architecture docs; Miro; `stock-domain-foundation`; `purchase-order-creation` |
 
-## Delta proposto por `stock-item-reservation`
+## Revisão material por disponibilidade e Purchase Demand
 
-Além de congelar o snapshot comercial, a geração válida da Estimate deve congelar, na mesma transação, o
-conjunto de `StockRequirement` de cada Service Execution apresentada. A partir desse momento não se anexa,
-remove nem altera requirement nessa execução. Esse congelamento não cria reserva nem altera disponibilidade.
+Esta revisão, aprovada em 2026-08-25, exige que a Estimate apresente a disponibilidade revalidada dos Stock Requirements
+e reconcilie a Purchase Demand criada desde o Diagnosis. Ela substitui funcionalmente a aprovação de 2026-08-20; a
+especificação técnica anterior não cobre esse comportamento.
+
+## Delta de `stock-item-reservation` incorporado
+
+Além de congelar o snapshot comercial, a geração válida da Estimate deve congelar, na mesma transação, o conjunto de
+`StockRequirement` de cada Service Execution apresentada e revalidar sua disponibilidade. A partir desse momento não se
+anexa, remove nem altera requirement nessa execução. A consulta não cria reserva, não compromete unidades e não altera
+`availableQuantity`; uma insuficiência apenas cria ou atualiza a Purchase Demand pertencente a Stock & Procurement.
 
 ## Problema e resultado esperado
 
-Após o Technician realizar um Diagnosis, a Service Order já possui as Service Executions identificadas e seus respectivos Stock Requirements.
+Após o Technician realizar um Diagnosis, a Service Order já possui as Service Executions identificadas e seus
+respectivos Stock Requirements.
 
 O Customer precisa receber uma representação comercial estável desse diagnóstico antes de autorizar qualquer execução.
 
-Esta feature cria uma Estimate a partir de um ciclo de Diagnosis já existente, preservando um snapshot comercial do trabalho identificado.
+Esta feature cria uma Estimate a partir de um ciclo de Diagnosis já existente, preservando um snapshot comercial do
+trabalho identificado.
 
 Ao final da geração:
 
 - existe uma Estimate identificável e associada à Service Order;
 - a Estimate representa exatamente um ciclo de Diagnosis;
-- as Service Executions daquele Diagnosis são representadas comercialmente sem transferir a propriedade do trabalho para a Estimate;
+- as Service Executions daquele Diagnosis são representadas comercialmente sem transferir a propriedade do trabalho
+  para a Estimate;
 - os dados comerciais necessários ficam congelados como snapshot;
 - o conjunto de `StockRequirement` de cada Service Execution apresentada fica congelado para uma futura
   tentativa de reserva;
-- é produzido o evento `EstimateGenerated`, permitindo que a capability de Notification reaja sem conhecer a implementação interna de Estimate.
+- cada item apresenta a disponibilidade observada na geração e eventual quantidade insuficiente, sem prometer saldo ao
+  Customer;
+- insuficiências revalidam a mesma Purchase Demand registrada desde o Diagnosis, sem criar ordem de compra automática;
+- é produzido o evento `EstimateGenerated`, permitindo que a capability de Notification reaja sem conhecer a
+  implementação interna de Estimate.
 
 ## Atores e cenários
 
 - Um Technician realiza um Diagnosis em uma Service Order.
 - O Diagnosis produz uma ou mais Service Executions.
 - Cada Service Execution pode possuir Stock Requirements.
+- O Diagnosis já pode ter registrado Purchase Demands para requirements insuficientes.
 - O sistema gera uma Estimate correspondente ao Diagnosis aberto.
-- A Estimate mantém snapshots comerciais das Service Executions e dos Stock Requirements relevantes.
+- A Estimate revalida e mantém snapshots comerciais e informativos das Service Executions e dos Stock Requirements.
 - Após a criação bem-sucedida da Estimate, o sistema produz `EstimateGenerated`.
 - A capability de Notification poderá reagir ao evento e comunicar o Customer.
 
@@ -69,20 +84,33 @@ Ao final da geração:
   no mesmo comando que persiste a Estimate.
 - Depois do congelamento, nenhum requirement daquela execução pode ser anexado, removido ou alterado;
   uma necessidade posterior exige novo Diagnosis, nova Service Execution e nova Estimate.
-- Dados comerciais provenientes de Stock Items devem ser copiados para a Estimate quando necessários à apresentação comercial.
+- Dados comerciais provenientes de Stock Items devem ser copiados para a Estimate quando necessários à apresentação
+  comercial.
 - Alterações posteriores em Service Catalog ou Stock Item não podem modificar retroativamente uma Estimate já gerada.
+
+### Snapshot de disponibilidade
+
+- A disponibilidade é revalidada para todos os Stock Requirements congelados na geração.
+- O snapshot distingue quantidade suficiente de insuficiente e registra as quantidades requerida e disponível observada.
+- O snapshot é informativo: não reserva unidades, não garante atendimento futuro e não altera estado da Service
+  Execution.
+- Insuficiência cria ou atualiza a mesma demanda `PENDING_REPAIR` identificada por Service Execution e Stock Item.
+- A decisão posterior do Customer não altera retroativamente o snapshot apresentado.
+- Rejeição ou expiração da Estimate não resolve a demanda, pois a insuficiência de estoque foi concretamente observada.
 
 ### Evento de domínio
 
 - `EstimateGenerated` somente ocorre após a criação válida da Estimate.
 - O evento identifica a Estimate, sua Service Order, o Diagnosis e o Customer relacionado.
-- O evento não representa envio de notificação, aprovação, rejeição, reserva de Stock ou início de execução.
+- O evento não representa envio de notificação, aprovação, rejeição, reserva de Stock, Purchase Order ou início de
+  execução.
 - Notification é consumidora do evento e não deve recalcular regras internas da Estimate.
 
 ### Expiração
 
 - A Estimate deve permitir representar uma data limite por meio de `expiresAt`.
-- A duração que determina `expiresAt` não será fixada nesta feature enquanto a decisão arquitetural correspondente permanecer aberta.
+- A duração que determina `expiresAt` não será fixada nesta feature enquanto a decisão arquitetural correspondente
+  permanecer aberta.
 - Nenhuma regra de 24 horas, 48 horas ou prazo de reposição será hard-coded nesta entrega.
 
 ## Fora de escopo
@@ -93,7 +121,8 @@ Ao final da geração:
 - expiração automática ou scheduler;
 - regra definitiva de duração do prazo de aprovação;
 - reserva, liberação ou consumo de Stock Items;
-- Purchase Order;
+- seleção, criação ou envio de Purchase Order; somente o registro/reconciliação da Purchase Demand pertence à integração
+  funcional com RF27;
 - execução e tracking das Service Executions;
 - implementação do canal de Notification;
 - alteração do fluxo de Diagnosis já existente;
@@ -114,5 +143,9 @@ Ao final da geração:
 - [x] Após a criação válida da Estimate é produzido `EstimateGenerated`.
 - [x] `EstimateGenerated` contém dados suficientes para identificar Estimate, Service Order, Diagnosis e Customer.
 - [x] A geração da Estimate não aprova Service Executions nem reserva Stock.
+- [ ] A geração revalida todos os Stock Requirements e apresenta um snapshot informativo de disponibilidade.
+- [ ] Uma insuficiência atualiza a mesma Purchase Demand originada no Diagnosis, sem duplicação e sem criar Purchase
+      Order automaticamente.
+- [ ] Rejeição ou expiração da Estimate não elimina a Purchase Demand correspondente.
 - [x] A feature permite representar `expiresAt` sem hard-code da duração do prazo.
 - [x] Nenhum comportamento de Notification é implementado dentro do domínio de Estimate.

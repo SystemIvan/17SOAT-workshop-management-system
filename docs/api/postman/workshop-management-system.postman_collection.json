@@ -504,7 +504,7 @@
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/purchase-demands?origin=PENDING_REPAIR&stockItemId={{stockItemId}}",
-            "description": "Lista apenas demandas OPEN. Uma tentativa de reserva com INSUFFICIENT_QUANTITY cria a demanda PENDING_REPAIR."
+            "description": "Lista apenas demandas OPEN. Diagnosis e Estimate registram ou atualizam PENDING_REPAIR ao observar INSUFFICIENT_QUANTITY; a falha de reserva após aprovação também pode reconciliar a mesma demanda."
           }
         },
         {

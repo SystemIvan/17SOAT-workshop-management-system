@@ -50,6 +50,7 @@ public class SearchOpenPurchaseDemandsUseCase {
                 demand.observedAvailableQuantity(),
                 demand.suggestedQuantity(),
                 demand.origin() == PurchaseDemandOrigin.PENDING_REPAIR ? demand.originReferenceId() : null,
-                demand.createdAt());
+                demand.createdAt(),
+                demand.updatedAt());
     }
 }

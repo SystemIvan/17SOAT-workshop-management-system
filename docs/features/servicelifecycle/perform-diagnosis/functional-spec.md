@@ -5,18 +5,28 @@
 | Feature | `perform-diagnosis` |
 | Status | Approved |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-22 |
+| Atualizado em | 2026-08-25 |
 | Aprovado por | Matheus Apostulo |
-| Aprovado em | 2026-08-22 |
-| Referências | `docs/Architecture.md` §2.3 (RF09–RF18), features `assign-diagnosis-assignee` e `diagnosis-authorship` |
+| Aprovado em | 2026-08-25 |
+| Referências | Architecture §2.3; Miro; `assign-diagnosis-assignee`; `diagnosis-authorship`; RF27 |
 
-> **Nota:** este documento é retroativo. A feature já está implementada em produção
+> **Nota:** o baseline deste documento é retroativo. A feature já está implementada em produção
 > (`ServiceOrder.performDiagnosis`, `PerformDiagnosisUseCase`, `POST /api/service-orders/{id}/diagnosis`)
 > e foi identificada sem passar pelo gate SDD do `AGENTS.md`, no mesmo levantamento que originou a
-> documentação retroativa de `service-order-creation` (RF09). O texto abaixo descreve o comportamento
-> como ele existe hoje no código, não uma proposta nova.
+> documentação retroativa de `service-order-creation` (RF09). A revisão funcional aprovada em 2026-08-25 ainda não foi
+> implementada: verificar disponibilidade após registrar os requirements e alimentar RF27 antes da decisão da Estimate.
 
-## Deltas materiais aprovados em features dependentes — pendentes de nova aprovação desta spec
+## Revisão material por insuficiência observada no Diagnosis
+
+Ao concluir o registro das Service Executions e seus Stock Requirements, o sistema verifica a disponibilidade canônica
+dos Stock Items. A verificação produz um snapshot informativo na execução e, quando a quantidade requerida superar a
+disponível, registra ou atualiza uma Purchase Demand `PENDING_REPAIR` em Stock & Procurement.
+
+A demanda representa falta concreta de estoque para uma necessidade diagnosticada. Ela independe da autorização para
+executar o serviço e, por isso, não é eliminada se o Customer rejeitar ou deixar expirar a Estimate. O gatilho nunca
+cria Purchase Order automaticamente; essa decisão continua pertencendo ao Stock Manager.
+
+## Deltas materiais de features dependentes incorporados nesta aprovação
 
 `assign-diagnosis-assignee` exige que a Service Order tenha `diagnosisAssigneeId` antes de aceitar cada Diagnosis.
 `diagnosis-authorship` exige `diagnosedByTechnicianId` no request e registra um `diagnosedAt` único, gerado pelo
@@ -39,6 +49,8 @@ rastreáveis dentro da Service Order, que servirão de base para gerar um Estima
 Ao final do registro de diagnóstico:
 
 - cada item informado vira um `ServiceExecution` novo, com status inicial `PENDING`;
+- os Stock Requirements de cada execução são confrontados com o saldo disponível sem reservar unidades;
+- insuficiências registram ou atualizam Purchase Demands antes da decisão do Customer;
 - todos os `ServiceExecution` criados nesse registro compartilham o mesmo `diagnosisId`, que identifica
   o lote;
 - a Service Order passa a ter um diagnóstico "aberto" (`openDiagnosisId`), e seu status derivado passa a
@@ -93,6 +105,16 @@ Ao final do registro de diagnóstico:
   serviço não depende de peça.
 - Cada `ServiceExecution` criado começa no status `PENDING`.
 
+### Disponibilidade informativa e demanda de compra
+
+- Requirements repetidos do mesmo Stock Item na execução são consolidados para verificar a quantidade total necessária.
+- A consulta registra quantidade requerida, quantidade disponível observada, eventual diferença positiva e instante da
+  observação.
+- A verificação não cria Stock Reservation, não altera `availableQuantity` e não muda o status `PENDING` da execução.
+- Uma diferença positiva cria ou atualiza uma única demanda por Service Execution e Stock Item.
+- Item inexistente, inativo ou quantidade inválida é problema de referência ou integridade, não uma demanda de compra.
+- A Estimate revalida o snapshot antes de apresentá-lo; a aprovação revalida novamente antes da reserva.
+
 ### Efeito no status da Service Order
 
 - Registrar um diagnóstico move o status derivado da Service Order para `IN_DIAGNOSIS`.
@@ -121,6 +143,7 @@ execuções em andamento de lotes anteriores. Coberto por
 - validação de existência do `catalogServiceId` no Service Catalog (`registration`) no momento do
   diagnóstico;
 - execução dos serviços diagnosticados (RF19+).
+- criação automática de Purchase Order; o Diagnosis apenas produz a necessidade selecionável por RF27.
 
 ## Critérios de aceite
 
@@ -128,6 +151,9 @@ execuções em andamento de lotes anteriores. Coberto por
 - [x] Cada item do diagnóstico vira um `ServiceExecution` com status `PENDING`.
 - [x] Todos os `ServiceExecution` de um mesmo registro compartilham o mesmo `diagnosisId`.
 - [x] Registrar um diagnóstico move o status da Service Order para `IN_DIAGNOSIS`.
+- [ ] O Diagnosis verifica os Stock Requirements consolidados sem reservar ou alterar saldo.
+- [ ] Uma insuficiência cria ou atualiza uma única Purchase Demand por Service Execution e Stock Item.
+- [ ] A demanda permanece aberta mesmo se a futura Estimate for rejeitada ou expirar.
 - [x] Tentar registrar diagnóstico em uma Service Order que já tem um diagnóstico aberto é rejeitado.
 - [x] Tentar registrar diagnóstico em uma Service Order inexistente resulta em erro de "não encontrado".
 - [x] Uma lista de itens vazia ou ausente é rejeitada como erro de validação.

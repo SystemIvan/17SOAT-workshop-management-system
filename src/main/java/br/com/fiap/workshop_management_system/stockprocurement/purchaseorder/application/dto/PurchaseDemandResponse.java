@@ -13,5 +13,6 @@ public record PurchaseDemandResponse(
         int observedAvailableQuantity,
         int suggestedQuantity,
         UUID serviceExecutionId,
-        Instant createdAt) {
+        Instant createdAt,
+        Instant updatedAt) {
 }

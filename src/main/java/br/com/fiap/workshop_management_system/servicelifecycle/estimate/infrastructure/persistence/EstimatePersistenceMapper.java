@@ -3,6 +3,7 @@ package br.com.fiap.workshop_management_system.servicelifecycle.estimate.infrast
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.Estimate;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateLine;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateStockItem;
+import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateStockAvailability;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Money;
 import org.springframework.stereotype.Component;
 
@@ -54,6 +55,13 @@ public class EstimatePersistenceMapper {
                 lineEntity.addStockItem(itemEntity);
             }
 
+            for (EstimateStockAvailability availability : line.stockAvailability()) {
+                lineEntity.addStockAvailability(new EstimateStockAvailabilityJpaEntity(
+                        availability.stockItemId(), availability.requestedQuantity(),
+                        availability.observedAvailableQuantity(), availability.shortageQuantity(), availability.status(),
+                        availability.observedAt()));
+            }
+
             entity.addLine(lineEntity);
         }
 
@@ -86,6 +94,12 @@ public class EstimatePersistenceMapper {
                         ))
                         .map(this::toDomainStockItem)
                         .toList();
+        List<EstimateStockAvailability> stockAvailability = entity.getStockAvailability().stream()
+                .map(availability -> new EstimateStockAvailability(
+                        availability.getStockItemId(), availability.getRequestedQuantity(),
+                        availability.getObservedAvailableQuantity(), availability.getShortageQuantity(),
+                        availability.getStatus(), availability.getObservedAt()))
+                .toList();
 
         return new EstimateLine(
                 entity.getServiceExecutionId(),
@@ -94,7 +108,8 @@ public class EstimatePersistenceMapper {
                         entity.getServicePriceValue(),
                         entity.getServicePriceCurrency()
                 ),
-                stockItems
+                stockItems,
+                stockAvailability
         );
     }
 

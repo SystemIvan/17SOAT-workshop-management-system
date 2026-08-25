@@ -3,159 +3,51 @@
 | Campo | Valor |
 |---|---|
 | Feature | `estimate-generation` |
-| Status | Stale |
+| Status | Implemented |
 | Responsável | Matheus Campagnone |
-| Atualizado em | 2026-08-16 |
-| Functional Spec | `./functional-spec.md` |
-| Technical Spec | `./technical-spec.md` |
-
-> Stale desde 2026-08-20: a especificação funcional foi devolvida a `Draft` pela feature
-> `stock-item-reservation`. O plano histórico não deve ser usado para nova implementação até nova revisão do SDD.
+| Atualizado em | 2026-08-25 |
+| Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-25) |
+| Especificação técnica | `./technical-spec.md` (`Approved` em 2026-08-25) |
 
 ## Objetivo
 
-Implementar uma fatia vertical de geração de Estimate a partir de um Diagnosis já realizado, incluindo domínio, persistência, caso de uso, API, contrato `EstimateGenerated` e testes.
+Revalidar os requisitos congelados durante a geração da Estimate, reconciliar Purchase Demands e guardar em cada linha
+a fotografia de disponibilidade independente do snapshot comercial, sem reservar estoque.
 
-A entrega não inclui aprovação/rejeição da Estimate, reserva de Stock, execução de serviços ou Notification.
+## Checkpoints ordenados
 
-## Checkpoint 1 — Domínio
+### 1. Domínio e avaliação compartilhada
 
-Criar:
+- [x] Criar `EstimateStockAvailability` e invariantes, agregando uma entrada por Stock Item em cada `EstimateLine`.
+- [x] Reutilizar exclusivamente `RepairStockAssessmentApi`; não importar internals de Stock & Procurement.
+- [x] Cobrir cópia imutável, resultado incompleto/extra/duplicado e execução sem requisito.
 
-- `Estimate`
-- `EstimateLine`
-- snapshot dos Stock Requirements da linha
-- `EstimateGenerated`
-- `EstimateRepository`
+### 2. Orquestração e persistência
 
-Validar:
+- [x] Alterar `GenerateEstimateUseCase` para congelar, consolidar, avaliar uma vez, atualizar a Service Execution e só
+  então criar/persistir a Estimate e publicar `EstimateGenerated`.
+- [x] Criar migration aditiva para `estimate_line_stock_availability` e adaptar JPA/mappers, sem backfill e sem seed.
+- [x] Garantir rollback de congelamento, snapshots, Estimate e Purchase Demands para qualquer erro do lote.
 
-- Estimate exige pelo menos uma linha;
-- IDs obrigatórios;
-- snapshots imutáveis;
-- uma linha referencia sua `ServiceExecution`;
-- o evento possui contrato estável para consumo externo.
+### 3. HTTP e documentação
 
-Testes:
+- [x] Expor `stockAvailability` como array não nulo em criação e consulta de Estimate, mantendo `stockItems` comercial.
+- [x] Atualizar Springdoc, MockMvc, coleção Postman e README para a revalidação da Estimate.
 
-- criação válida;
-- Estimate sem linhas rejeitada;
-- snapshots preservados;
-- coleções expostas de forma imutável.
+### 4. Segurança e qualidade
 
-## Checkpoint 2 — Caso de uso
+- [x] Revisar dados calculados pelo servidor, erros estáveis, ausência de dados pessoais e a lacuna de autenticação do
+  baseline.
+- [x] Executar testes de domínio, aplicação, persistência, módulo, `make test`, `make verify` e revisão de cobertura.
 
-Criar `GenerateEstimateUseCase`.
+## Critérios de conclusão
 
-Fluxo:
+- [x] Estimate preserva sua fotografia e não altera saldo/reserva.
+- [x] Leitura suficiente não resolve Purchase Demand; reserva criada continua sendo a transição de resolução.
+- [x] Migrations, contratos, documentação, segurança e qualidade verificados.
 
-1. carregar ServiceOrder;
-2. validar Diagnosis;
-3. selecionar ServiceExecutions do Diagnosis;
-4. impedir geração sem execuções;
-5. impedir Estimate duplicada para o Diagnosis;
-6. criar snapshots;
-7. persistir Estimate;
-8. produzir `EstimateGenerated`.
+## Evidências e segurança
 
-Não limpar `openDiagnosisId` durante a geração.
-
-Testes:
-
-- fluxo válido;
-- ServiceOrder inexistente;
-- Diagnosis inválido;
-- Diagnosis sem execuções;
-- Estimate duplicada;
-- persistência realizada;
-- evento produzido.
-
-## Checkpoint 3 — Persistência
-
-Criar migration Flyway nova para:
-
-- `estimates`;
-- `estimate_lines`;
-- snapshots de Stock Items por linha.
-
-Criar adapter de persistência seguindo o padrão já usado no projeto.
-
-Garantir unicidade de `diagnosis_id`.
-
-Validar round-trip entre domínio e JPA.
-
-## Checkpoint 4 — API
-
-Criar endpoint:
-
-`POST /api/service-orders/{serviceOrderId}/estimates`
-
-Request:
-
-`{ "diagnosisId": "<UUID>" }`
-
-Também disponibilizar consulta do recurso criado:
-
-`GET /api/estimates/{estimateId}`
-
-Resultado esperado:
-
-- `201 Created`;
-- retorno da Estimate criada;
-- identificação de ServiceOrder, Diagnosis, Customer e linhas;
-- erros coerentes para not found, conflito e dados inválidos.
-
-Atualizar:
-
-- OpenAPI;
-- collection Postman.
-
-## Checkpoint 5 — Contrato para Notifications
-
-Garantir que `EstimateGenerated` exponha:
-
-- `eventId`;
-- `occurredAt`;
-- `estimateId`;
-- `serviceOrderId`;
-- `diagnosisId`;
-- `customerId`;
-- `expiresAt`.
-
-Não implementar adapter ou listener de Notification nesta feature.
-
-O contrato deve poder ser instanciado e testado independentemente para permitir que o Épico 5 trabalhe com mock.
-
-## Checkpoint 6 — Validação final
-
-Executar:
-
-- testes do domínio;
-- testes da Application Layer;
-- testes de persistência;
-- testes Web;
-- testes de arquitetura;
-- `make verify`.
-
-Revisar:
-
-- migration;
-- OpenAPI;
-- Postman;
-- ausência de mudanças fora da feature;
-- ausência de violação entre módulos.
-
-## Definition of Done
-
-- [x] Estimate implementada como Aggregate Root.
-- [x] EstimateLine implementada como snapshot comercial.
-- [x] EstimateRepository implementado.
-- [x] GenerateEstimateUseCase implementado.
-- [x] Persistência e migration implementadas.
-- [x] Endpoint REST implementado.
-- [x] `EstimateGenerated` implementado e testado.
-- [x] OpenAPI atualizado.
-- [x] Postman atualizado.
-- [x] Testes relevantes passando.
-- [x] `make verify` passando.
-- [ ] PR pronto para review.
+`make verify`, ModuleStructureTest e validação Flyway/Hibernate passaram em 2026-08-25. O snapshot é calculado pelo
+servidor, não recebe saldo/status no request e não expõe dados pessoais. A autenticação continua sendo lacuna do
+baseline, sem achado crítico ou alto introduzido por esta feature.

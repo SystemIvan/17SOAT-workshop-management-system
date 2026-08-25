@@ -17,14 +17,17 @@ e dependências, não substitui `functional-spec.md`, `technical-spec.md`, `impl
 ## Sequência funcional
 
 1. Stock Item Foundation mantém o catálogo e a disponibilidade atual.
-2. Stock Item Reservation tenta comprometer atomicamente os requirements de uma Service Execution autorizada.
-3. Uma insuficiência pode originar uma Purchase Demand `PENDING_REPAIR`.
-4. RF30 poderá originar uma Purchase Demand `LOW_STOCK` a partir de nível mínimo e alvo de reposição aprovados.
-5. RF27 permite ao Stock Manager criar uma Purchase Order ad hoc, a partir de demandas ou combinando as duas formas.
-6. O External Supplier System confirma a ordem e devolve uma referência externa.
-7. RF28 fecha a Purchase Order quando a entrega for confirmada pelo Stock Manager.
-8. RF29 registra o recebimento, aumenta a disponibilidade e alimenta novas tentativas de reserva.
-9. A priorização posterior decide quais Service Executions pendentes tentar atender primeiro.
+2. Diagnosis e geração de Estimate observam a disponibilidade e registram a necessidade concreta de compra sem reservar
+   unidades.
+3. Stock Item Reservation tenta comprometer atomicamente os requirements de uma Service Execution autorizada.
+4. Uma insuficiência pode originar ou atualizar uma Purchase Demand `PENDING_REPAIR` já no Diagnosis; rejeição ou
+   expiração comercial não a resolve.
+5. RF30 poderá originar uma Purchase Demand `LOW_STOCK` a partir de nível mínimo e alvo de reposição aprovados.
+6. RF27 permite ao Stock Manager criar uma Purchase Order ad hoc, a partir de demandas ou combinando as duas formas.
+7. O External Supplier System confirma a ordem e devolve uma referência externa.
+8. RF28 fecha a Purchase Order quando a entrega for confirmada pelo Stock Manager.
+9. RF29 registra o recebimento, aumenta a disponibilidade e alimenta novas tentativas de reserva.
+10. A priorização posterior decide quais Service Executions pendentes tentar atender primeiro.
 
 ## Recorte das features
 
