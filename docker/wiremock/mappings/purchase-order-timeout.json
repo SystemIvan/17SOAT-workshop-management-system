@@ -1,0 +1,23 @@
+{
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/api/v1/purchase-orders",
+    "bodyPatterns": [
+      {
+        "matchesJsonPath": "$.items[?(@.productCode == 'SUPPLIER-TIMEOUT-001')]"
+      }
+    ]
+  },
+  "response": {
+    "status": 201,
+    "fixedDelayMilliseconds": 7000,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "supplierOrderReference": "SUP-TIMEOUT",
+      "status": "ACCEPTED"
+    }
+  }
+}
