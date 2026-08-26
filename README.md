@@ -290,7 +290,9 @@ retornados em respostas `201 Created` são os que devem ser usados no restante d
     com `{"technicianId":"{{technicianId}}"}`. Espere `200 OK` e confira `assignedTechnicianId`. Não atribua uma
     execução `REJECTED`.
 
-13. Com a execução `READY`, envie, nesta ordem, `Start execution`, `Update execution progress` e `Complete execution`:
+13. Depois de atribuir o Technician no passo 12, e somente com a execução `READY`, envie, nesta ordem,
+    `Start execution`, `Update execution progress` e `Complete execution`. `Start execution` sem
+    `assignedTechnicianId` retorna `409 INVALID_STATE_TRANSITION`:
 
     ```http
     POST  {{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/start

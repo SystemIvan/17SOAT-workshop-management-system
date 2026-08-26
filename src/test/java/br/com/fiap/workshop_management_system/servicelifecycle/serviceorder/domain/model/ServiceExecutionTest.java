@@ -52,6 +52,7 @@ class ServiceExecutionTest {
 
         assertEquals(ServiceExecutionStatus.READY, serviceOrder.serviceExecutions().get(0).status());
         assertEquals(reservationId, serviceOrder.serviceExecutions().get(0).stockReservationId());
+        serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
         serviceOrder.startExecution(executionId);
         assertEquals(ServiceExecutionStatus.IN_PROGRESS, serviceOrder.serviceExecutions().get(0).status());
     }
@@ -66,10 +67,22 @@ class ServiceExecutionTest {
     }
 
     @Test
+    void cannotStartAReadyExecutionWithoutAnAssignedTechnician() {
+        ServiceOrder serviceOrder = serviceOrderWithOneExecution();
+        UUID executionId = serviceOrder.serviceExecutions().get(0).id();
+        serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+
+        assertThrows(IllegalStateException.class, () -> serviceOrder.startExecution(executionId));
+
+        assertEquals(ServiceExecutionStatus.READY, serviceOrder.serviceExecutions().get(0).status());
+    }
+
+    @Test
     void canUpdateProgressOfAnInProgressExecution() {
         ServiceOrder serviceOrder = serviceOrderWithOneExecution();
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+        serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
         serviceOrder.startExecution(executionId);
 
         serviceOrder.updateExecutionProgress(executionId, "Peça trocada, aguardando teste");
@@ -106,6 +119,7 @@ class ServiceExecutionTest {
         ServiceOrder serviceOrder = serviceOrderWithOneExecution();
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+        serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
         serviceOrder.startExecution(executionId);
         serviceOrder.completeExecution(executionId);
 
@@ -149,6 +163,7 @@ class ServiceExecutionTest {
         ServiceOrder serviceOrder = serviceOrderWithOneExecution();
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+        serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
         serviceOrder.startExecution(executionId);
 
         assertThrows(IllegalStateException.class,

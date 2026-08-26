@@ -1253,6 +1253,34 @@
       "description": "Depende de uma ServiceExecution já AUTHORIZED por \"Estimates / Decide estimate lines\" (decisão APPROVED); por isso roda depois de \"Estimates\", não dentro de \"Service Lifecycle\".",
       "item": [
         {
+          "name": "Assign technician before starting execution",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "const executionId = pm.variables.get('executionId');",
+                  "const execution = pm.response.json().executions.find((item) => item.id === executionId);",
+                  "pm.test('Execution has the assigned technician', function () { pm.expect(execution.assignedTechnicianId).to.eql(pm.variables.get('technicianId')); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"technicianId\": \"{{technicianId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/assign-technician",
+            "description": "Obrigatório antes de Start execution. Uma execução READY sem assignedTechnicianId recebe 409/INVALID_STATE_TRANSITION ao iniciar."
+          }
+        },
+        {
           "name": "Start execution",
           "event": [
             {
@@ -1269,7 +1297,8 @@
           ],
           "request": {
             "method": "POST",
-            "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/start"
+              "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/start",
+              "description": "Requer execution READY e Technician atribuído no passo anterior; caso contrário retorna 409/INVALID_STATE_TRANSITION."
           }
         },
         {

@@ -65,6 +65,7 @@ class ServiceOrderControllerStartExecutionTest {
         String serviceOrderId = createServiceOrder();
         String executionId = diagnoseWithOneExecution(serviceOrderId);
         authorizeExecution(UUID.fromString(serviceOrderId), UUID.fromString(executionId));
+        assignTechnician(serviceOrderId, executionId);
 
         mockMvc.perform(post("/api/service-orders/{id}/executions/{executionId}/start",
                         serviceOrderId, executionId))
@@ -102,10 +103,23 @@ class ServiceOrderControllerStartExecutionTest {
     }
 
     @Test
+    void returnsConflictWhenReadyExecutionHasNoAssignedTechnician() throws Exception {
+        String serviceOrderId = createServiceOrder();
+        String executionId = diagnoseWithOneExecution(serviceOrderId);
+        authorizeExecution(UUID.fromString(serviceOrderId), UUID.fromString(executionId));
+
+        mockMvc.perform(post("/api/service-orders/{id}/executions/{executionId}/start",
+                        serviceOrderId, executionId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_STATE_TRANSITION"));
+    }
+
+    @Test
     void returnsConflictWhenExecutionIsAlreadyInProgress() throws Exception {
         String serviceOrderId = createServiceOrder();
         String executionId = diagnoseWithOneExecution(serviceOrderId);
         authorizeExecution(UUID.fromString(serviceOrderId), UUID.fromString(executionId));
+        assignTechnician(serviceOrderId, executionId);
 
         mockMvc.perform(post("/api/service-orders/{id}/executions/{executionId}/start",
                         serviceOrderId, executionId))
@@ -162,17 +176,30 @@ class ServiceOrderControllerStartExecutionTest {
     }
 
     private String assignDiagnosisAssignee(String serviceOrderId) throws Exception {
-        MvcResult technician = mockMvc.perform(post("/api/technicians")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Carlos Silva\",\"specialties\":[\"MECHANICAL\"]}"))
-                .andExpect(status().isCreated())
-                .andReturn();
-        String technicianId = JsonPath.read(technician.getResponse().getContentAsString(), "$.id");
+        String technicianId = createTechnician();
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
                         "/api/service-orders/{id}/diagnosis-assignee", serviceOrderId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"technicianId\":\"" + technicianId + "\"}"))
                 .andExpect(status().isOk());
         return technicianId;
+    }
+
+    private void assignTechnician(String serviceOrderId, String executionId) throws Exception {
+        String technicianId = createTechnician();
+        mockMvc.perform(post("/api/service-orders/{id}/executions/{executionId}/assign-technician",
+                        serviceOrderId, executionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"technicianId\":\"" + technicianId + "\"}"))
+                .andExpect(status().isOk());
+    }
+
+    private String createTechnician() throws Exception {
+        MvcResult technician = mockMvc.perform(post("/api/technicians")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Carlos Silva\",\"specialties\":[\"MECHANICAL\"]}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return JsonPath.read(technician.getResponse().getContentAsString(), "$.id");
     }
 }
