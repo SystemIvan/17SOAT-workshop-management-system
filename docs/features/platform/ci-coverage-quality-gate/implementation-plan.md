@@ -230,6 +230,14 @@ Dependência operacional:
   GitHub impedirem a configuração, registrar a evidência e interromper a conclusão da feature; não declarar a proteção
   como aplicada sem verificação.
 
+Estado operacional em 2026-08-26:
+
+- `dev` exige `Quality gate` com origem GitHub Actions, atualização estrita com a base e aplicação a administradores;
+- `main` permanece sem proteção e sem o workflow. A API retornou `404 Branch not protected` e a comparação
+  `origin/main...origin/dev` mostrou `main` 180 commits atrás de `dev`;
+- promover todo o conteúdo de `dev` ou preparar um backport isolado para `main` exige uma decisão explícita de release.
+  Até essa decisão, não aplicar um required check que ainda não foi validado nessa base.
+
 ### Checkpoint 7 — Encerrar a feature
 
 Status: `Pending`.
@@ -254,9 +262,9 @@ Critério de conclusão:
 - [x] Maven reprova cobertura abaixo de 80% sem parsing textual externo.
 - [x] Maven reprova ausência do relatório JaCoCo em execução limpa.
 - [x] `make verify` e `make coverage` delegam ao gate `./mvnw clean verify`.
-- [ ] Workflow `CI` executa o único check `Quality gate` com Java 21 e Maven Wrapper.
-- [ ] Concorrência cancela execução obsoleta sem misturar Pull Requests distintos.
-- [ ] Artifacts de testes e cobertura são publicados por 30 dias, inclusive após falhas aplicáveis.
+- [x] Workflow `CI` executa o único check `Quality gate` com Java 21 e Maven Wrapper.
+- [x] Concorrência cancela execução obsoleta sem misturar Pull Requests distintos.
+- [x] Artifacts de testes e cobertura são publicados por 30 dias, inclusive após falhas aplicáveis.
 - [x] Permissões, secrets, actions e conteúdo dos artifacts passaram pela revisão de segurança local.
 - [x] `make test`, `make coverage`, `make verify` e `ModuleStructureTest` estão verdes.
 - [x] README e documentação de arquitetura refletem o estado implementado.
@@ -280,10 +288,17 @@ Critério de conclusão:
 | 2026-08-26 | 5 | `git diff --check` e revisão do diff | Passou | Sem erro de whitespace, teste alterado/desabilitado ou arquivo fora do escopo |
 | 2026-08-26 | 5 | revisão de segurança | Passou | Nenhum achado crítico/alto; itens `N/A` justificados no checklist |
 | 2026-08-26 | 6 | PR [#39](https://github.com/SystemIvan/17SOAT-workshop-management-system/pull/39) | Parcial | Criado para `dev` no SHA `df55667`; integrado externamente por `SystemIvan` antes de checks ou review, sem solicitação de landing pelo agente |
+| 2026-08-26 | 6 | run [32987915699](https://github.com/SystemIvan/17SOAT-workshop-management-system/actions/runs/32987915699) | Passou | Evento `pull_request` do PR #39 no SHA `df55667`; `Quality gate` verde e artifacts de testes e JaCoCo publicados |
 | 2026-08-26 | 6 | run [32988515227](https://github.com/SystemIvan/17SOAT-workshop-management-system/actions/runs/32988515227) | Passou | Push do merge commit `069b562`; job `Quality gate` e todas as seis etapas principais verdes |
 | 2026-08-26 | 6 | artifacts do run `32988515227` | Passou | `test-reports-32988515227-1` e `jacoco-report-32988515227-1`, retenção até 2026-09-25; 601 testes verdes e cobertura de 91,85% conferidos após download |
+| 2026-08-26 | 6 | PR [#40](https://github.com/SystemIvan/17SOAT-workshop-management-system/pull/40) e run [32994106084](https://github.com/SystemIvan/17SOAT-workshop-management-system/actions/runs/32994106084) | Passou | PR para registrar o rollout, aprovado por `matheusapostulo`; `Quality gate` verde no SHA `c853e37` |
+| 2026-08-26 | 6 | cobertura insuficiente no PR temporário [#42](https://github.com/SystemIvan/17SOAT-workshop-management-system/pull/42), run [32994526215](https://github.com/SystemIvan/17SOAT-workshop-management-system/actions/runs/32994526215) | Falhou como esperado | 601 testes verdes; JaCoCo reprovou razão `0.91` abaixo do mínimo temporário `1.00`; artifacts de testes e cobertura retidos até 2026-09-25 |
+| 2026-08-26 | 6 | relatório ausente no PR #42, run [32995176394](https://github.com/SystemIvan/17SOAT-workshop-management-system/actions/runs/32995176394) | Falhou como esperado | 601 testes verdes; Enforcer exigiu `target/site/jacoco/jacoco.xml`; relatório de testes publicado e upload JaCoCo acusou ausência |
+| 2026-08-26 | 6 | teste falho no PR #42, run [32995412614](https://github.com/SystemIvan/17SOAT-workshop-management-system/actions/runs/32995412614) | Falhou como esperado | 602 testes, 1 falha intencional; Surefire publicado e gate bloqueado antes da geração do relatório JaCoCo |
+| 2026-08-26 | 6 | concorrência no PR #42, runs [33010652866](https://github.com/SystemIvan/17SOAT-workshop-management-system/actions/runs/33010652866) e [33010675839](https://github.com/SystemIvan/17SOAT-workshop-management-system/actions/runs/33010675839) | Passou | Run obsoleto cancelado durante `Run quality gate`; substituto executou 601 testes, aprovou cobertura e publicou ambos os artifacts por 30 dias |
+| 2026-08-26 | 6 | encerramento do PR #42 | Passou | PR fechado sem merge; conteúdo final idêntico a `dev`; branch temporário local e remoto removido após preservar as evidências nos runs |
 | 2026-08-26 | 6 | proteção de `dev` pela API GitHub | Passou | `Quality gate` associado ao GitHub Actions (`app_id=15368`), `strict=true` e `enforce_admins=true` |
-| 2026-08-26 | 6 | proteção de `main` | Pendente | O workflow ainda não está presente em `main`; aplicar o check agora impediria sua própria execução em Pull Requests para essa base |
+| 2026-08-26 | 6 | proteção de `main` | Pendente | API retornou `404 Branch not protected`; workflow ausente e `main` está 180 commits atrás de `dev`; requer decisão explícita entre promoção de `dev` e backport isolado |
 
 Evidências mínimas esperadas:
 
