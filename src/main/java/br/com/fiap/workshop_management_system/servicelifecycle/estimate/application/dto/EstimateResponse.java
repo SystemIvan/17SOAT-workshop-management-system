@@ -2,8 +2,9 @@ package br.com.fiap.workshop_management_system.servicelifecycle.estimate.applica
 
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.Estimate;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateLine;
-import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateStockItem;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateStockAvailability;
+import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateStockItem;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Money;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -18,10 +19,13 @@ public record EstimateResponse(
         Instant createdAt,
         Instant expiresAt,
         String status,
+        MoneyResponse total,
         List<LineResponse> lines
 ) {
 
     public static EstimateResponse from(Estimate estimate) {
+        Money total = calculateTotal(estimate);
+
         return new EstimateResponse(
                 estimate.id(),
                 estimate.serviceOrderId(),
@@ -30,31 +34,55 @@ public record EstimateResponse(
                 estimate.createdAt(),
                 estimate.expiresAt(),
                 estimate.status().name(),
+                MoneyResponse.from(total),
                 estimate.lines().stream()
                         .map(LineResponse::from)
                         .toList()
         );
     }
 
+    private static Money calculateTotal(Estimate estimate) {
+        if (estimate.lines().isEmpty()) {
+            return Money.brl(BigDecimal.ZERO);
+        }
+
+        String currency = estimate.lines()
+                .getFirst()
+                .lineTotal()
+                .currency();
+
+        BigDecimal value = estimate.lines().stream()
+                .map(EstimateLine::lineTotal)
+                .map(Money::value)
+                .reduce(
+                        BigDecimal.ZERO,
+                        BigDecimal::add
+                );
+
+        return new Money(value, currency);
+    }
+
     public record LineResponse(
             UUID serviceExecutionId,
             String serviceName,
             MoneyResponse servicePrice,
+            MoneyResponse lineTotal,
             List<StockItemResponse> stockItems,
             List<StockAvailabilityResponse> stockAvailability
     ) {
+
         private static LineResponse from(EstimateLine line) {
             return new LineResponse(
                     line.serviceExecutionId(),
                     line.serviceName(),
-                    new MoneyResponse(
-                            line.servicePrice().value(),
-                            line.servicePrice().currency()
-                    ),
+                    MoneyResponse.from(line.servicePrice()),
+                    MoneyResponse.from(line.lineTotal()),
                     line.stockItems().stream()
                             .map(StockItemResponse::from)
                             .toList(),
-                    line.stockAvailability().stream().map(StockAvailabilityResponse::from).toList()
+                    line.stockAvailability().stream()
+                            .map(StockAvailabilityResponse::from)
+                            .toList()
             );
         }
     }
@@ -65,11 +93,20 @@ public record EstimateResponse(
             int observedAvailableQuantity,
             int shortageQuantity,
             String status,
-            Instant observedAt) {
-        private static StockAvailabilityResponse from(EstimateStockAvailability availability) {
-            return new StockAvailabilityResponse(availability.stockItemId(), availability.requestedQuantity(),
-                    availability.observedAvailableQuantity(), availability.shortageQuantity(),
-                    availability.status().name(), availability.observedAt());
+            Instant observedAt
+    ) {
+
+        private static StockAvailabilityResponse from(
+                EstimateStockAvailability availability) {
+
+            return new StockAvailabilityResponse(
+                    availability.stockItemId(),
+                    availability.requestedQuantity(),
+                    availability.observedAvailableQuantity(),
+                    availability.shortageQuantity(),
+                    availability.status().name(),
+                    availability.observedAt()
+            );
         }
     }
 
@@ -80,16 +117,16 @@ public record EstimateResponse(
             String nameSnapshot,
             MoneyResponse priceSnapshot
     ) {
-        private static StockItemResponse from(EstimateStockItem item) {
+
+        private static StockItemResponse from(
+                EstimateStockItem item) {
+
             return new StockItemResponse(
                     item.stockItemId(),
                     item.type().name(),
                     item.quantity(),
                     item.nameSnapshot(),
-                    new MoneyResponse(
-                            item.priceSnapshot().value(),
-                            item.priceSnapshot().currency()
-                    )
+                    MoneyResponse.from(item.priceSnapshot())
             );
         }
     }
@@ -98,5 +135,12 @@ public record EstimateResponse(
             BigDecimal value,
             String currency
     ) {
+
+        private static MoneyResponse from(Money money) {
+            return new MoneyResponse(
+                    money.value(),
+                    money.currency()
+            );
+        }
     }
 }
