@@ -173,6 +173,7 @@ class ServiceOrderTest {
 
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), approvedExecutionId);
         serviceOrder.rejectExecutionFromEstimate(UUID.randomUUID(), rejectedExecutionId);
+        serviceOrder.confirmTechnicianAssignment(approvedExecutionId, UUID.randomUUID());
         serviceOrder.startExecution(approvedExecutionId);
         serviceOrder.completeExecution(approvedExecutionId);
 

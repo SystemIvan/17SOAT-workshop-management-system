@@ -67,3 +67,12 @@ autorização, dados sensíveis, persistência e dependências. Registrar evidê
 - `make test`: passou, **624 testes**, 0 falhas/erros; `ModuleStructureTest` incluído.
 - `make verify`: passou, **624 testes**, 0 falhas/erros; cobertura JaCoCo **91,43%**.
 - `git diff --check`: passou.
+
+### Correção de regressão de fixtures — 2026-08-26
+
+Uma execução posterior da suíte identificou 11 fixtures de testes de RF10/RF12/RF19/RF22/RF24 que montavam
+diretamente uma execução `READY → IN_PROGRESS` ou `COMPLETED` sem atribuir Technician. Eles foram
+atualizados para chamar `confirmTechnicianAssignment` antes de iniciar, preservando a nova regra de
+produção e a intenção de cada teste. `make test` e `./mvnw verify` passaram após a correção, com 624
+testes e 0 falhas/erros. A tentativa de `make verify` falhou somente no `clean`, antes dos testes, porque
+um artefato temporário em `target/surefire-reports` não pôde ser removido; a validação sem `clean` passou.
