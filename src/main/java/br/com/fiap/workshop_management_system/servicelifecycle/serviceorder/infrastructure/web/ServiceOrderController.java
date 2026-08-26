@@ -155,7 +155,7 @@ public class ServiceOrderController {
             @ApiResponse(responseCode = "400", description = "Invalid diagnosis request"),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Service order, technician or Catalog Service not found"),
+                    description = "Service order, technician, Catalog Service or Stock Item not found"),
             @ApiResponse(
                     responseCode = "409",
                     description = "Diagnosis is unavailable or a Catalog Service is archived")

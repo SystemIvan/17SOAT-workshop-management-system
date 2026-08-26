@@ -8,6 +8,8 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
         .CatalogServiceArchivedForNewWorkException;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
         .CatalogServiceNotFoundForNewWorkException;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .ServiceOrderStockItemNotFoundException;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.port.CatalogServiceEligibility;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.port
         .CatalogServiceEligibilityPort;
@@ -23,6 +25,7 @@ import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.app
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentResult;
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentResultLine;
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAvailabilityStatus;
+import br.com.fiap.workshop_management_system.stockprocurement.stock.application.exception.StockItemNotFoundException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -106,6 +109,34 @@ class PerformDiagnosisUseCaseTest {
         assertEquals(1, response.executions().getFirst().stockAvailability().size());
         assertEquals(2, response.executions().getFirst().stockAvailability().getFirst().shortageQuantity());
         assertEquals("PENDING", response.executions().getFirst().status().name());
+    }
+
+    @Test
+    void translatesUnknownStockItemIntoAServiceLifecycleOwnedNotFoundException() {
+        InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository();
+        InMemoryTechnicianRepository technicians = new InMemoryTechnicianRepository();
+        RecordingCatalogServiceEligibilityPort catalogServices = new RecordingCatalogServiceEligibilityPort();
+        UUID stockItemId = UUID.randomUUID();
+        RepairStockAssessmentApi assessmentApi = command -> {
+            throw new StockItemNotFoundException();
+        };
+        PerformDiagnosisUseCase useCase = new PerformDiagnosisUseCase(
+                serviceOrders, technicians, catalogServices, assessmentApi, Clock.systemUTC());
+        ServiceOrder serviceOrder = ServiceOrder.create(
+                UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, "Initial assessment");
+        Technician technician = Technician.create("Carlos Silva", Set.of(Specialty.MECHANICAL));
+        serviceOrder.assignDiagnosisAssignee(technician.id());
+        serviceOrders.save(serviceOrder);
+        technicians.save(technician);
+
+        PerformDiagnosisRequest request = new PerformDiagnosisRequest(technician.id(), List.of(
+                new DiagnosisItemRequest(UUID.randomUUID(), "Troca de óleo", new MoneyDTO(BigDecimal.TEN, "BRL"),
+                        List.of(new br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto
+                                .StockRequirementRequest(stockItemId,
+                                br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockItemType.PART,
+                                1, "Filtro", new MoneyDTO(BigDecimal.ONE, "BRL"))))));
+
+        assertThrows(ServiceOrderStockItemNotFoundException.class, () -> useCase.execute(serviceOrder.id(), request));
     }
 
     private static RepairStockAssessmentResult shortageResult(RepairStockAssessmentCommand command, UUID stockItemId) {

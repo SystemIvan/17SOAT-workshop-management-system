@@ -7,6 +7,8 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
         .CatalogServiceArchivedForNewWorkException;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
         .CatalogServiceNotFoundForNewWorkException;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .ServiceOrderStockItemNotFoundException;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.port.CatalogServiceEligibility;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.port
         .CatalogServiceEligibilityPort;
@@ -21,6 +23,7 @@ import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.app
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentExecution;
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentLine;
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentResult;
+import br.com.fiap.workshop_management_system.stockprocurement.stock.application.exception.StockItemNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -91,8 +94,13 @@ public class PerformDiagnosisUseCase {
         Instant diagnosedAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
         UUID diagnosisId = serviceOrder.performDiagnosis(items, request.diagnosedByTechnicianId(), diagnosedAt);
         if (repairStockAssessmentApi != null) {
-            RepairStockAssessmentResult result = repairStockAssessmentApi.assessAndRecord(
-                    new RepairStockAssessmentCommand(toAssessmentExecutions(serviceOrder, diagnosisId)));
+            RepairStockAssessmentResult result;
+            try {
+                result = repairStockAssessmentApi.assessAndRecord(
+                        new RepairStockAssessmentCommand(toAssessmentExecutions(serviceOrder, diagnosisId)));
+            } catch (StockItemNotFoundException exception) {
+                throw new ServiceOrderStockItemNotFoundException();
+            }
             serviceOrder.recordStockAvailability(diagnosisId, toSnapshots(result));
         }
         repository.save(serviceOrder);
