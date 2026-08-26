@@ -74,6 +74,14 @@
           "name": "Create user account (ADMIN only)",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('newManagerUsername', 'manager.new.' + Date.now());"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "exec": [
@@ -81,7 +89,7 @@
                   "const body = pm.response.json();",
                   "pm.test('Response echoes the requested username and role', function () {",
                   "    pm.expect(body.id).to.be.a('string').and.not.empty;",
-                  "    pm.expect(body.username).to.eql('manager.new');",
+                  "    pm.expect(body.username).to.eql(pm.collectionVariables.get('newManagerUsername'));",
                   "    pm.expect(body.role).to.eql('MANAGER');",
                   "});"
                 ]
@@ -98,10 +106,10 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"manager.new\",\n  \"password\": \"changeme123\",\n  \"role\": \"MANAGER\"\n}"
+              "raw": "{\n  \"username\": \"{{newManagerUsername}}\",\n  \"password\": \"changeme123\",\n  \"role\": \"MANAGER\"\n}"
             },
             "url": "{{baseUrl}}/api/auth/users",
-            "description": "Chamado uma única vez por base de dados: reexecutar com o mesmo username retorna 409. Não faz parte da sequência E2E principal do README."
+            "description": "The pre-request script generates a fresh username on every run (Date.now() suffix) so the request can be repeated (e.g. via Newman) against the same database without a 409 USERNAME_ALREADY_EXISTS conflict."
           }
         }
       ]
@@ -269,24 +277,6 @@
                 "url": "{{baseUrl}}/api/customers/{{customerId}}/contact-info",
                 "description": "Shows every accepted field in one partial update. At least one field is required; omitted fields are preserved, and an address must be complete when provided."
               }
-            },
-            {
-              "name": "Archive customer",
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "exec": [
-                      "pm.test('Status code is 204', function () { pm.response.to.have.status(204); });"
-                    ]
-                  }
-                }
-              ],
-              "request": {
-                "method": "DELETE",
-                "url": "{{baseUrl}}/api/customers/{{customerId}}",
-                "description": "Não faz parte da sequência E2E principal (arquivaria o customerId usado pelas demais requisições). Execute isoladamente ao final, se necessário."
-              }
             }
           ]
         },
@@ -381,6 +371,18 @@
               "name": "Update vehicle details",
               "event": [
                 {
+                  "listen": "prerequest",
+                  "script": {
+                    "exec": [
+                      "function randomAlphaNumeric(length) {",
+                      "    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';",
+                      "    return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');",
+                      "}",
+                      "pm.collectionVariables.set('vehicleChassis', randomAlphaNumeric(17));"
+                    ]
+                  }
+                },
+                {
                   "listen": "test",
                   "script": {
                     "exec": [
@@ -393,9 +395,9 @@
               "request": {
                 "method": "PATCH",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"brand\": \"Volkswagen\",\n  \"model\": \"Polo\",\n  \"year\": 2026,\n  \"color\": \"Azul\",\n  \"chassis\": \"9BWZZZ377VT009999\"\n}" },
+                "body": { "mode": "raw", "raw": "{\n  \"brand\": \"Volkswagen\",\n  \"model\": \"Polo\",\n  \"year\": 2026,\n  \"color\": \"Azul\",\n  \"chassis\": \"{{vehicleChassis}}\"\n}" },
                 "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
-                "description": "Shows every accepted field. Brand, model, year and color are required; an omitted, null, empty or blank chassis preserves the current value."
+                "description": "Shows every accepted field. Brand, model, year and color are required; an omitted, null, empty or blank chassis preserves the current value. O pré-request script gera um chassis novo a cada execução, já que o chassis deve ser único."
               }
             },
             {
@@ -417,24 +419,6 @@
                 "body": { "mode": "raw", "raw": "{\n  \"mileage\": 43000\n}" },
                 "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}/mileage",
                 "description": "Records the first mileage reading or a greater value. Repeating the current value is idempotent; lower values return 409."
-              }
-            },
-            {
-              "name": "Archive vehicle",
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "exec": [
-                      "pm.test('Status code is 204', function () { pm.response.to.have.status(204); });"
-                    ]
-                  }
-                }
-              ],
-              "request": {
-                "method": "DELETE",
-                "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
-                "description": "Archives a vehicle without deleting its history. Repeating the request is idempotent. Não faz parte da sequência E2E principal (arquivaria o vehicleId usado pelas demais requisições)."
               }
             }
           ]
@@ -495,11 +479,21 @@
               "name": "Rename catalog service",
               "event": [
                 {
+                  "listen": "prerequest",
+                  "script": {
+                    "exec": [
+                      "pm.collectionVariables.set('renamedCatalogServiceName', 'Troca de óleo premium ' + Date.now());"
+                    ]
+                  }
+                },
+                {
                   "listen": "test",
                   "script": {
                     "exec": [
                       "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
-                      "pm.test('Name was updated', function () { pm.expect(pm.response.json().name).to.eql('Troca de óleo premium'); });"
+                      "pm.test('Name was updated', function () {",
+                      "    pm.expect(pm.response.json().name).to.eql(pm.collectionVariables.get('renamedCatalogServiceName'));",
+                      "});"
                     ]
                   }
                 }
@@ -507,9 +501,9 @@
               "request": {
                 "method": "PATCH",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"name\": \"Troca de óleo premium\"\n}" },
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"{{renamedCatalogServiceName}}\"\n}" },
                 "url": "{{baseUrl}}/api/catalog-services/{{catalogServiceId}}",
-                "description": "Atualiza somente o nome de exibição de um serviço ativo."
+                "description": "Atualiza somente o nome de exibição de um serviço ativo. O pré-request script gera um nome novo a cada execução, já que o nome deve ser único entre serviços ativos."
               }
             },
             {
@@ -601,6 +595,115 @@
               }
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "Stock & Procurement",
+      "description": "Cadastro de itens de estoque. A reserva/consumo e a compra de reposição ficam na pasta \"Stock & Procurement — Reservations & Purchase Orders\", mais adiante, pois dependem de uma diagnose/estimate já aprovada.",
+      "item": [
+        {
+          "name": "Create stock item",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('stockItemSku', 'FILTER-' + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Stock item id is present', function () { pm.expect(body.id).to.be.a('string').and.not.empty; });",
+                  "pm.collectionVariables.set('stockItemId', body.id);",
+                  "pm.environment.set('stockItemId', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Oil filter\",\n  \"sku\": \"{{stockItemSku}}\",\n  \"type\": \"PART\",\n  \"availableQuantity\": 20,\n  \"price\": { \"value\": 45.90, \"currency\": \"BRL\" }\n}"
+            },
+            "url": "{{baseUrl}}/api/stock-items",
+            "description": "O pré-request script gera um SKU único a cada execução, já que o SKU deve ser único."
+          }
+        },
+        {
+          "name": "Get stock item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/stock-items/{{stockItemId}}"
+          }
+        },
+        {
+          "name": "Search available parts and supplies",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/stock-items?search=filter&type=PART&type=SUPPLY&available=true&active=true"
+          }
+        },
+        {
+          "name": "Update stock item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Name was updated', function () { pm.expect(pm.response.json().name).to.eql('Premium oil filter'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Premium oil filter\",\n  \"price\": { \"value\": 49.90, \"currency\": \"BRL\" }\n}"
+            },
+            "url": "{{baseUrl}}/api/stock-items/{{stockItemId}}"
+          }
         }
       ]
     },
@@ -1035,175 +1138,6 @@
                 },
                 "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/assign-technician"
               }
-            },
-            {
-              "name": "Attach stock requirement",
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "exec": [
-                      "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
-                    ]
-                  }
-                }
-              ],
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"stockItemId\": \"{{stockItemId}}\",\n  \"type\": \"PART\",\n  \"quantity\": 1,\n  \"nameSnapshot\": \"Oil filter\",\n  \"priceSnapshot\": { \"value\": 45.90, \"currency\": \"BRL\" }\n}"
-                },
-                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/stock-requirements",
-                "description": "Não faz parte da sequência E2E principal (Perform diagnosis já anexa o requirement inicial); use para adicionar um requirement extra a uma execução existente."
-              }
-            },
-            {
-              "name": "Retry stock reservation",
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "exec": [
-                      "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
-                      "const body = pm.response.json();",
-                      "pm.test('Outcome is RESERVED or NOT_RESERVED', function () {",
-                      "    pm.expect(['RESERVED', 'NOT_RESERVED']).to.include(body.outcome);",
-                      "});",
-                      "if (body.reservationId) { pm.collectionVariables.set('stockReservationId', body.reservationId); }"
-                    ]
-                  }
-                }
-              ],
-              "request": {
-                "method": "POST",
-                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{serviceExecutionId}}/stock-reservation",
-                "description": "Repete a tentativa sobre os requirements congelados. Não aceita linhas no corpo da requisição. Não faz parte da sequência E2E principal (a decisão do orçamento já tenta reservar); use apenas quando Get service order status indicar AWAITING_ITEMS."
-              },
-              "response": [
-                {
-                  "name": "Reserved",
-                  "status": "OK",
-                  "code": 200,
-                  "_postman_previewlanguage": "json",
-                  "header": [],
-                  "cookie": [],
-                  "body": "{\n  \"serviceExecutionId\": \"66666666-6666-6666-6666-666666666666\",\n  \"outcome\": \"RESERVED\",\n  \"reservationId\": \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\n  \"issues\": []\n}"
-                },
-                {
-                  "name": "Not reserved",
-                  "status": "OK",
-                  "code": 200,
-                  "_postman_previewlanguage": "json",
-                  "header": [],
-                  "cookie": [],
-                  "body": "{\n  \"serviceExecutionId\": \"66666666-6666-6666-6666-666666666666\",\n  \"outcome\": \"NOT_RESERVED\",\n  \"reservationId\": null,\n  \"issues\": [{\n    \"stockItemId\": \"44444444-4444-4444-4444-444444444444\",\n    \"reason\": \"INSUFFICIENT_QUANTITY\",\n    \"requestedQuantity\": 2,\n    \"availableQuantity\": 1\n  }]\n}"
-                }
-              ]
-            },
-            {
-              "name": "Start execution",
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "exec": [
-                      "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
-                      "const executionId = pm.variables.get('executionId');",
-                      "const execution = pm.response.json().executions.find((item) => item.id === executionId);",
-                      "pm.test('Execution status is IN_PROGRESS', function () { pm.expect(execution.status).to.eql('IN_PROGRESS'); });"
-                    ]
-                  }
-                }
-              ],
-              "request": {
-                "method": "POST",
-                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/start"
-              }
-            },
-            {
-              "name": "Update execution progress",
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "exec": [
-                      "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
-                      "const executionId = pm.variables.get('executionId');",
-                      "const execution = pm.response.json().executions.find((item) => item.id === executionId);",
-                      "pm.test('Execution status remains IN_PROGRESS', function () { pm.expect(execution.status).to.eql('IN_PROGRESS'); });"
-                    ]
-                  }
-                }
-              ],
-              "request": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"note\": \"Oil drained and filter replaced\"\n}"
-                },
-                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/progress"
-              }
-            },
-            {
-              "name": "Complete execution",
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "exec": [
-                      "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
-                      "const executionId = pm.variables.get('executionId');",
-                      "const execution = pm.response.json().executions.find((item) => item.id === executionId);",
-                      "pm.test('Execution status is COMPLETED', function () { pm.expect(execution.status).to.eql('COMPLETED'); });"
-                    ]
-                  }
-                }
-              ],
-              "request": {
-                "method": "POST",
-                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/complete"
-              }
-            },
-            {
-              "name": "Finalize service order",
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "exec": [
-                      "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
-                      "pm.test('statusSnapshot is DELIVERED', function () { pm.expect(pm.response.json().statusSnapshot).to.eql('DELIVERED'); });"
-                    ]
-                  }
-                }
-              ],
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"vehicleDelivered\": true\n}"
-                },
-                "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/finalize"
-              }
             }
           ]
         }
@@ -1284,9 +1218,14 @@
               "script": {
                 "exec": [
                   "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
                   "pm.test('Response is the updated service order', function () {",
-                  "    pm.expect(pm.response.json().id).to.eql(pm.variables.get('serviceOrderId'));",
-                  "});"
+                  "    pm.expect(body.id).to.eql(pm.variables.get('serviceOrderId'));",
+                  "});",
+                  "const execution = body.executions.find(e => e.id === pm.collectionVariables.get('executionId'));",
+                  "if (execution && execution.stockReservationId) {",
+                  "    pm.collectionVariables.set('stockReservationId', execution.stockReservationId);",
+                  "}"
                 ]
               }
             }
@@ -1310,92 +1249,40 @@
       ]
     },
     {
-      "name": "Stock & Procurement",
+      "name": "Service Lifecycle — Execution & Delivery",
+      "description": "Depende de uma ServiceExecution já AUTHORIZED por \"Estimates / Decide estimate lines\" (decisão APPROVED); por isso roda depois de \"Estimates\", não dentro de \"Service Lifecycle\".",
       "item": [
         {
-          "name": "Create stock item",
+          "name": "Start execution",
           "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "exec": [
-                  "pm.collectionVariables.set('stockItemSku', 'FILTER-' + Date.now());"
-                ]
-              }
-            },
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
-                  "const body = pm.response.json();",
-                  "pm.test('Stock item id is present', function () { pm.expect(body.id).to.be.a('string').and.not.empty; });",
-                  "pm.collectionVariables.set('stockItemId', body.id);",
-                  "pm.environment.set('stockItemId', body.id);"
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "const executionId = pm.variables.get('executionId');",
+                  "const execution = pm.response.json().executions.find((item) => item.id === executionId);",
+                  "pm.test('Execution status is IN_PROGRESS', function () { pm.expect(execution.status).to.eql('IN_PROGRESS'); });"
                 ]
               }
             }
           ],
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Oil filter\",\n  \"sku\": \"{{stockItemSku}}\",\n  \"type\": \"PART\",\n  \"availableQuantity\": 20,\n  \"price\": { \"value\": 45.90, \"currency\": \"BRL\" }\n}"
-            },
-            "url": "{{baseUrl}}/api/stock-items",
-            "description": "O pré-request script gera um SKU único a cada execução, já que o SKU deve ser único."
+            "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/start"
           }
         },
         {
-          "name": "Get stock item",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/stock-items/{{stockItemId}}"
-          }
-        },
-        {
-          "name": "Search available parts and supplies",
+          "name": "Update execution progress",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
                   "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Response is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/stock-items?search=filter&type=PART&type=SUPPLY&available=true&active=true"
-          }
-        },
-        {
-          "name": "Update stock item",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
-                  "pm.test('Name was updated', function () { pm.expect(pm.response.json().name).to.eql('Premium oil filter'); });"
+                  "const executionId = pm.variables.get('executionId');",
+                  "const execution = pm.response.json().executions.find((item) => item.id === executionId);",
+                  "pm.test('Execution status remains IN_PROGRESS', function () { pm.expect(execution.status).to.eql('IN_PROGRESS'); });"
                 ]
               }
             }
@@ -1410,29 +1297,65 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Premium oil filter\",\n  \"price\": { \"value\": 49.90, \"currency\": \"BRL\" }\n}"
+              "raw": "{\n  \"note\": \"Oil drained and filter replaced\"\n}"
             },
-            "url": "{{baseUrl}}/api/stock-items/{{stockItemId}}"
+            "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/progress"
           }
         },
         {
-          "name": "Deactivate stock item",
+          "name": "Complete execution",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status code is 204', function () { pm.response.to.have.status(204); });"
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "const executionId = pm.variables.get('executionId');",
+                  "const execution = pm.response.json().executions.find((item) => item.id === executionId);",
+                  "pm.test('Execution status is COMPLETED', function () { pm.expect(execution.status).to.eql('COMPLETED'); });"
                 ]
               }
             }
           ],
           "request": {
-            "method": "DELETE",
-            "url": "{{baseUrl}}/api/stock-items/{{stockItemId}}",
-            "description": "Não faz parte da sequência E2E principal (desativaria o stockItemId usado pelo fluxo de diagnóstico/reserva)."
+            "method": "POST",
+            "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/complete"
           }
         },
+        {
+          "name": "Finalize service order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('statusSnapshot is DELIVERED', function () { pm.expect(pm.response.json().statusSnapshot).to.eql('DELIVERED'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehicleDelivered\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/finalize"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stock & Procurement — Reservations & Purchase Orders",
+      "description": "Depende de recursos criados na pasta \"Stock & Procurement\" (mais cedo na collection) e de uma diagnose/estimate já aprovada na pasta \"Service Lifecycle\"/\"Estimates\".",
+      "item": [
         {
           "name": "Get stock reservation",
           "event": [
@@ -1530,70 +1453,6 @@
           }
         },
         {
-          "name": "Create Purchase Order from demand",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": { "exec": ["if (!pm.collectionVariables.get('purchaseOrderIdempotencyKey')) { pm.collectionVariables.set('purchaseOrderIdempotencyKey', pm.variables.replaceIn('{{$guid}}')); }"] }
-            },
-            {
-              "listen": "test",
-              "script": { "exec": [
-                "pm.test('Status code is 200 or 201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
-                "const body = pm.response.json();",
-                "pm.test('Purchase order id is present', function () { pm.expect(body.id).to.be.a('string').and.not.empty; });",
-                "pm.collectionVariables.set('purchaseOrderId', body.id);"
-              ] }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{purchaseOrderIdempotencyKey}}" }
-            ],
-            "body": { "mode": "raw", "raw": "{\n  \"demandIds\": [\"{{purchaseDemandId}}\"],\n  \"lines\": [\n    {\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"quantity\": 10\n    }\n  ]\n}" },
-            "url": "{{baseUrl}}/api/purchase-orders",
-            "description": "Cria uma ordem orientada por demanda. Para um request misto, mantenha demandIds e acrescente outra linha ad hoc. A quantidade deve cobrir a soma sugerida das demandas selecionadas."
-          }
-        },
-        {
-          "name": "Retry same Purchase Order",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
-              "const body = pm.response.json();",
-              "pm.test('Same purchase order id is returned', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('purchaseOrderId')); });"
-            ] }
-          }],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{purchaseOrderIdempotencyKey}}" }
-            ],
-            "body": { "mode": "raw", "raw": "{\n  \"demandIds\": [\"{{purchaseDemandId}}\"],\n  \"lines\": [\n    {\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"quantity\": 10\n    }\n  ]\n}" },
-            "url": "{{baseUrl}}/api/purchase-orders",
-            "description": "Repete exatamente header e body. Retorna 200 para uma ordem OPEN já confirmada, sem nova compra externa; também recupera PENDING_SUBMISSION após 502/503."
-          }
-        },
-        {
-          "name": "Get Purchase Order",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
-              "pm.test('Purchase order is OPEN', function () { pm.expect(pm.response.json().status).to.eql('OPEN'); });"
-            ] }
-          }],
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/purchase-orders/{{purchaseOrderId}}",
-            "description": "Retorna apenas Purchase Orders funcionalmente confirmadas no estado OPEN."
-          }
-        },
-        {
           "name": "Create ad hoc Purchase Order",
           "event": [
             {
@@ -1620,6 +1479,201 @@
             "url": "{{baseUrl}}/api/purchase-orders",
             "description": "Criação livre pelo Stock Manager, sem Purchase Demand. O simulador confirma a ordem, mas RF27 não altera o saldo."
           }
+        },
+        {
+          "name": "Get Purchase Order",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Purchase order is OPEN', function () { pm.expect(pm.response.json().status).to.eql('OPEN'); });"
+            ] }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/purchase-orders/{{purchaseOrderId}}",
+            "description": "Retorna apenas Purchase Orders funcionalmente confirmadas no estado OPEN. Lê o purchaseOrderId deixado por \"Create ad hoc Purchase Order\" (a via orientada por demanda mora na pasta Isolated, pois depende de uma Purchase Demand real)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Isolated (run manually, not part of the full-collection E2E run)",
+      "description": "Estas requisições arquivam/desativam recursos usados pelas demais pastas ou só se aplicam a um estado condicional. Rodar a collection inteira via Collection Runner/Newman do início ao fim NÃO deve incluir esta pasta; execute cada item aqui manualmente e isoladamente, quando necessário.",
+      "item": [
+        {
+          "name": "Create Purchase Order from demand",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "exec": ["if (!pm.collectionVariables.get('purchaseOrderIdempotencyKey')) { pm.collectionVariables.set('purchaseOrderIdempotencyKey', pm.variables.replaceIn('{{$guid}}')); }"] }
+            },
+            {
+              "listen": "test",
+              "script": { "exec": [
+                "pm.test('Status code is 200 or 201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                "const body = pm.response.json();",
+                "pm.test('Purchase order id is present', function () { pm.expect(body.id).to.be.a('string').and.not.empty; });",
+                "pm.collectionVariables.set('purchaseOrderId', body.id);"
+              ] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{purchaseOrderIdempotencyKey}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"demandIds\": [\"{{purchaseDemandId}}\"],\n  \"lines\": [\n    {\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"quantity\": 10\n    }\n  ]\n}" },
+            "url": "{{baseUrl}}/api/purchase-orders",
+            "description": "Cria uma ordem orientada por demanda. Não faz parte da sequência E2E principal: precisa de um purchaseDemandId real (\"Stock & Procurement — Reservations & Purchase Orders / List open purchase demands\" só encontra uma demanda se algum diagnóstico/estimate tiver observado INSUFFICIENT_QUANTITY para o stockItemId em questão, o que o fluxo principal não força). Para exercitar isso manualmente: crie um diagnóstico com quantidade de stockRequirement maior que o availableQuantity do stock item, aprove a linha e então rode este request."
+          }
+        },
+        {
+          "name": "Retry same Purchase Order",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Same purchase order id is returned', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('purchaseOrderId')); });"
+            ] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{purchaseOrderIdempotencyKey}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"demandIds\": [\"{{purchaseDemandId}}\"],\n  \"lines\": [\n    {\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"quantity\": 10\n    }\n  ]\n}" },
+            "url": "{{baseUrl}}/api/purchase-orders",
+            "description": "Repete exatamente header e body. Retorna 200 para uma ordem OPEN já confirmada, sem nova compra externa; também recupera PENDING_SUBMISSION após 502/503. Execute logo após \"Create Purchase Order from demand\", na mesma execução manual isolada."
+          }
+        },
+        {
+          "name": "Archive customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/customers/{{customerId}}",
+            "description": "Arquivaria o customerId usado pelas demais requisições. Execute isoladamente, ao final, se necessário."
+          }
+        },
+        {
+          "name": "Archive vehicle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
+            "description": "Archives a vehicle without deleting its history. Repeating the request is idempotent. Arquivaria o vehicleId usado pelas demais requisições (Service Lifecycle); execute isoladamente, ao final, se necessário."
+          }
+        },
+        {
+          "name": "Deactivate stock item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/stock-items/{{stockItemId}}",
+            "description": "Desativaria o stockItemId usado pelo fluxo de diagnóstico/reserva/compra; execute isoladamente, ao final, se necessário."
+          }
+        },
+        {
+          "name": "Attach stock requirement",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stockItemId\": \"{{stockItemId}}\",\n  \"type\": \"PART\",\n  \"quantity\": 1,\n  \"nameSnapshot\": \"Oil filter\",\n  \"priceSnapshot\": { \"value\": 45.90, \"currency\": \"BRL\" }\n}"
+            },
+            "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/stock-requirements",
+            "description": "Perform diagnosis já anexa o requirement inicial; use para adicionar um requirement extra a uma execução existente, isoladamente."
+          }
+        },
+        {
+          "name": "Retry stock reservation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Outcome is RESERVED or NOT_RESERVED', function () {",
+                  "    pm.expect(['RESERVED', 'NOT_RESERVED']).to.include(body.outcome);",
+                  "});",
+                  "if (body.reservationId) { pm.collectionVariables.set('stockReservationId', body.reservationId); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{serviceExecutionId}}/stock-reservation",
+            "description": "Repete a tentativa sobre os requirements congelados. Não aceita linhas no corpo da requisição. A decisão do orçamento já tenta reservar; use apenas quando Get service order status indicar AWAITING_ITEMS, isoladamente."
+          },
+          "response": [
+            {
+              "name": "Reserved",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "cookie": [],
+              "body": "{\n  \"serviceExecutionId\": \"66666666-6666-6666-6666-666666666666\",\n  \"outcome\": \"RESERVED\",\n  \"reservationId\": \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\n  \"issues\": []\n}"
+            },
+            {
+              "name": "Not reserved",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "cookie": [],
+              "body": "{\n  \"serviceExecutionId\": \"66666666-6666-6666-6666-666666666666\",\n  \"outcome\": \"NOT_RESERVED\",\n  \"reservationId\": null,\n  \"issues\": [{\n    \"stockItemId\": \"44444444-4444-4444-4444-444444444444\",\n    \"reason\": \"INSUFFICIENT_QUANTITY\",\n    \"requestedQuantity\": 2,\n    \"availableQuantity\": 1\n  }]\n}"
+            }
+          ]
         }
       ]
     }
