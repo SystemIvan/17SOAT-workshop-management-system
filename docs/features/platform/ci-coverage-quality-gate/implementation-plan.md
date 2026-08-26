@@ -235,8 +235,13 @@ Estado operacional em 2026-08-26:
 - `dev` exige `Quality gate` com origem GitHub Actions, atualização estrita com a base e aplicação a administradores;
 - `main` permanece sem proteção e sem o workflow. A API retornou `404 Branch not protected` e a comparação
   `origin/main...origin/dev` mostrou `main` 180 commits atrás de `dev`;
-- promover todo o conteúdo de `dev` ou preparar um backport isolado para `main` exige uma decisão explícita de release.
-  Até essa decisão, não aplicar um required check que ainda não foi validado nessa base.
+- a avaliação de backport confirmou que `main` contém somente 13 entradas de scaffolding: `pom.xml`, workflow,
+  `docker-compose.yml` e classes Java estão vazios, sem Maven Wrapper ou testes. O cherry-pick foi abortado sem criar
+  branch remoto ou Pull Request, pois um gate isolado não teria uma aplicação executável para validar;
+- decisão do mantenedor em 2026-08-26: adiar a promoção e a proteção de `main` até que todos os desenvolvimentos
+  pendentes estejam concluídos em `dev`. Até lá, não criar PR de promoção, backport ou required check em `main`;
+- após a estabilização de `dev`, abrir um PR de promoção para `main`, validar `Quality gate` no PR e no push, aplicar a
+  proteção com atualização estrita e então concluir os checkpoints 6 e 7.
 
 ### Checkpoint 7 — Encerrar a feature
 
@@ -298,7 +303,8 @@ Critério de conclusão:
 | 2026-08-26 | 6 | concorrência no PR #42, runs [33010652866](https://github.com/SystemIvan/17SOAT-workshop-management-system/actions/runs/33010652866) e [33010675839](https://github.com/SystemIvan/17SOAT-workshop-management-system/actions/runs/33010675839) | Passou | Run obsoleto cancelado durante `Run quality gate`; substituto executou 601 testes, aprovou cobertura e publicou ambos os artifacts por 30 dias |
 | 2026-08-26 | 6 | encerramento do PR #42 | Passou | PR fechado sem merge; conteúdo final idêntico a `dev`; branch temporário local e remoto removido após preservar as evidências nos runs |
 | 2026-08-26 | 6 | proteção de `dev` pela API GitHub | Passou | `Quality gate` associado ao GitHub Actions (`app_id=15368`), `strict=true` e `enforce_admins=true` |
-| 2026-08-26 | 6 | proteção de `main` | Pendente | API retornou `404 Branch not protected`; workflow ausente e `main` está 180 commits atrás de `dev`; requer decisão explícita entre promoção de `dev` e backport isolado |
+| 2026-08-26 | 6 | avaliação de backport para `main` | Inviável | `main` possui 13 entradas de scaffolding, sem build ou aplicação executável; cherry-pick abortado, sem branch remoto ou PR |
+| 2026-08-26 | 6 | promoção e proteção de `main` | Adiada | Decisão do mantenedor: aguardar a conclusão dos desenvolvimentos pendentes em `dev`; depois promover `dev`, validar o gate e aplicar a proteção |
 
 Evidências mínimas esperadas:
 
