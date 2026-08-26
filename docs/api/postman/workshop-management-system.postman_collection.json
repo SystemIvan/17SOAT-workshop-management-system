@@ -27,9 +27,12 @@
     { "key": "estimateId", "value": "99999999-9999-9999-9999-999999999999" },
     { "key": "purchaseDemandId", "value": "cccccccc-cccc-cccc-cccc-cccccccccccc" },
     { "key": "purchaseOrderFlowDemandId", "value": "" },
+    { "key": "lowStockPurchaseDemandId", "value": "" },
+    { "key": "lowStockSuggestedQuantity", "value": "" },
     { "key": "purchaseOrderId", "value": "dddddddd-dddd-dddd-dddd-dddddddddddd" },
     { "key": "purchaseOrderIdempotencyKey", "value": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" },
     { "key": "purchaseOrderFlowIdempotencyKey", "value": "" },
+    { "key": "lowStockPurchaseOrderIdempotencyKey", "value": "" },
     { "key": "authToken", "value": "" }
   ],
   "item": [
@@ -1522,6 +1525,53 @@
             "method": "GET",
             "url": "{{baseUrl}}/api/purchase-demands?origin=PENDING_REPAIR&stockItemId={{stockItemId}}",
             "description": "Lista apenas demandas OPEN. Diagnosis e Estimate registram ou atualizam PENDING_REPAIR ao observar INSUFFICIENT_QUANTITY; a falha de reserva após aprovação também pode reconciliar a mesma demanda."
+          }
+        },
+        {
+          "name": "List open low-stock purchase demands",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Response is an array', function () { pm.expect(body).to.be.an('array'); });",
+              "pm.test('An open LOW_STOCK purchase demand is available', function () { pm.expect(body).to.not.be.empty; });",
+              "pm.test('Only LOW_STOCK demands are returned', function () { body.forEach(function (demand) { pm.expect(demand.origin).to.eql('LOW_STOCK'); }); });",
+              "if (body.length > 0) { pm.collectionVariables.set('lowStockPurchaseDemandId', body[0].id); pm.collectionVariables.set('lowStockSuggestedQuantity', String(body[0].suggestedQuantity)); }"
+            ] }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/purchase-demands?origin=LOW_STOCK&stockItemId={{stockItemId}}",
+            "description": "Lista as demandas OPEN de reposição preventiva para o Stock Item selecionado. Antes, configure uma Low Stock Policy cujo minimumQuantity seja maior que o availableQuantity; a detecção cria ou atualiza a demanda LOW_STOCK."
+          }
+        },
+        {
+          "name": "Create Purchase Order from low-stock demand",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "exec": ["const demandId = pm.collectionVariables.get('lowStockPurchaseDemandId'); const suggestedQuantity = Number(pm.collectionVariables.get('lowStockSuggestedQuantity')); if (!demandId || !Number.isInteger(suggestedQuantity) || suggestedQuantity <= 0) { throw new Error('Run List open low-stock purchase demands before creating this Purchase Order.'); } pm.collectionVariables.set('lowStockPurchaseOrderIdempotencyKey', pm.variables.replaceIn('{{$guid}}')); pm.collectionVariables.unset('purchaseOrderId'); pm.collectionVariables.unset('stockReceiptId');"] }
+            },
+            {
+              "listen": "test",
+              "script": { "exec": [
+                "pm.test('Status code is 200 or 201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                "const body = pm.response.json();",
+                "pm.test('Purchase order id is present', function () { pm.expect(body.id).to.be.a('string').and.not.empty; });",
+                "pm.collectionVariables.set('purchaseOrderId', body.id);"
+              ] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{lowStockPurchaseOrderIdempotencyKey}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"demandIds\": [\"{{lowStockPurchaseDemandId}}\"],\n  \"lines\": [\n    {\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"quantity\": {{lowStockSuggestedQuantity}}\n    }\n  ]\n}" },
+            "url": "{{baseUrl}}/api/purchase-orders",
+            "description": "Cria uma Purchase Order para a demanda LOW_STOCK retornada pela request anterior. A quantidade é preenchida com suggestedQuantity, pois a linha precisa cobrir a sugestão da demanda selecionada."
           }
         },
         {

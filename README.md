@@ -111,6 +111,7 @@ apenas a origem, sem `/api`: para a execução local, use `http://localhost:8080
 | `stockReservationId` | É preenchida pelo script de `Retry stock reservation` quando houver `reservationId`; se a reserva já ocorreu na decisão, copie `executions[0].stockReservationId` da resposta da decisão para consultar ou consumir a reserva. |
 | `purchaseDemandId` | Variável para testes manuais isolados de Purchase Order. |
 | `purchaseOrderFlowDemandId` | É preenchida por `List open purchase demands` com a primeira demanda retornada e é usada pelo fluxo principal de Purchase Order. |
+| `lowStockPurchaseDemandId` e `lowStockSuggestedQuantity` | São preenchidas por `List open low-stock purchase demands` e usadas pela Purchase Order de reposição preventiva. |
 | `purchaseOrderId` | É preenchida pelas criações de Purchase Order confirmadas pelo simulador. |
 | `purchaseOrderIdempotencyKey` | Identifica o comando de criação ad hoc. Preserve o mesmo UUID e body em retries; gere outro UUID para uma compra diferente. |
 | `purchaseOrderFlowIdempotencyKey` | É gerada pela collection ao executar `Create Purchase Order from demand`; o `Retry same Purchase Order` reutiliza-a automaticamente. |
@@ -196,10 +197,14 @@ retornados em respostas `201 Created` são os que devem ser usados no restante d
    quantidade disponível deve ser pelo menos a quantidade exigida no diagnóstico para exercitar a reserva bem-sucedida.
 
    Para a reposição preventiva, envie em seguida `PUT {{baseUrl}}/api/stock-items/{{stockItemId}}/low-stock-policy`
-   com `{ "minimumQuantity": 5, "targetQuantity": 12 }`. A consulta
+   com um `minimumQuantity` maior que o saldo atual e um `targetQuantity` ainda maior — por exemplo,
+   `{ "minimumQuantity": 21, "targetQuantity": 30 }` para o item acima. A consulta
    `GET {{baseUrl}}/api/stock-items?lowStock=true&active=true` mostra apenas itens configurados cujo saldo está
-   estritamente abaixo do mínimo. Para desabilitar a policy de forma idempotente, envie `DELETE` no mesmo caminho;
-   nenhuma dessas operações cria uma Purchase Order automaticamente.
+   estritamente abaixo do mínimo. Em seguida, execute `Stock & Procurement / List open low-stock purchase demands`;
+   ela consulta `GET {{baseUrl}}/api/purchase-demands?origin=LOW_STOCK&stockItemId={{stockItemId}}` e retorna a
+   demanda aberta para a reposição preventiva. Depois, execute `Create Purchase Order from low-stock demand`: a
+   coleção usa o ID e o `suggestedQuantity` retornados para montar a linha da ordem. Para desabilitar a policy de
+   forma idempotente, envie `DELETE` no mesmo caminho; nenhuma dessas operações cria uma Purchase Order automaticamente.
 
 6. Em `Service Lifecycle / Service Orders`, envie `Create service order` em
    `POST {{baseUrl}}/api/service-orders`. Mantenha `customerId` e `vehicleId` nas variáveis da coleção e informe o
