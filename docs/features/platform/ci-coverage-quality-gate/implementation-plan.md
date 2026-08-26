@@ -197,7 +197,7 @@ Critério de conclusão:
 
 ### Checkpoint 6 — Validar CI e aplicar proteção de branches
 
-Status: `Pending`.
+Status: `In progress`.
 
 Pré-requisitos:
 
@@ -279,7 +279,11 @@ Critério de conclusão:
 | 2026-08-26 | 5 | relatórios finais | Passou | 91,85% de linhas; HTML, XML e CSV presentes em `target/site/jacoco/` |
 | 2026-08-26 | 5 | `git diff --check` e revisão do diff | Passou | Sem erro de whitespace, teste alterado/desabilitado ou arquivo fora do escopo |
 | 2026-08-26 | 5 | revisão de segurança | Passou | Nenhum achado crítico/alto; itens `N/A` justificados no checklist |
-| 2026-08-26 | 6 | `gh auth status` e `gh pr view` | Pendente | Autenticação válida; a branch ainda não possui upstream nem Pull Request |
+| 2026-08-26 | 6 | PR [#39](https://github.com/SystemIvan/17SOAT-workshop-management-system/pull/39) | Parcial | Criado para `dev` no SHA `df55667`; integrado externamente por `SystemIvan` antes de checks ou review, sem solicitação de landing pelo agente |
+| 2026-08-26 | 6 | run [32988515227](https://github.com/SystemIvan/17SOAT-workshop-management-system/actions/runs/32988515227) | Passou | Push do merge commit `069b562`; job `Quality gate` e todas as seis etapas principais verdes |
+| 2026-08-26 | 6 | artifacts do run `32988515227` | Passou | `test-reports-32988515227-1` e `jacoco-report-32988515227-1`, retenção até 2026-09-25; 601 testes verdes e cobertura de 91,85% conferidos após download |
+| 2026-08-26 | 6 | proteção de `dev` pela API GitHub | Passou | `Quality gate` associado ao GitHub Actions (`app_id=15368`), `strict=true` e `enforce_admins=true` |
+| 2026-08-26 | 6 | proteção de `main` | Pendente | O workflow ainda não está presente em `main`; aplicar o check agora impediria sua própria execução em Pull Requests para essa base |
 
 Evidências mínimas esperadas:
 
