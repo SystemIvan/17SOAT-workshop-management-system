@@ -1,12 +1,25 @@
 package br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.infrastructure.web;
 
 import br.com.fiap.workshop_management_system.identity.auth.application.port.TokenIssuer;
-import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.exception.ExternalSupplierUnavailableException;
-import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.port.ExternalPurchaseOrderCommand;
-import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.port.ExternalPurchaseOrderResult;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.DiagnosisItem;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Money;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceExecutionStatus;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrderStatus;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockItemType;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockRequirement;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.VehicleSnapshot;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.exception
+        .ExternalSupplierUnavailableException;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.port
+        .ExternalPurchaseOrderCommand;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.port
+        .ExternalPurchaseOrderResult;
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.port.ExternalSupplierGateway;
 import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.ReserveStockItem;
-import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.ReserveStockItemsCommand;
+import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api
+        .ReserveStockItemsCommand;
 import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.StockReservationApi;
 import br.com.fiap.workshop_management_system.stockprocurement.stockreceipt.application.event.StockItemsRestockedEvent;
 import br.com.fiap.workshop_management_system.testsupport.TestAuth;
@@ -28,6 +41,8 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -59,6 +74,9 @@ class PurchaseOrderFlowIntegrationTest {
 
     @Autowired
     private RestockEventProbe restockEventProbe;
+
+    @Autowired
+    private ServiceOrderRepository serviceOrderRepository;
 
     private MockMvc mockMvc;
 
@@ -252,6 +270,36 @@ class PurchaseOrderFlowIntegrationTest {
     }
 
     @Test
+    void receiptRetriesTheAwaitingExecutionAndPersistsTheReservation() throws Exception {
+        UUID stockItemId = createStockItem("PO-AUTO-RETRY-", 0);
+        ServiceOrder serviceOrder = awaitingItemsServiceOrder(stockItemId, 2);
+        UUID executionId = serviceOrder.serviceExecutions().getFirst().id();
+        serviceOrderRepository.save(serviceOrder);
+
+        MvcResult creation = mockMvc.perform(post("/api/purchase-orders")
+                        .header("Idempotency-Key", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(orderBody(stockItemId, 2, null)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String purchaseOrderId = JsonPath.read(creation.getResponse().getContentAsString(), "$.id");
+        mockMvc.perform(post("/api/purchase-orders/{id}/close", purchaseOrderId))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/purchase-orders/{id}/receipt", purchaseOrderId))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/service-orders/{id}", serviceOrder.id()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusSnapshot").value(ServiceOrderStatus.IN_PROGRESS.name()))
+                .andExpect(jsonPath("$.executions[0].id").value(executionId.toString()))
+                .andExpect(jsonPath("$.executions[0].status").value(ServiceExecutionStatus.READY.name()))
+                .andExpect(jsonPath("$.executions[0].stockReservationId", notNullValue()));
+        org.junit.jupiter.api.Assertions.assertEquals(
+                0, stockItemQuantity(stockItemId));
+    }
+
+    @Test
     void rejectsReceiptForAnOpenPurchaseOrder() throws Exception {
         UUID stockItemId = createStockItem("PO-OPEN-RECEIPT-", 0);
         MvcResult creation = mockMvc.perform(post("/api/purchase-orders")
@@ -277,6 +325,38 @@ class PurchaseOrderFlowIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn();
         return UUID.fromString(JsonPath.read(result.getResponse().getContentAsString(), "$.id"));
+    }
+
+    private ServiceOrder awaitingItemsServiceOrder(UUID stockItemId, int requiredQuantity) {
+        ServiceOrder serviceOrder = ServiceOrder.create(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015),
+                "Automatic reservation retry test");
+        UUID technicianId = UUID.randomUUID();
+        serviceOrder.assignDiagnosisAssignee(technicianId);
+        UUID diagnosisId = serviceOrder.performDiagnosis(List.of(new DiagnosisItem(
+                UUID.randomUUID(),
+                "Oil change",
+                Money.brl(BigDecimal.TEN),
+                List.of(new StockRequirement(
+                        stockItemId,
+                        StockItemType.PART,
+                        requiredQuantity,
+                        "Purchase item",
+                        Money.brl(BigDecimal.TEN),
+                        false)))), technicianId, Instant.EPOCH);
+        serviceOrder.freezeStockRequirements(diagnosisId);
+        serviceOrder.authorizeExecutionFromEstimate(
+                UUID.randomUUID(), serviceOrder.serviceExecutions().getFirst().id());
+        return serviceOrder;
+    }
+
+    private int stockItemQuantity(UUID stockItemId) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/stock-items/{id}", stockItemId))
+                .andExpect(status().isOk())
+                .andReturn();
+        return JsonPath.read(result.getResponse().getContentAsString(), "$.availableQuantity");
     }
 
     private String orderBody(UUID stockItemId, int quantity, String demandId) {

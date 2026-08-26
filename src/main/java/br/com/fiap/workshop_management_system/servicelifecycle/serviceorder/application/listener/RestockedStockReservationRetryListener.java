@@ -1,11 +1,11 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.listener;
 
-import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.RetryStockReservationUseCase;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase
+        .RetryStockReservationUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Priority;
-import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceExecution;
-import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceExecutionStatus;
-import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository
+        .StockReservationRetryCandidate;
 import br.com.fiap.workshop_management_system.stockprocurement.stockreceipt.application.event.StockItemsRestockedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,8 +35,8 @@ public class RestockedStockReservationRetryListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void on(StockItemsRestockedEvent event) {
-        List<Candidate> candidates = findCandidates(event.stockItemIds());
-        for (Candidate candidate : candidates) {
+        List<StockReservationRetryCandidate> candidates = findCandidates(event.stockItemIds());
+        for (StockReservationRetryCandidate candidate : candidates) {
             try {
                 retryStockReservationUseCase.execute(candidate.serviceOrderId(), candidate.serviceExecutionId());
             } catch (RuntimeException exception) {
@@ -49,24 +49,14 @@ public class RestockedStockReservationRetryListener {
         }
     }
 
-    private List<Candidate> findCandidates(List<UUID> stockItemIds) {
+    private List<StockReservationRetryCandidate> findCandidates(List<UUID> stockItemIds) {
         Set<UUID> receivedItemIds = Set.copyOf(stockItemIds);
         return serviceOrderRepository.findAwaitingItemsByStockItemIds(receivedItemIds).stream()
-                .flatMap(serviceOrder -> serviceOrder.serviceExecutions().stream()
-                        .filter(execution -> isCandidate(execution, receivedItemIds))
-                        .map(execution -> new Candidate(serviceOrder.id(), serviceOrder.priority(), execution.id())))
-                .sorted(Comparator.comparingInt((Candidate candidate) -> priorityRank(candidate.priority()))
-                        .thenComparing(Candidate::serviceOrderId)
-                        .thenComparing(Candidate::serviceExecutionId))
+                .sorted(Comparator.comparingInt(
+                                (StockReservationRetryCandidate candidate) -> priorityRank(candidate.priority()))
+                        .thenComparing(StockReservationRetryCandidate::serviceOrderId)
+                        .thenComparing(StockReservationRetryCandidate::serviceExecutionId))
                 .toList();
-    }
-
-    private boolean isCandidate(ServiceExecution execution, Set<UUID> receivedItemIds) {
-        return execution.status() == ServiceExecutionStatus.AWAITING_ITEMS
-                && execution.stockRequirementsFrozen()
-                && execution.stockRequirements().stream()
-                .map(requirement -> requirement.stockItemId())
-                .anyMatch(receivedItemIds::contains);
     }
 
     private int priorityRank(Priority priority) {
@@ -76,8 +66,5 @@ public class RestockedStockReservationRetryListener {
             case NORMAL -> 2;
             case LOW -> 3;
         };
-    }
-
-    private record Candidate(UUID serviceOrderId, Priority priority, UUID serviceExecutionId) {
     }
 }

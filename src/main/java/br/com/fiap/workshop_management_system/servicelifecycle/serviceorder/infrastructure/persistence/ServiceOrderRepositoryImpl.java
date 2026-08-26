@@ -2,7 +2,10 @@ package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.inf
 
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
-import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderSearchCriteria;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository
+        .ServiceOrderSearchCriteria;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository
+        .StockReservationRetryCandidate;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
@@ -66,11 +69,12 @@ public class ServiceOrderRepositoryImpl implements ServiceOrderRepository {
     }
 
     @Override
-    public List<ServiceOrder> findAwaitingItemsByStockItemIds(java.util.Collection<UUID> stockItemIds) {
+    public List<StockReservationRetryCandidate> findAwaitingItemsByStockItemIds(
+            java.util.Collection<UUID> stockItemIds) {
         if (stockItemIds == null || stockItemIds.isEmpty()) {
             return List.of();
         }
-        return jpaRepository.findAwaitingItemsByStockItemIds(stockItemIds).stream().map(mapper::toDomain).toList();
+        return jpaRepository.findAwaitingItemsByStockItemIds(stockItemIds);
     }
 
     @Override

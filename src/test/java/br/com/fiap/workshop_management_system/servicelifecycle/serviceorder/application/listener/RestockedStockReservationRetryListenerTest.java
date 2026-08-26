@@ -5,11 +5,14 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.DiagnosisItem;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Money;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Priority;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceExecutionStatus;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockItemType;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockRequirement;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.VehicleSnapshot;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository
+        .StockReservationRetryCandidate;
 import br.com.fiap.workshop_management_system.stockprocurement.stockreceipt.application.event.StockItemsRestockedEvent;
 import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api
         .ReservationAttemptOutcome;
@@ -26,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -123,8 +127,18 @@ class RestockedStockReservationRetryListenerTest {
         }
 
         @Override
-        public List<ServiceOrder> findAwaitingItemsByStockItemIds(java.util.Collection<UUID> stockItemIds) {
-            return candidates;
+        public List<StockReservationRetryCandidate> findAwaitingItemsByStockItemIds(
+                java.util.Collection<UUID> stockItemIds) {
+            Set<UUID> receivedItemIds = Set.copyOf(stockItemIds);
+            return candidates.stream()
+                    .flatMap(serviceOrder -> serviceOrder.serviceExecutions().stream()
+                            .filter(execution -> execution.status() == ServiceExecutionStatus.AWAITING_ITEMS)
+                            .filter(execution -> execution.stockRequirementsFrozen())
+                            .filter(execution -> execution.stockRequirements().stream()
+                                    .anyMatch(requirement -> receivedItemIds.contains(requirement.stockItemId())))
+                            .map(execution -> new StockReservationRetryCandidate(
+                                    serviceOrder.id(), serviceOrder.priority(), execution.id())))
+                    .toList();
         }
 
         @Override

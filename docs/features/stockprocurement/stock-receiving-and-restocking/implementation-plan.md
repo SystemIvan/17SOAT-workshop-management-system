@@ -5,7 +5,7 @@
 | Feature | `stock-receiving-and-restocking` |
 | Status | Implemented |
 | Responsável | Matheus Apostulo |
-| Atualizado em | 2026-08-25 |
+| Atualizado em | 2026-08-26 |
 | Branch de implementação | `feat/stockprocurement-purchase-order-receiving` |
 | Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-25) |
 | Especificação técnica | `./technical-spec.md` (`Approved` em 2026-08-25) |
@@ -285,6 +285,7 @@ comando ou assertion automatizada quando o comportamento puder ser testado.
 | 6 | 2026-08-25 | `PurchaseOrderConcurrencyIntegrationTest` cobriu duas chamadas para a mesma ordem, dois Receipts de ordens distintas para o mesmo item e Receipt concorrente com reserva sem perda de saldo. O projeto não possui publication registry persistente: a recuperação aprovada é replay do Receipt ou retry manual; Docker Compose/MySQL não estava em execução para a evidência operacional. |
 | 7 | 2026-08-25 | Springdoc/OpenAPI, Postman, README, arquitetura e mapa de Stock & Procurement atualizados; coleção JSON e `git diff --check` validados. |
 | 8 | 2026-08-26 | Revisão de segurança registrada acima; `make test`, `make verify` e `make coverage` concluídos. JaCoCo: 91,75% de linhas (4539/4947). Nenhuma dependência nova ou finding crítico/alto. |
+| Correção pós-implementação | 2026-08-26 | A regressão integrada `receiptRetriesTheAwaitingExecutionAndPersistsTheReservation` reproduziu `MultipleBagFetchException` na seleção JPA e ausência de commit no retry disparado por `AFTER_COMMIT`. A consulta passou a projetar somente IDs e prioridade dos candidatos, sem materializar duas bags, e cada retry passou a usar `REQUIRES_NEW`. O teste comprova Receipt → reserva persistida → execução `READY` → Service Order `IN_PROGRESS`, sem retry HTTP manual. `make verify`: 620 testes verdes; JaCoCo: 92,01% de linhas (4376/4756). Sem alteração de contrato, migration, dependência ou exposição de dados. |
 
 ## Rollback e recuperação
 
