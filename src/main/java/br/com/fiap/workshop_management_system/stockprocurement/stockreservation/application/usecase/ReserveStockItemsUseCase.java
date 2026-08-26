@@ -4,6 +4,7 @@ import br.com.fiap.workshop_management_system.stockprocurement.stock.domain.mode
 import br.com.fiap.workshop_management_system.stockprocurement.stock.domain.model.StockItem;
 import br.com.fiap.workshop_management_system.stockprocurement.stock.domain.model.StockItemReservationEligibility;
 import br.com.fiap.workshop_management_system.stockprocurement.stock.domain.repository.StockItemRepository;
+import br.com.fiap.workshop_management_system.stockprocurement.lowstock.application.usecase.EvaluateLowStockUseCase;
 import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.ReservationAttemptOutcome;
 import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.ReserveStockItem;
 import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.ReserveStockItemsCommand;
@@ -43,21 +44,22 @@ public class ReserveStockItemsUseCase implements StockReservationApi {
     private final StockReservationRepository stockReservationRepository;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher;
+    private final EvaluateLowStockUseCase lowStockEvaluator;
 
     @Autowired
     public ReserveStockItemsUseCase(
             StockItemRepository stockItemRepository,
             StockReservationRepository stockReservationRepository,
-            ApplicationEventPublisher eventPublisher) {
-        this(stockItemRepository, stockReservationRepository, Clock.systemUTC(), eventPublisher);
+            ApplicationEventPublisher eventPublisher,
+            EvaluateLowStockUseCase lowStockEvaluator) {
+        this(stockItemRepository, stockReservationRepository, Clock.systemUTC(), eventPublisher, lowStockEvaluator);
     }
 
     ReserveStockItemsUseCase(
             StockItemRepository stockItemRepository,
             StockReservationRepository stockReservationRepository,
             Clock clock) {
-        this(stockItemRepository, stockReservationRepository, clock, event -> {
-        });
+        this(stockItemRepository, stockReservationRepository, clock, event -> { }, null);
     }
 
     ReserveStockItemsUseCase(
@@ -65,10 +67,20 @@ public class ReserveStockItemsUseCase implements StockReservationApi {
             StockReservationRepository stockReservationRepository,
             Clock clock,
             ApplicationEventPublisher eventPublisher) {
+        this(stockItemRepository, stockReservationRepository, clock, eventPublisher, null);
+    }
+
+    ReserveStockItemsUseCase(
+            StockItemRepository stockItemRepository,
+            StockReservationRepository stockReservationRepository,
+            Clock clock,
+            ApplicationEventPublisher eventPublisher,
+            EvaluateLowStockUseCase lowStockEvaluator) {
         this.stockItemRepository = stockItemRepository;
         this.stockReservationRepository = stockReservationRepository;
         this.clock = clock;
         this.eventPublisher = eventPublisher;
+        this.lowStockEvaluator = lowStockEvaluator;
     }
 
     @Override
@@ -115,7 +127,10 @@ public class ReserveStockItemsUseCase implements StockReservationApi {
                     reservation.id(), command.serviceExecutionId(), command.items()));
         }
 
-        for (UUID stockItemId : changedStockItemIds) {
+        for (UUID stockItemId : changedStockItemIds.stream().sorted().toList()) {
+            if (lowStockEvaluator != null) {
+                lowStockEvaluator.evaluateLockedStockItem(lockedStockItems.get(stockItemId));
+            }
             stockItemRepository.save(lockedStockItems.get(stockItemId));
         }
         return List.copyOf(results);

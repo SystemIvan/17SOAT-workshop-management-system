@@ -11,18 +11,29 @@ public class StockItem {
     private String name;
     private Price price;
     private boolean active;
+    private LowStockPolicy lowStockPolicy;
 
     public static StockItem create(Sku sku, String name, StockItemType type, Price price, Quantity availableQuantity) {
-        return new StockItem(UUID.randomUUID(), sku, name, type, price, availableQuantity, true);
+        return create(sku, name, type, price, availableQuantity, null);
+    }
+
+    public static StockItem create(Sku sku, String name, StockItemType type, Price price, Quantity availableQuantity,
+                                   LowStockPolicy lowStockPolicy) {
+        return new StockItem(UUID.randomUUID(), sku, name, type, price, availableQuantity, true, lowStockPolicy);
     }
 
     public static StockItem reconstitute(UUID id, Sku sku, String name, StockItemType type, Price price,
                                          Quantity availableQuantity, boolean active) {
-        return new StockItem(id, sku, name, type, price, availableQuantity, active);
+        return reconstitute(id, sku, name, type, price, availableQuantity, active, null);
+    }
+
+    public static StockItem reconstitute(UUID id, Sku sku, String name, StockItemType type, Price price,
+                                         Quantity availableQuantity, boolean active, LowStockPolicy lowStockPolicy) {
+        return new StockItem(id, sku, name, type, price, availableQuantity, active, lowStockPolicy);
     }
 
     private StockItem(UUID id, Sku sku, String name, StockItemType type, Price price, Quantity availableQuantity,
-                      boolean active) {
+                      boolean active, LowStockPolicy lowStockPolicy) {
         if (id == null || sku == null || type == null || price == null || availableQuantity == null) {
             throw new IllegalArgumentException("Stock item required data must not be null");
         }
@@ -33,6 +44,7 @@ public class StockItem {
         this.price = price;
         this.availableQuantity = availableQuantity;
         this.active = active;
+        this.lowStockPolicy = lowStockPolicy;
     }
 
     public void updateDetails(String name, Price price) {
@@ -49,6 +61,31 @@ public class StockItem {
 
     public void deactivate() {
         active = false;
+        lowStockPolicy = null;
+    }
+
+    public void configureLowStockPolicy(LowStockPolicy policy) {
+        if (!active) {
+            throw new StockItemInactiveException();
+        }
+        if (policy == null) {
+            throw new InvalidLowStockPolicyException("Low stock policy must not be null");
+        }
+        lowStockPolicy = policy;
+    }
+
+    public void disableLowStockPolicy() {
+        lowStockPolicy = null;
+    }
+
+    public LowStockAssessment assessLowStock() {
+        if (!active || lowStockPolicy == null) {
+            return LowStockAssessment.notConfigured();
+        }
+        if (!lowStockPolicy.isLow(availableQuantity)) {
+            return LowStockAssessment.normal();
+        }
+        return LowStockAssessment.low(lowStockPolicy.suggestedPurchase(availableQuantity));
     }
 
     public boolean hasAvailableQuantity() {
@@ -83,6 +120,19 @@ public class StockItem {
         this.availableQuantity = new Quantity(availableQuantity.value() - requestedQuantity.value());
     }
 
+    public StockItemReceiptBalance receive(Quantity receivedQuantity) {
+        if (receivedQuantity == null || receivedQuantity.value() <= 0) {
+            throw new IllegalArgumentException("Received quantity must be greater than zero");
+        }
+        Quantity availableBefore = availableQuantity;
+        try {
+            availableQuantity = new Quantity(Math.addExact(availableQuantity.value(), receivedQuantity.value()));
+        } catch (ArithmeticException exception) {
+            throw new ArithmeticException("Stock quantity exceeds the supported range");
+        }
+        return new StockItemReceiptBalance(availableBefore, availableQuantity);
+    }
+
     private static void validateReservationQuantity(Quantity requestedQuantity) {
         if (requestedQuantity == null || requestedQuantity.value() <= 0) {
             throw new IllegalArgumentException("Reserved quantity must be greater than zero");
@@ -103,4 +153,5 @@ public class StockItem {
     public Price price() { return price; }
     public Quantity availableQuantity() { return availableQuantity; }
     public boolean active() { return active; }
+    public LowStockPolicy lowStockPolicy() { return lowStockPolicy; }
 }

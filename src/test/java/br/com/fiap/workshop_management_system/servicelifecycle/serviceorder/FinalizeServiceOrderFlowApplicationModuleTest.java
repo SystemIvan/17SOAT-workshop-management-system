@@ -56,6 +56,7 @@ class FinalizeServiceOrderFlowApplicationModuleTest {
         serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), java.time.Instant.EPOCH);
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+        serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
         serviceOrder.startExecution(executionId);
         serviceOrder.completeExecution(executionId);
         serviceOrderRepository.save(serviceOrder);

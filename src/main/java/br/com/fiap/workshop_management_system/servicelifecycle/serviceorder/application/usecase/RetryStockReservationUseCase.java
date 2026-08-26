@@ -3,16 +3,20 @@ package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.app
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceExecution;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceExecutionStatus;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
-import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.event.TechnicianMaterialsReservedEvent;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.event
+        .TechnicianMaterialsReservedEvent;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
-import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.ReservationAttemptOutcome;
+import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api
+        .ReservationAttemptOutcome;
 import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.ReserveStockItem;
-import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.ReserveStockItemsCommand;
+import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api
+        .ReserveStockItemsCommand;
 import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.ReserveStockItemsResult;
 import br.com.fiap.workshop_management_system.stockprocurement.stockreservation.application.api.StockReservationApi;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -43,7 +47,7 @@ public class RetryStockReservationUseCase {
         });
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ReserveStockItemsResult execute(UUID serviceOrderId, UUID serviceExecutionId) {
         ServiceOrder serviceOrder = ServiceOrderFinder.getOrThrowForUpdate(serviceOrderRepository, serviceOrderId);
         ServiceExecution execution = findExecution(serviceOrder, serviceExecutionId);

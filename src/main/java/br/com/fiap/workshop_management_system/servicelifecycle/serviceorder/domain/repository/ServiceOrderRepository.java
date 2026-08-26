@@ -27,5 +27,10 @@ public interface ServiceOrderRepository {
         throw new UnsupportedOperationException("search not supported by this ServiceOrderRepository");
     }
 
+    default List<StockReservationRetryCandidate> findAwaitingItemsByStockItemIds(
+            java.util.Collection<UUID> stockItemIds) {
+        throw new UnsupportedOperationException("awaiting-items search not supported by this ServiceOrderRepository");
+    }
+
     void save(ServiceOrder serviceOrder);
 }

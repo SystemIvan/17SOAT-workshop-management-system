@@ -1,5 +1,6 @@
 package br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.dto;
 
-public enum OpenPurchaseOrderStatus {
-    OPEN
+public enum PurchaseOrderStatusResponse {
+    OPEN,
+    CLOSED
 }

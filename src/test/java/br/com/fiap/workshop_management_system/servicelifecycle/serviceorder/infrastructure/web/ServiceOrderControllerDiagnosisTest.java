@@ -162,6 +162,43 @@ class ServiceOrderControllerDiagnosisTest {
     }
 
     @Test
+    void rejectsMissingStockItemWithoutPersistingDiagnosis() throws Exception {
+        String serviceOrderId = createServiceOrder();
+        String body = """
+                {
+                  "diagnosedByTechnicianId": "%s",
+                  "items": [
+                    {
+                      "catalogServiceId": "%s",
+                      "name": "Troca de óleo",
+                      "price": {"value": 100.00, "currency": "BRL"},
+                      "stockRequirements": [
+                        {
+                          "stockItemId": "%s",
+                          "type": "PART",
+                          "quantity": 1,
+                          "nameSnapshot": "Filtro de óleo",
+                          "priceSnapshot": {"value": 25.00, "currency": "BRL"}
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """.formatted(diagnosedByTechnicianId, createActiveCatalogService(mockMvc), UUID.randomUUID());
+
+        mockMvc.perform(post("/api/service-orders/{id}/diagnosis", serviceOrderId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("STOCK_ITEM_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Stock item was not found"));
+
+        mockMvc.perform(get("/api/service-orders/{id}", serviceOrderId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.executions.length()").value(0));
+    }
+
+    @Test
     void existingExecutionContinuesUsingItsSnapshotAfterCatalogArchive() throws Exception {
         String serviceOrderId = createServiceOrder();
         String catalogServiceId = createActiveCatalogService(mockMvc);
