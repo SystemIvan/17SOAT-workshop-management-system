@@ -40,7 +40,7 @@ jobs:
           cache-dependency-path: pom.xml
 
       - name: Run quality gate
-        run: ./mvnw clean verify -Djacoco.skip=true
+        run: ./mvnw clean verify
 
       - name: Upload test reports
         if: ${{ always() }}
