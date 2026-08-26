@@ -26,6 +26,8 @@ public class PurchaseOrder {
     private String supplierRejectionCode;
     private Instant updatedAt;
     private Instant openedAt;
+    private Instant closedAt;
+    private UUID closedByUserAccountId;
 
     public static PurchaseOrder prepare(
             UUID idempotencyKey,
@@ -45,6 +47,8 @@ public class PurchaseOrder {
                 null,
                 normalizedCreatedAt,
                 normalizedCreatedAt,
+                null,
+                null,
                 null);
     }
 
@@ -59,7 +63,9 @@ public class PurchaseOrder {
             String supplierRejectionCode,
             Instant createdAt,
             Instant updatedAt,
-            Instant openedAt) {
+            Instant openedAt,
+            Instant closedAt,
+            UUID closedByUserAccountId) {
         return new PurchaseOrder(
                 id,
                 idempotencyKey,
@@ -71,7 +77,9 @@ public class PurchaseOrder {
                 supplierRejectionCode,
                 createdAt,
                 updatedAt,
-                openedAt);
+                openedAt,
+                closedAt,
+                closedByUserAccountId);
     }
 
     private PurchaseOrder(
@@ -85,7 +93,9 @@ public class PurchaseOrder {
             String supplierRejectionCode,
             Instant createdAt,
             Instant updatedAt,
-            Instant openedAt) {
+            Instant openedAt,
+            Instant closedAt,
+            UUID closedByUserAccountId) {
         if (id == null || idempotencyKey == null || status == null) {
             throw new IllegalArgumentException("Purchase order required data must not be null");
         }
@@ -95,8 +105,10 @@ public class PurchaseOrder {
         Instant normalizedCreatedAt = normalizeInstant(createdAt, "Purchase order creation time must not be null");
         Instant normalizedUpdatedAt = normalizeInstant(updatedAt, "Purchase order update time must not be null");
         Instant normalizedOpenedAt = openedAt == null ? null : normalizeInstant(openedAt, "");
+        Instant normalizedClosedAt = closedAt == null ? null : normalizeInstant(closedAt, "");
         if (normalizedUpdatedAt.isBefore(normalizedCreatedAt)
-                || (normalizedOpenedAt != null && normalizedOpenedAt.isBefore(normalizedCreatedAt))) {
+                || (normalizedOpenedAt != null && normalizedOpenedAt.isBefore(normalizedCreatedAt))
+                || (normalizedClosedAt != null && normalizedClosedAt.isBefore(normalizedCreatedAt))) {
             throw new IllegalArgumentException("Purchase order timestamps are inconsistent");
         }
 
@@ -111,6 +123,8 @@ public class PurchaseOrder {
         this.createdAt = normalizedCreatedAt;
         this.updatedAt = normalizedUpdatedAt;
         this.openedAt = normalizedOpenedAt;
+        this.closedAt = normalizedClosedAt;
+        this.closedByUserAccountId = closedByUserAccountId;
         validateState();
     }
 
@@ -128,6 +142,23 @@ public class PurchaseOrder {
         this.supplierRejectionCode = null;
         this.updatedAt = normalizedOpenedAt;
         this.openedAt = normalizedOpenedAt;
+    }
+
+    public void close(UUID closedByUserAccountId, Instant closedAt) {
+        if (status == PurchaseOrderStatus.CLOSED) {
+            return;
+        }
+        if (status != PurchaseOrderStatus.OPEN) {
+            throw new PurchaseOrderTransitionException("Purchase order cannot be closed from its current status");
+        }
+        if (closedByUserAccountId == null) {
+            throw new IllegalArgumentException("Purchase order closing user account id must not be null");
+        }
+        Instant normalizedClosedAt = requireCurrentOrFuture(closedAt);
+        this.status = PurchaseOrderStatus.CLOSED;
+        this.updatedAt = normalizedClosedAt;
+        this.closedAt = normalizedClosedAt;
+        this.closedByUserAccountId = closedByUserAccountId;
     }
 
     public void reject(String rejectionCode, Instant rejectedAt) {
@@ -168,6 +199,13 @@ public class PurchaseOrder {
             case REJECTED -> {
                 if (externalReference != null || supplierRejectionCode == null || openedAt != null) {
                     throw new IllegalArgumentException("Rejected purchase order has inconsistent state data");
+                }
+            }
+            case CLOSED -> {
+                if (externalReference == null || supplierRejectionCode != null || openedAt == null
+                        || closedAt == null || closedByUserAccountId == null || closedAt.isBefore(openedAt)
+                        || !updatedAt.equals(closedAt)) {
+                    throw new IllegalArgumentException("Closed purchase order has inconsistent state data");
                 }
             }
         }
@@ -260,5 +298,13 @@ public class PurchaseOrder {
 
     public Instant openedAt() {
         return openedAt;
+    }
+
+    public Instant closedAt() {
+        return closedAt;
+    }
+
+    public UUID closedByUserAccountId() {
+        return closedByUserAccountId;
     }
 }

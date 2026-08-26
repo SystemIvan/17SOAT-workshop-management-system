@@ -66,6 +66,14 @@ public class ServiceOrderRepositoryImpl implements ServiceOrderRepository {
     }
 
     @Override
+    public List<ServiceOrder> findAwaitingItemsByStockItemIds(java.util.Collection<UUID> stockItemIds) {
+        if (stockItemIds == null || stockItemIds.isEmpty()) {
+            return List.of();
+        }
+        return jpaRepository.findAwaitingItemsByStockItemIds(stockItemIds).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
     public void save(ServiceOrder serviceOrder) {
         jpaRepository.save(mapper.toEntity(serviceOrder));
     }

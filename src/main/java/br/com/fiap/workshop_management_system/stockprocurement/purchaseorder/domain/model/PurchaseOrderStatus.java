@@ -3,5 +3,6 @@ package br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.do
 public enum PurchaseOrderStatus {
     PENDING_SUBMISSION,
     OPEN,
-    REJECTED
+    REJECTED,
+    CLOSED
 }

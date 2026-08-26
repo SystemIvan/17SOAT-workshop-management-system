@@ -331,7 +331,7 @@ Onde você está no fluxo principal:
 |---|---|
 | A demanda acabou de nascer no Diagnosis | Continue no **passo 8** para gerar a Estimate. |
 | A Estimate foi aprovada e a reserva falhou | Você está no **passo 10**, com a execução em `AWAITING_ITEMS`. |
-| A Purchase Order foi criada com sucesso | Continue parado no **passo 10**: RF27 não recebe item nem repõe estoque. RF29 é que permitirá nova tentativa de reserva. |
+| A Purchase Order foi criada com sucesso | Confirme a entrega com RF28; o saldo continua inalterado até o recebimento futuro de RF29. |
 
 Para registrar a Purchase Order:
 
@@ -342,6 +342,15 @@ Para registrar a Purchase Order:
 3. Execute `Retry same Purchase Order` sem alterar header ou body. Espere `200 OK` e a mesma referência externa.
    Alterar o body com a mesma chave retorna `409 PURCHASE_ORDER_IDEMPOTENCY_CONFLICT`.
 4. Execute `Get Purchase Order`. A demanda deixa de aparecer na listagem aberta porque está `ORDERED`.
+5. Execute `List Purchase Orders pending delivery` e localize a ordem `OPEN`. Em seguida, execute `Close Purchase
+   Order` sem body: espere `200 OK`, `status: "CLOSED"`, `closedAt` e `closedByUserAccountId`.
+6. Execute `Retry close Purchase Order`. Espere `200 OK` e o mesmo `closedAt`; o fechamento é terminal, idempotente e
+   não altera `availableQuantity`.
+7. Execute `Receive Purchase Order`. Espere `201 Created`, `Location`, uma linha de Receipt por linha da ordem e o
+   incremento de `availableQuantity`. O request não possui body e aceita o recebimento histórico de item inativo sem
+   reativá-lo.
+8. Execute `Retry Purchase Order Receipt` e `Get Purchase Order Receipt`. Espere `200 OK`, o mesmo ID de Receipt e
+   nenhum novo incremento de saldo. O replay também republica a tentativa pós-commit das execuções elegíveis.
 
 O `make docker-up` também inicia o WireMock na porta `8089`; a aplicação usa o endereço interno
 `http://supplier-simulator:8080`. Não configure fornecedor real no MVP: a restrição ao Stock Manager ainda é apenas
@@ -358,8 +367,9 @@ O simulador possui dois SKUs especiais para falhas controladas:
   `503 EXTERNAL_SUPPLIER_UNAVAILABLE`. A ordem fica `PENDING_SUBMISSION` internamente; repita exatamente o mesmo POST e
   `Idempotency-Key` depois de restaurar o simulador/comportamento para reconciliar sem duplicar a compra.
 
-RF27 termina quando a ordem está `OPEN`. Ela não recebe os itens, não aumenta `availableQuantity`, não fecha a ordem e
-não tenta novamente as reservas por prioridade. Esses comportamentos permanecem em RF28/RF29.
+RF27 termina quando a ordem está `OPEN`. RF28 confirma a entrega integral e a torna `CLOSED`, registrando autoria e
+instante, mas não recebe itens nem aumenta `availableQuantity`. RF29 é a única etapa que cria o Stock Receipt, altera
+saldo e inicia, após o commit, a reavaliação de reservas das Service Executions em `AWAITING_ITEMS` por prioridade.
 
 ### Bifurcações e acompanhamento de status
 

@@ -11,6 +11,10 @@ import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.app
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.domain.model.PurchaseDemandNotSelectableException;
 import br.com.fiap.workshop_management_system.stockprocurement.stock.application.exception.StockItemNotFoundException;
 import br.com.fiap.workshop_management_system.stockprocurement.stock.domain.model.StockItemInactiveException;
+import br.com.fiap.workshop_management_system.stockprocurement.stockreceipt.application.exception.PurchaseOrderNotClosedException;
+import br.com.fiap.workshop_management_system.stockprocurement.stockreceipt.application.exception.StockQuantityOverflowException;
+import br.com.fiap.workshop_management_system.stockprocurement.stockreceipt.application.exception.StockReceiptInconsistentException;
+import br.com.fiap.workshop_management_system.stockprocurement.stockreceipt.application.exception.StockReceiptNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -35,6 +39,30 @@ class PurchaseOrderExceptionHandler {
     ResponseEntity<ErrorResponse> handleOrderNotFound(PurchaseOrderNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse("PURCHASE_ORDER_NOT_FOUND", exception.getMessage()));
+    }
+
+    @ExceptionHandler(PurchaseOrderNotClosedException.class)
+    ResponseEntity<ErrorResponse> handleOrderNotClosed(PurchaseOrderNotClosedException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("PURCHASE_ORDER_NOT_CLOSED", "Purchase order must be closed before receipt"));
+    }
+
+    @ExceptionHandler(StockReceiptNotFoundException.class)
+    ResponseEntity<ErrorResponse> handleReceiptNotFound(StockReceiptNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse("STOCK_RECEIPT_NOT_FOUND", "Stock receipt not found"));
+    }
+
+    @ExceptionHandler(StockReceiptInconsistentException.class)
+    ResponseEntity<ErrorResponse> handleReceiptInconsistent(StockReceiptInconsistentException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("STOCK_RECEIPT_INCONSISTENT", "Stock receipt is inconsistent"));
+    }
+
+    @ExceptionHandler(StockQuantityOverflowException.class)
+    ResponseEntity<ErrorResponse> handleQuantityOverflow(StockQuantityOverflowException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("STOCK_QUANTITY_OVERFLOW", "Stock quantity exceeds the supported range"));
     }
 
     @ExceptionHandler(StockItemNotFoundException.class)

@@ -83,6 +83,19 @@ public class StockItem {
         this.availableQuantity = new Quantity(availableQuantity.value() - requestedQuantity.value());
     }
 
+    public StockItemReceiptBalance receive(Quantity receivedQuantity) {
+        if (receivedQuantity == null || receivedQuantity.value() <= 0) {
+            throw new IllegalArgumentException("Received quantity must be greater than zero");
+        }
+        Quantity availableBefore = availableQuantity;
+        try {
+            availableQuantity = new Quantity(Math.addExact(availableQuantity.value(), receivedQuantity.value()));
+        } catch (ArithmeticException exception) {
+            throw new ArithmeticException("Stock quantity exceeds the supported range");
+        }
+        return new StockItemReceiptBalance(availableBefore, availableQuantity);
+    }
+
     private static void validateReservationQuantity(Quantity requestedQuantity) {
         if (requestedQuantity == null || requestedQuantity.value() <= 0) {
             throw new IllegalArgumentException("Reserved quantity must be greater than zero");

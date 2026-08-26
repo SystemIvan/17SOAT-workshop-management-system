@@ -95,4 +95,26 @@ class StockItemTest {
         assertThrows(IllegalStateException.class, () -> item.reserve(new Quantity(1)));
         assertThrows(IllegalArgumentException.class, () -> item.assessReservation(new Quantity(0)));
     }
+
+    @Test
+    void receivesIntoActiveOrInactiveItemsWithoutChangingActivation() {
+        StockItem item = item(StockItemType.PART, 2);
+        item.deactivate();
+
+        StockItemReceiptBalance balance = item.receive(new Quantity(3));
+
+        assertEquals(new Quantity(2), balance.availableBefore());
+        assertEquals(new Quantity(5), balance.availableAfter());
+        assertEquals(new Quantity(5), item.availableQuantity());
+        assertFalse(item.active());
+    }
+
+    @Test
+    void rejectsInvalidOrOverflowingReceipts() {
+        StockItem item = item(StockItemType.PART, Integer.MAX_VALUE);
+
+        assertThrows(IllegalArgumentException.class, () -> item.receive(new Quantity(0)));
+        assertThrows(ArithmeticException.class, () -> item.receive(new Quantity(1)));
+        assertEquals(new Quantity(Integer.MAX_VALUE), item.availableQuantity());
+    }
 }

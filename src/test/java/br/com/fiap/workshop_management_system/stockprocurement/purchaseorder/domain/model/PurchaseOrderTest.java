@@ -75,7 +75,7 @@ class PurchaseOrderTest {
         assertThrows(IllegalArgumentException.class,
                 () -> PurchaseOrder.reconstitute(
                         UUID.randomUUID(), UUID.randomUUID(), PAYLOAD_HASH, PurchaseOrderStatus.OPEN, List.of(line),
-                        Set.of(), null, null, CREATED_AT, CREATED_AT, null));
+                        Set.of(), null, null, CREATED_AT, CREATED_AT, null, null, null));
     }
 
     @Test
@@ -88,6 +88,41 @@ class PurchaseOrderTest {
         PurchaseOrder order = preparedOrder();
         assertThrows(IllegalArgumentException.class,
                 () -> order.open("SUP-123", CREATED_AT.minusSeconds(1)));
+    }
+
+    @Test
+    void closesOpenOrderOnceAndPreservesTheFirstAuditDataOnReplay() {
+        PurchaseOrder order = preparedOrder();
+        Instant openedAt = CREATED_AT.plusSeconds(1);
+        Instant closedAt = openedAt.plusSeconds(1);
+        UUID closedBy = UUID.randomUUID();
+        order.open("SUP-123", openedAt);
+
+        order.close(closedBy, closedAt);
+        order.close(UUID.randomUUID(), closedAt.plusSeconds(1));
+
+        assertEquals(PurchaseOrderStatus.CLOSED, order.status());
+        assertEquals(closedAt.truncatedTo(java.time.temporal.ChronoUnit.MICROS), order.closedAt());
+        assertEquals(closedBy, order.closedByUserAccountId());
+        assertEquals(order.closedAt(), order.updatedAt());
+        assertEquals("SUP-123", order.externalReference());
+    }
+
+    @Test
+    void rejectsInvalidClosingTransitionsAndInconsistentClosedReconstitution() {
+        PurchaseOrder order = preparedOrder();
+        assertThrows(PurchaseOrderTransitionException.class,
+                () -> order.close(UUID.randomUUID(), CREATED_AT.plusSeconds(1)));
+
+        order.open("SUP-123", CREATED_AT.plusSeconds(1));
+        assertThrows(IllegalArgumentException.class, () -> order.close(null, CREATED_AT.plusSeconds(2)));
+        assertThrows(IllegalArgumentException.class,
+                () -> order.close(UUID.randomUUID(), CREATED_AT));
+        assertThrows(IllegalArgumentException.class,
+                () -> PurchaseOrder.reconstitute(
+                        UUID.randomUUID(), UUID.randomUUID(), PAYLOAD_HASH, PurchaseOrderStatus.CLOSED, List.of(line()),
+                        Set.of(), "SUP-123", null, CREATED_AT, CREATED_AT.plusSeconds(2), CREATED_AT.plusSeconds(1),
+                        null, UUID.randomUUID()));
     }
 
     private static PurchaseOrder preparedOrder() {
