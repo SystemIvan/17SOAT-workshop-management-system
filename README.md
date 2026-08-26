@@ -44,6 +44,22 @@ make verify
 make run-dev
 ```
 
+`make verify` e `make coverage` executam o quality gate completo por meio de `./mvnw clean verify`. O build reprova
+quando a suíte, o `ModuleStructureTest`, a geração do relatório JaCoCo ou a cobertura global de linhas falha. O limite
+mínimo é 80%, definido no `pom.xml`; o workflow não mantém um cálculo separado. Depois de uma execução local, abra
+`target/site/jacoco/index.html` para consultar o relatório de cobertura.
+
+## Continuous integration
+
+O workflow `CI` executa o check único `Quality gate` em Pull Requests e pushes para `dev` e `main`, usando Temurin 21 e
+o Maven Wrapper. No resumo de cada execução, a seção **Artifacts** disponibiliza por 30 dias:
+
+- `test-reports-*`, com os relatórios Surefire/Failsafe produzidos;
+- `jacoco-report-*`, com os relatórios HTML, XML e CSV do JaCoCo.
+
+Um novo commit cancela a execução obsoleta da mesma proposta. A proteção das branches deve exigir o contexto exato
+`Quality gate`; renomear o job requer coordenar antes a regra correspondente no GitHub.
+
 ## E2E smoke suite (Postman/Newman)
 
 Every request in the Postman collection asserts its HTTP status and key response fields via `pm.test`, so it

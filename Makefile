@@ -1,4 +1,8 @@
+ifeq ($(OS),Windows_NT)
+MVNW := mvnw.cmd
+else
 MVNW := ./mvnw
+endif
 COMPOSE := docker compose
 
 .PHONY: help test coverage verify compile build clean run run-dev \
@@ -32,10 +36,10 @@ test:
 	$(MVNW) test
 
 coverage:
-	$(MVNW) verify
+	$(MVNW) clean verify
 
 verify:
-	$(MVNW) verify
+	$(MVNW) clean verify
 
 compile:
 	$(MVNW) compile

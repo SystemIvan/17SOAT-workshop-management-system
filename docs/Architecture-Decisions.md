@@ -1129,8 +1129,6 @@ These items do not need a new architecture decision once their related decision,
 - Add Spring Security/JWT dependencies and filters after AD-016; the technology choice itself is already accepted.
 - Add Swagger/OpenAPI documentation to existing REST APIs.
 - Add use-case, controller, persistence and end-to-end integration tests.
-- Configure JaCoCo and enforce the official 80% critical-domain threshold in active CI.
-- Enable/fix CI; the current workflow is fully commented out.
 - Complete `README.md` with local execution and project objectives.
 - Run and document the required vulnerability scan.
 - Correct Docker documentation examples after comparing them with actual dependencies/endpoints.
