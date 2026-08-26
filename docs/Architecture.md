@@ -467,9 +467,11 @@ sujeitos às decisões dos respectivos responsáveis/time; este documento não c
 
 ### 6.2 Reposição de estoque (B)
 
-Indisponibilidade ou nível baixo dispara criação de Purchase Order. A integração com o fornecedor fica atrás de
-Gateway + Anti-Corruption Layer. Após fechamento/recebimento, Stock registra os itens, reavalia demandas pendentes,
-reserva material e publica o evento que libera as execuções.
+Indisponibilidade ou nível baixo pode originar uma Purchase Demand, que o Stock Manager usa para criar uma Purchase
+Order; não existe compra automática. A integração com o fornecedor fica atrás de Gateway + Anti-Corruption Layer.
+RF28 fecha integralmente uma ordem `OPEN` e registra a auditoria sem modificar saldo. RF29 cria o aggregate imutável
+`StockReceipt`, registra uma entrada por linha e publica `StockItemsRestockedEvent`; Service Lifecycle consome o evento
+depois do commit para reavaliar reservas em `AWAITING_ITEMS`, sem acoplamento inverso com Stock & Procurement.
 
 ### 6.3 Reparo adicional (B)
 

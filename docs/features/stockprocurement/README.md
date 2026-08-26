@@ -36,9 +36,9 @@ e dependências, não substitui `functional-spec.md`, `technical-spec.md`, `impl
 | `stock-domain-foundation` | Catálogo e consulta de Stock Items | Implemented |
 | `stock-item-reservation` | Reserva atômica, consulta e consumo | Implemented |
 | RF27 — `purchase-order-creation` | Demandas, criação manual e ordem externa `OPEN` | Implemented |
-| RF30 — low stock | Nível mínimo, alvo e detecção de baixo estoque | Spec futura |
-| RF28 — close Purchase Order | Confirmação de entrega e fechamento da ordem | Spec futura |
-| RF29 — receive and restock | Entrada de materiais, saldo e reação das reservas | Spec futura |
+| RF30 — `low-stock-detection` | Mínimo, alvo e detecção | Specs aprovadas; Plan Draft |
+| RF28 — `purchase-order-closing` | Entrega e fechamento | Implemented |
+| RF29 — `stock-receiving-and-restocking` | Recebimento, saldo e retries | Implemented |
 
 Cada linha futura exige seu próprio ciclo completo de SDD. A situação desta tabela não aprova comportamento nem permite
 implementar placeholders.
@@ -67,16 +67,16 @@ implementar placeholders.
 
 ### RF28 — Fechar Purchase Order
 
-- definir se fechar significa confirmar entrega integral;
-- decidir como tratar rejeição, cancelamento, divergência e entrega parcial;
-- preservar a referência externa e a imutabilidade das linhas confirmadas.
+- confirma entrega integral de uma ordem `OPEN` e registra autoria/instante uma única vez;
+- mantém `CLOSED` terminal, idempotente, sem cancelamento, reabertura, divergência ou entrega parcial;
+- preserva a referência externa, linhas confirmadas e saldo de todos os Stock Items.
 
 ### RF29 — Receber e repor
 
-- registrar uma movimentação rastreável em vez de atualizar saldo por CRUD;
-- definir idempotência do recebimento e proteção contra entrada duplicada;
-- decidir a ordem de retry das Service Executions em `AWAITING_ITEMS`;
-- preservar a decisão do Miro de não reservar previamente o material futuro para uma Service Order específica.
+- registra um Stock Receipt imutável e uma movimentação de entrada por linha, sem CRUD de saldo;
+- mantém recebimento idempotente por Purchase Order e publica o evento novamente no replay;
+- reavalia Service Executions em `AWAITING_ITEMS` após o commit em ordem `URGENT`, `HIGH`, `NORMAL`, `LOW`;
+- não promete material à Service Order que originou a demanda de compra.
 
 ## Demonstração do External Supplier System
 

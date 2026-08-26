@@ -1590,7 +1590,107 @@
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/purchase-orders/{{purchaseOrderId}}",
-            "description": "Retorna apenas Purchase Orders funcionalmente confirmadas no estado OPEN."
+            "description": "Retorna Purchase Orders funcionalmente confirmadas nos estados OPEN ou CLOSED."
+          }
+        },
+        {
+          "name": "List Purchase Orders pending delivery",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Response is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+            ] }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/purchase-orders?status=OPEN",
+            "description": "Lista somente Purchase Orders abertas, pendentes de confirmação integral de entrega."
+          }
+        },
+        {
+          "name": "Close Purchase Order",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Purchase order is CLOSED', function () { pm.expect(body.status).to.eql('CLOSED'); });",
+              "pm.test('Closing audit is present', function () { pm.expect(body.closedAt).to.be.a('string'); pm.expect(body.closedByUserAccountId).to.be.a('string'); });",
+              "pm.collectionVariables.set('purchaseOrderClosedAt', body.closedAt);"
+            ] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/purchase-orders/{{purchaseOrderId}}/close",
+            "description": "Confirma a entrega integral sem body. O fechamento não altera o saldo dos Stock Items."
+          }
+        },
+        {
+          "name": "Retry close Purchase Order",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Closing audit is unchanged', function () { pm.expect(body.closedAt).to.eql(pm.collectionVariables.get('purchaseOrderClosedAt')); });"
+            ] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/purchase-orders/{{purchaseOrderId}}/close",
+            "description": "Repete o fechamento terminal de forma idempotente; não troca autoria, instante ou saldo."
+          }
+        },
+        {
+          "name": "Receive Purchase Order",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+              "const body = pm.response.json();",
+              "pm.test('Receipt is complete', function () { pm.expect(body.id).to.be.a('string'); pm.expect(body.lines).to.be.an('array').and.not.empty; });",
+              "pm.collectionVariables.set('stockReceiptId', body.id);"
+            ] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/purchase-orders/{{purchaseOrderId}}/receipt",
+            "description": "Registra a entrada integral da ordem CLOSED sem body. Linhas, quantidades, saldo e auditoria são derivados no servidor."
+          }
+        },
+        {
+          "name": "Retry Purchase Order Receipt",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Same receipt is returned', function () { pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('stockReceiptId')); });"
+            ] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/purchase-orders/{{purchaseOrderId}}/receipt",
+            "description": "Replay seguro: não duplica Receipt, movimento ou saldo e republica a tentativa pós-commit."
+          }
+        },
+        {
+          "name": "Get Purchase Order Receipt",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Receipt id matches', function () { pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('stockReceiptId')); });"
+            ] }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/purchase-orders/{{purchaseOrderId}}/receipt",
+            "description": "Consulta o Receipt e os snapshots imutáveis da Purchase Order."
           }
         },
         {
