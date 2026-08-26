@@ -2,12 +2,15 @@ package br.com.fiap.workshop_management_system.stockprocurement.stock.infrastruc
 
 import br.com.fiap.workshop_management_system.stockprocurement.stock.application.dto.CreateStockItemRequest;
 import br.com.fiap.workshop_management_system.stockprocurement.stock.application.dto.StockItemResponse;
+import br.com.fiap.workshop_management_system.stockprocurement.stock.application.dto.LowStockPolicyRequest;
 import br.com.fiap.workshop_management_system.stockprocurement.stock.application.dto.UpdateStockItemRequest;
 import br.com.fiap.workshop_management_system.stockprocurement.stock.application.usecase.CreateStockItemUseCase;
 import br.com.fiap.workshop_management_system.stockprocurement.stock.application.usecase.DeactivateStockItemUseCase;
 import br.com.fiap.workshop_management_system.stockprocurement.stock.application.usecase.GetStockItemUseCase;
 import br.com.fiap.workshop_management_system.stockprocurement.stock.application.usecase.SearchStockItemsUseCase;
 import br.com.fiap.workshop_management_system.stockprocurement.stock.application.usecase.UpdateStockItemUseCase;
+import br.com.fiap.workshop_management_system.stockprocurement.stock.application.usecase.ConfigureLowStockPolicyUseCase;
+import br.com.fiap.workshop_management_system.stockprocurement.stock.application.usecase.DisableLowStockPolicyUseCase;
 import br.com.fiap.workshop_management_system.stockprocurement.stock.domain.model.StockItemType;
 import br.com.fiap.workshop_management_system.stockprocurement.stock.domain.repository.StockItemSearchCriteria;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -44,15 +48,21 @@ public class StockItemController {
     private final SearchStockItemsUseCase searchUseCase;
     private final UpdateStockItemUseCase updateUseCase;
     private final DeactivateStockItemUseCase deactivateUseCase;
+    private final ConfigureLowStockPolicyUseCase configureLowStockPolicyUseCase;
+    private final DisableLowStockPolicyUseCase disableLowStockPolicyUseCase;
 
     public StockItemController(CreateStockItemUseCase createUseCase, GetStockItemUseCase getUseCase,
                                SearchStockItemsUseCase searchUseCase, UpdateStockItemUseCase updateUseCase,
-                               DeactivateStockItemUseCase deactivateUseCase) {
+                               DeactivateStockItemUseCase deactivateUseCase,
+                               ConfigureLowStockPolicyUseCase configureLowStockPolicyUseCase,
+                               DisableLowStockPolicyUseCase disableLowStockPolicyUseCase) {
         this.createUseCase = createUseCase;
         this.getUseCase = getUseCase;
         this.searchUseCase = searchUseCase;
         this.updateUseCase = updateUseCase;
         this.deactivateUseCase = deactivateUseCase;
+        this.configureLowStockPolicyUseCase = configureLowStockPolicyUseCase;
+        this.disableLowStockPolicyUseCase = disableLowStockPolicyUseCase;
     }
 
     @PostMapping
@@ -77,8 +87,10 @@ public class StockItemController {
             String search,
             @RequestParam(required = false) Set<StockItemType> type,
             @RequestParam(required = false) Boolean available,
+            @Parameter(description = "Filters configured items by strict low-stock condition")
+            @RequestParam(required = false) Boolean lowStock,
             @RequestParam(defaultValue = "true") boolean active) {
-        return ResponseEntity.ok(searchUseCase.execute(new StockItemSearchCriteria(search, type, available, active)));
+        return ResponseEntity.ok(searchUseCase.execute(new StockItemSearchCriteria(search, type, available, lowStock, active)));
     }
 
     @PatchMapping("/{id}")
@@ -92,6 +104,20 @@ public class StockItemController {
     @Operation(summary = "Logically deactivate a stock item")
     public ResponseEntity<Void> deactivate(@PathVariable UUID id) {
         deactivateUseCase.execute(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}/low-stock-policy")
+    @Operation(summary = "Configure the optional low stock policy of an active stock item")
+    public ResponseEntity<StockItemResponse> configureLowStockPolicy(@PathVariable UUID id,
+                                                                       @Valid @RequestBody LowStockPolicyRequest request) {
+        return ResponseEntity.ok(configureLowStockPolicyUseCase.execute(id, request.toCommand()));
+    }
+
+    @DeleteMapping("/{id}/low-stock-policy")
+    @Operation(summary = "Disable the low stock policy idempotently")
+    public ResponseEntity<Void> disableLowStockPolicy(@PathVariable UUID id) {
+        disableLowStockPolicyUseCase.execute(id);
         return ResponseEntity.noContent().build();
     }
 }

@@ -184,6 +184,9 @@ public class ServiceExecution {
      */
     void start() {
         requireStatus(ServiceExecutionStatus.READY);
+        if (assignedTechnicianId == null) {
+            throw new IllegalStateException("A technician must be assigned before starting a ServiceExecution");
+        }
         this.status = ServiceExecutionStatus.IN_PROGRESS;
     }
 

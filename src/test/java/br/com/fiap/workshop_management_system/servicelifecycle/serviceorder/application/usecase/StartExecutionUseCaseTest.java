@@ -31,11 +31,25 @@ class StartExecutionUseCaseTest {
 
         ServiceOrder serviceOrder = newReadyServiceOrder();
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
+        serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
         serviceOrders.save(serviceOrder);
 
         ServiceOrderResponse response = useCase.execute(serviceOrder.id(), executionId);
 
         assertEquals(ServiceExecutionStatus.IN_PROGRESS, response.executions().get(0).status());
+    }
+
+    @Test
+    void rejectsStartingAReadyExecutionWithoutAnAssignedTechnician() {
+        InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository();
+        StartExecutionUseCase useCase = new StartExecutionUseCase(serviceOrders);
+
+        ServiceOrder serviceOrder = newReadyServiceOrder();
+        UUID executionId = serviceOrder.serviceExecutions().get(0).id();
+        serviceOrders.save(serviceOrder);
+
+        assertThrows(IllegalStateException.class, () -> useCase.execute(serviceOrder.id(), executionId));
+        assertEquals(ServiceExecutionStatus.READY, serviceOrder.serviceExecutions().get(0).status());
     }
 
     @Test

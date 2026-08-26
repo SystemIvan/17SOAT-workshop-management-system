@@ -31,12 +31,17 @@ public class StockItemJpaEntity {
     private int availableQuantity;
     @Column(nullable = false)
     private boolean active;
+    @Column(name = "minimum_quantity")
+    private Integer minimumQuantity;
+    @Column(name = "target_quantity")
+    private Integer targetQuantity;
 
     protected StockItemJpaEntity() {
     }
 
     public StockItemJpaEntity(UUID id, String sku, String name, StockItemType type, BigDecimal priceValue,
-                              String priceCurrency, int availableQuantity, boolean active) {
+                              String priceCurrency, int availableQuantity, boolean active, Integer minimumQuantity,
+                              Integer targetQuantity) {
         this.id = id;
         this.sku = sku;
         this.name = name;
@@ -45,6 +50,8 @@ public class StockItemJpaEntity {
         this.priceCurrency = priceCurrency;
         this.availableQuantity = availableQuantity;
         this.active = active;
+        this.minimumQuantity = minimumQuantity;
+        this.targetQuantity = targetQuantity;
     }
 
     public UUID getId() { return id; }
@@ -55,4 +62,6 @@ public class StockItemJpaEntity {
     public String getPriceCurrency() { return priceCurrency; }
     public int getAvailableQuantity() { return availableQuantity; }
     public boolean isActive() { return active; }
+    public Integer getMinimumQuantity() { return minimumQuantity; }
+    public Integer getTargetQuantity() { return targetQuantity; }
 }

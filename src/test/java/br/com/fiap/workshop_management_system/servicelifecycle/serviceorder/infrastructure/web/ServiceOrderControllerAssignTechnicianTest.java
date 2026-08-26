@@ -175,6 +175,7 @@ class ServiceOrderControllerAssignTechnicianTest {
         transactionTemplate.executeWithoutResult(status -> {
             ServiceOrder serviceOrder = serviceOrderRepository.findById(serviceOrderId).orElseThrow();
             serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+            serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
             serviceOrderRepository.save(serviceOrder);
         });
 

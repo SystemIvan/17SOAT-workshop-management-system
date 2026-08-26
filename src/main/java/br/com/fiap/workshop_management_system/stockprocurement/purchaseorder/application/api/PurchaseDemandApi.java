@@ -2,5 +2,7 @@ package br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.ap
 
 public interface PurchaseDemandApi {
 
-    void recordLowStock(LowStockPurchaseDemandCommand command);
+    LowStockPurchaseDemandResult recordLowStock(LowStockPurchaseDemandCommand command);
+
+    void resolveLowStock(LowStockPurchaseDemandResolutionCommand command);
 }

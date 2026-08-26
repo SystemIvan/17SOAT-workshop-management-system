@@ -33,6 +33,7 @@ class ServiceOrderTest {
     private UUID authorizeExecution(ServiceOrder serviceOrder, UUID executionId) {
         UUID estimateId = UUID.randomUUID();
         serviceOrder.authorizeExecutionFromEstimate(estimateId, executionId);
+        serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
         return estimateId;
     }
 
@@ -172,6 +173,7 @@ class ServiceOrderTest {
 
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), approvedExecutionId);
         serviceOrder.rejectExecutionFromEstimate(UUID.randomUUID(), rejectedExecutionId);
+        serviceOrder.confirmTechnicianAssignment(approvedExecutionId, UUID.randomUUID());
         serviceOrder.startExecution(approvedExecutionId);
         serviceOrder.completeExecution(approvedExecutionId);
 

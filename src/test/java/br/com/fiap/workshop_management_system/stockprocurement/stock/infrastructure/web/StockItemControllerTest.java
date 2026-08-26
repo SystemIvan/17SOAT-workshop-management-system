@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -86,6 +87,56 @@ class StockItemControllerTest {
         mockMvc.perform(get("/api/stock-items/not-a-uuid"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void configuresFiltersAndDisablesLowStockPolicy() throws Exception {
+        String lowStockItemId = create("HTTP-LOW-" + System.nanoTime(), "Low brake pad", "PART", 2);
+        String normalStockItemId = create("HTTP-NORMAL-" + System.nanoTime(), "Normal brake pad", "PART", 8);
+
+        mockMvc.perform(put("/api/stock-items/{id}/low-stock-policy", lowStockItemId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"minimumQuantity\":3,\"targetQuantity\":10}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lowStockPolicy.minimumQuantity").value(3))
+                .andExpect(jsonPath("$.lowStockStatus").value("LOW"))
+                .andExpect(jsonPath("$.lowStockOccurrenceId").isNotEmpty())
+                .andExpect(jsonPath("$.suggestedPurchaseQuantity").value(8));
+
+        mockMvc.perform(put("/api/stock-items/{id}/low-stock-policy", normalStockItemId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"minimumQuantity\":3,\"targetQuantity\":10}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lowStockStatus").value("NORMAL"));
+
+        mockMvc.perform(get("/api/stock-items").param("lowStock", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(lowStockItemId));
+        mockMvc.perform(get("/api/stock-items").param("lowStock", "false"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(normalStockItemId));
+
+        mockMvc.perform(delete("/api/stock-items/{id}/low-stock-policy", lowStockItemId))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/stock-items/{id}/low-stock-policy", lowStockItemId))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/stock-items/{id}", lowStockItemId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lowStockPolicy").doesNotExist())
+                .andExpect(jsonPath("$.lowStockStatus").value("NOT_CONFIGURED"));
+    }
+
+    @Test
+    void rejectsInvalidLowStockPolicy() throws Exception {
+        String id = create("HTTP-POLICY-" + System.nanoTime(), "Policy item", "PART", 1);
+
+        mockMvc.perform(put("/api/stock-items/{id}/low-stock-policy", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"minimumQuantity\":4,\"targetQuantity\":4}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_LOW_STOCK_POLICY"));
     }
 
     private String create(String sku, String name, String type, int availableQuantity) throws Exception {

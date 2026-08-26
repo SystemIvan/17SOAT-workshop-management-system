@@ -21,6 +21,8 @@ public class PurchaseOrderPersistenceMapper {
                 order.createdAt(),
                 order.updatedAt(),
                 order.openedAt(),
+                order.closedAt(),
+                order.closedByUserAccountId(),
                 order.lines().stream()
                         .map(line -> new PurchaseOrderLineEmbeddable(
                                 line.stockItemId(),
@@ -52,6 +54,8 @@ public class PurchaseOrderPersistenceMapper {
                 entity.getSupplierRejectionCode(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
-                entity.getOpenedAt());
+                entity.getOpenedAt(),
+                entity.getClosedAt(),
+                entity.getClosedByUserAccountId());
     }
 }
