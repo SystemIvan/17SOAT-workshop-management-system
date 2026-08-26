@@ -195,6 +195,12 @@ retornados em respostas `201 Created` são os que devem ser usados no restante d
    Envie `POST {{baseUrl}}/api/stock-items`, espere `201 Created` e use o `stockItemId` gravado pelo script. A
    quantidade disponível deve ser pelo menos a quantidade exigida no diagnóstico para exercitar a reserva bem-sucedida.
 
+   Para a reposição preventiva, envie em seguida `PUT {{baseUrl}}/api/stock-items/{{stockItemId}}/low-stock-policy`
+   com `{ "minimumQuantity": 5, "targetQuantity": 12 }`. A consulta
+   `GET {{baseUrl}}/api/stock-items?lowStock=true&active=true` mostra apenas itens configurados cujo saldo está
+   estritamente abaixo do mínimo. Para desabilitar a policy de forma idempotente, envie `DELETE` no mesmo caminho;
+   nenhuma dessas operações cria uma Purchase Order automaticamente.
+
 6. Em `Service Lifecycle / Service Orders`, envie `Create service order` em
    `POST {{baseUrl}}/api/service-orders`. Mantenha `customerId` e `vehicleId` nas variáveis da coleção e informe o
    retrato do veículo e a avaliação inicial, como no exemplo:

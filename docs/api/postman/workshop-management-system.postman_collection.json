@@ -645,6 +645,46 @@
           }
         },
         {
+          "name": "Configure low stock policy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Policy is returned', function () { pm.expect(pm.response.json().lowStockPolicy.minimumQuantity).to.eql(5); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"minimumQuantity\": 5,\n  \"targetQuantity\": 12\n}" },
+            "url": "{{baseUrl}}/api/stock-items/{{stockItemId}}/low-stock-policy"
+          }
+        },
+        {
+          "name": "Search low stock items",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"] }
+            }
+          ],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/stock-items?lowStock=true&active=true" }
+        },
+        {
+          "name": "Disable low stock policy",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.test('Status code is 204', function () { pm.response.to.have.status(204); });"] }
+            }
+          ],
+          "request": { "method": "DELETE", "url": "{{baseUrl}}/api/stock-items/{{stockItemId}}/low-stock-policy" }
+        },
+        {
           "name": "Get stock item",
           "event": [
             {

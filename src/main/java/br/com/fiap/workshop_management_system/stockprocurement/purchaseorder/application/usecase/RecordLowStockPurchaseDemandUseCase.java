@@ -1,7 +1,10 @@
 package br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.usecase;
 
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.LowStockPurchaseDemandCommand;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.LowStockPurchaseDemandResolutionCommand;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.LowStockPurchaseDemandResult;
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.PurchaseDemandApi;
+import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.PurchaseDemandStatusView;
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.domain.model.PurchaseDemand;
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.domain.model.PurchaseDemandOrigin;
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.domain.repository.PurchaseDemandRepository;
@@ -42,7 +45,7 @@ public class RecordLowStockPurchaseDemandUseCase implements PurchaseDemandApi {
 
     @Override
     @Transactional
-    public void recordLowStock(LowStockPurchaseDemandCommand command) {
+    public LowStockPurchaseDemandResult recordLowStock(LowStockPurchaseDemandCommand command) {
         StockItem stockItem = stockItemRepository.findByIdForUpdate(command.stockItemId())
                 .orElseThrow(StockItemNotFoundException::new);
         if (!stockItem.active()) {
@@ -65,6 +68,20 @@ public class RecordLowStockPurchaseDemandUseCase implements PurchaseDemandApi {
                 command.observedAvailableQuantity(),
                 command.suggestedQuantity(),
                 observedAt);
+        demandRepository.save(demand);
+        return new LowStockPurchaseDemandResult(demand.id(), PurchaseDemandStatusView.valueOf(demand.status().name()));
+    }
+
+    @Override
+    @Transactional
+    public void resolveLowStock(LowStockPurchaseDemandResolutionCommand command) {
+        PurchaseDemand demand = demandRepository.findEquivalentForUpdate(
+                        PurchaseDemandOrigin.LOW_STOCK, command.occurrenceId(), command.stockItemId())
+                .orElse(null);
+        if (demand == null) {
+            return;
+        }
+        demand.resolve(command.resolvedAt().truncatedTo(ChronoUnit.MICROS));
         demandRepository.save(demand);
     }
 

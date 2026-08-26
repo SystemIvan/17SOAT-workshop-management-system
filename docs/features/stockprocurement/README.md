@@ -22,7 +22,8 @@ e dependências, não substitui `functional-spec.md`, `technical-spec.md`, `impl
 3. Stock Item Reservation tenta comprometer atomicamente os requirements de uma Service Execution autorizada.
 4. Uma insuficiência pode originar ou atualizar uma Purchase Demand `PENDING_REPAIR` já no Diagnosis; rejeição ou
    expiração comercial não a resolve.
-5. RF30 poderá originar uma Purchase Demand `LOW_STOCK` a partir de nível mínimo e alvo de reposição aprovados.
+5. RF30 configura policy opcional por item e origina uma única Purchase Demand `LOW_STOCK` por ocorrência contínua;
+   não existe scheduler nem Purchase Order automática.
 6. RF27 permite ao Stock Manager criar uma Purchase Order ad hoc, a partir de demandas ou combinando as duas formas.
 7. O External Supplier System confirma a ordem e devolve uma referência externa.
 8. RF28 fecha a Purchase Order quando a entrega for confirmada pelo Stock Manager.
@@ -36,7 +37,7 @@ e dependências, não substitui `functional-spec.md`, `technical-spec.md`, `impl
 | `stock-domain-foundation` | Catálogo e consulta de Stock Items | Implemented |
 | `stock-item-reservation` | Reserva atômica, consulta e consumo | Implemented |
 | RF27 — `purchase-order-creation` | Demandas, criação manual e ordem externa `OPEN` | Implemented |
-| RF30 — `low-stock-detection` | Mínimo, alvo e detecção | Specs aprovadas; Plan Draft |
+| RF30 — `low-stock-detection` | Policy, occurrence, demanda `LOW_STOCK` e sinalização | Implemented |
 | RF28 — `purchase-order-closing` | Entrega e fechamento | Implemented |
 | RF29 — `stock-receiving-and-restocking` | Recebimento, saldo e retries | Implemented |
 

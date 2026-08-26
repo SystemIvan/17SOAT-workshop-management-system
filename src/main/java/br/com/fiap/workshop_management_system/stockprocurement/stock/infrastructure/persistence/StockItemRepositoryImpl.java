@@ -66,6 +66,13 @@ public class StockItemRepositoryImpl implements StockItemRepository {
                 predicates.add(criteria.available() ? builder.greaterThan(root.get("availableQuantity"), 0)
                         : builder.equal(root.get("availableQuantity"), 0));
             }
+            if (criteria.lowStock() != null) {
+                Predicate configured = builder.and(builder.isNotNull(root.get("minimumQuantity")),
+                        builder.isNotNull(root.get("targetQuantity")));
+                Predicate low = builder.lessThan(root.get("availableQuantity"), root.get("minimumQuantity"));
+                predicates.add(criteria.lowStock() ? builder.and(configured, low)
+                        : builder.and(configured, builder.not(low)));
+            }
             return builder.and(predicates.toArray(Predicate[]::new));
         };
         Sort sort = Sort.by("name").ascending().and(Sort.by("sku").ascending());

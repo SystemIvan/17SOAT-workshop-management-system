@@ -3,9 +3,9 @@
 | Campo | Valor |
 |---|---|
 | Feature | `low-stock-detection` |
-| Status | Draft |
+| Status | Implemented |
 | Responsável | Matheus Apostulo |
-| Atualizado em | 2026-08-25 |
+| Atualizado em | 2026-08-26 |
 | Branch de implementação | `feat/stockprocurement-low-stock-detection` |
 | Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-25) |
 | Especificação técnica | `./technical-spec.md` (`Approved` em 2026-08-25) |
@@ -54,17 +54,17 @@ RF30 não deve iniciar integração com Receipt antes dessas precondições esta
 
 | Ordem | Checkpoint | Status |
 |---:|---|---|
-| 0 | Validar baseline RF27–RF29 e contratos existentes | Pending |
-| 1 | Implementar policy e occurrence no domínio | Pending |
-| 2 | Criar migration, JPA, repositories e queries | Pending |
-| 3 | Evoluir `PurchaseDemandApi` e reconciliação de claim | Pending |
-| 4 | Implementar detector nos fluxos transacionais | Pending |
-| 5 | Integrar reavaliação after-commit de Receipt | Pending |
-| 6 | Implementar HTTP, filtros e respostas | Pending |
-| 7 | Implementar sinalização consumer-owned | Pending |
-| 8 | Validar concorrência, idempotência e Modulith | Pending |
-| 9 | Atualizar OpenAPI, Postman e documentação | Pending |
-| 10 | Concluir segurança, cobertura e gates finais | Pending |
+| 0 | Validar baseline RF27–RF29 e contratos existentes | Completed |
+| 1 | Implementar policy e occurrence no domínio | Completed |
+| 2 | Criar migration, JPA, repositories e queries | Completed |
+| 3 | Evoluir `PurchaseDemandApi` e reconciliação de claim | Completed |
+| 4 | Implementar detector nos fluxos transacionais | Completed |
+| 5 | Integrar reavaliação after-commit de Receipt | Completed |
+| 6 | Implementar HTTP, filtros e respostas | Completed |
+| 7 | Implementar sinalização consumer-owned | Completed |
+| 8 | Validar concorrência, idempotência e Modulith | Completed |
+| 9 | Atualizar OpenAPI, Postman e documentação | Completed |
+| 10 | Concluir segurança, cobertura e gates finais | Completed |
 
 ## Checkpoint 0 — Validar baseline RF27–RF29 e contratos existentes
 
@@ -321,14 +321,14 @@ contrato público antes de reconciliar qualquer diferença entre baseline e tech
 
 | Item | Status inicial | Evidência/mitigação esperada |
 |---|---|---|
-| Validação/mass assignment | Pending | Somente mínimo/alvo; demais campos calculados |
-| Autenticação/autorização | Pending | `MANAGER`/`ADMIN`, `401`, `403` |
-| Exposição de dados | Pending | Apenas dados operacionais de inventário |
-| Segredos/logs | Pending | Sem JWT, PII, preço ou payload completo |
-| SQL/migration | Pending | Checks, FKs, unique `open_slot` e `validate` |
-| Concorrência | Pending | Locks, unique e testes com claims/receipts |
+| Validação/mass assignment | Reviewed | Requests aceitam somente mínimo e alvo; saldo, status, sugestão e IDs são calculados |
+| Autenticação/autorização | Reviewed | Endpoints permanecem sob a regra `MANAGER`/`ADMIN` de `/api/stock-items/**` |
+| Exposição de dados | Reviewed | Respostas e evento carregam somente dados operacionais de inventário |
+| Segredos/logs | Reviewed | Adapter registra IDs e quantidades, sem JWT, PII, preço ou payload completo |
+| SQL/migration | Reviewed | Checks, FKs, `open_slot` único e Flyway/Hibernate validados no startup de teste |
+| Concorrência | Reviewed | Locks pessimistas por item, unique de ocorrência aberta e idempotência de demand/Receipt preservados |
 | Dependências | N/A | Nenhuma dependência externa nova prevista |
-| Eventos/abuso | Pending | Leitura pura, replay idempotente e alerta único |
+| Eventos/abuso | Reviewed | Leitura pura, replay de Receipt idempotente e alerta somente na abertura |
 
 Nenhum finding crítico/alto pode permanecer aberto. `N/A` final exige justificativa curta.
 
@@ -347,6 +347,23 @@ Nenhum finding crítico/alto pode permanecer aberto. `N/A` final exige justifica
 Preencher durante a execução com data, comandos, resultados, banco, cobertura, links e achados de segurança. Checkpoint
 sem evidência permanece `Pending` ou `In Progress`.
 
+- 2026-08-26 — Checkpoint 0: baseline `e8ac769` confirmado na branch
+  `feat/stockprocurement-low-stock-detection`. Verificados `PurchaseDemandApi.recordLowStock`, unique de equivalência,
+  IDs de demandas na Purchase Order, locks pessimistas por UUID, Receipt/evento e replay idempotente. O comando
+  `./mvnw -q -Dtest='PurchaseDemandTest,PurchaseOrderTest,PurchaseOrderFlowIntegrationTest,ReserveStockItemsUseCaseTest,StockReservationConcurrencyIntegrationTest,StockReceiptTest,StockRestockingEventsApplicationModuleTest,RestockedStockReservationRetryListenerTest' test`
+  concluiu com 36 testes, zero falhas, zero erros e zero ignorados; Flyway aplicou 21 migrations e Hibernate iniciou
+  com o schema validado.
+- 2026-08-26 — Checkpoint 1: implementados `LowStockPolicy`, assessment opcional no `StockItem` e aggregate
+  `LowStockOccurrence` sem dependências de framework. O comando
+  `./mvnw -q -Dtest='StockItemTest,LowStockPolicyTest,LowStockOccurrenceTest' test` concluiu com 15 testes, zero
+  falhas, zero erros e zero ignorados.
+- 2026-08-26 — Checkpoints 2–9: migration aditiva `V20260826180212__add_low_stock_detection.sql`, adapter JPA,
+  named interface de Purchase Demand, detector transacional, listener de Receipt, endpoints/filtro, OpenAPI gerado,
+  Postman, README e arquitetura atualizados. A coleção Postman foi validada com `JSON::PP`; não há seed necessário.
+- 2026-08-26 — Checkpoints 8 e 10: `StockItemControllerTest` e `ModuleStructureTest` passaram após a validação das
+  fronteiras. `make coverage` concluiu com 633 testes, zero falhas, zero erros e zero ignorados; `jacoco:check` e
+  Maven Enforcer confirmaram o relatório e a cobertura global. Não foram identificados findings críticos ou altos.
+
 ## Rollback e recuperação
 
 - Migration é aditiva e imutável depois de aplicada.
@@ -358,14 +375,13 @@ sem evidência permanece `Pending` ou `In Progress`.
 
 ## Checklist de conclusão
 
-- [ ] Policy opcional preserva compatibilidade e valida invariantes.
-- [ ] Comparação estrita e sugestão estão cobertas.
-- [ ] Uma única occurrence/demand existe por ciclo.
-- [ ] Claim/release não deixa demanda obsoleta aberta.
-- [ ] Reserva e Receipt reavaliam sem quebrar suas próprias invariantes.
-- [ ] Leitura não gera efeitos e compra continua manual.
-- [ ] Sinalização ocorre uma vez por ocorrência e falha em melhor esforço.
-- [ ] Segurança não possui finding crítico/alto aberto.
-- [ ] OpenAPI, Postman, README e arquitetura estão atualizados.
-- [ ] `make verify`, Modulith, migrations e cobertura foram revisados.
-
+- [x] Policy opcional preserva compatibilidade e valida invariantes.
+- [x] Comparação estrita e sugestão estão cobertas.
+- [x] Uma única occurrence/demand existe por ciclo.
+- [x] Claim/release não deixa demanda obsoleta aberta.
+- [x] Reserva e Receipt reavaliam sem quebrar suas próprias invariantes.
+- [x] Leitura não gera efeitos e compra continua manual.
+- [x] Sinalização ocorre uma vez por ocorrência e falha em melhor esforço.
+- [x] Segurança não possui finding crítico/alto aberto.
+- [x] OpenAPI, Postman, README e arquitetura estão atualizados.
+- [x] `make verify`, Modulith, migrations e cobertura foram revisados.

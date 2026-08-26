@@ -78,6 +78,23 @@ A feature `ci-coverage-quality-gate` tornou o build Maven a fonte única da pol�
 - As actions oficiais são fixadas por SHA completo; o workflow não recebe secrets, não usa Maven global e não calcula
   cobertura por parsing de relatório.
 
+## Atualização de implementação — 26 de agosto de 2026: RF30 (I)
+
+A feature `low-stock-detection` estende o módulo `stockprocurement` com reposição preventiva por item, sem criar um
+módulo Notifications, scheduler ou Purchase Order automática.
+
+- `LowStockPolicy` é um value object opcional de `StockItem`: aceita mínimo não negativo e alvo estritamente maior;
+  a condição é estrita (`availableQuantity < minimumQuantity`) e a sugestão é `targetQuantity - availableQuantity`.
+- `LowStockOccurrence` mantém um ciclo histórico por item, com no máximo uma ocorrência `OPEN`, demanda `LOW_STOCK`
+  imutavelmente vinculada e encerramentos explícitos para recuperação, desabilitação, desativação ou recebimento do
+  ciclo comprado.
+- A avaliação ocorre dentro das transações de configuração, cadastro e reserva. O listener de `StockItemsRestockedEvent`
+  roda depois do commit em uma nova transação, fechando o ciclo recebido antes de reavaliar o saldo.
+- As consultas de Stock Item somente calculam e expõem policy, status, ocorrência e sugestão; o filtro `lowStock` não
+  produz escrita. Os endpoints administrativos permanecem protegidos para `MANAGER` e `ADMIN`.
+- A notificação é um efeito consumer-owned, publicado apenas na abertura e consumido `AFTER_COMMIT` por adapter de log
+  sanitizado. Falhas de entrega não revertem estoque, demanda ou ocorrência.
+
 ## 1. Tech Challenge overview
 
 ### 1.1 Problema oficial (A)
