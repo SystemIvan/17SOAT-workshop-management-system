@@ -26,8 +26,10 @@
     { "key": "diagnosisId", "value": "88888888-8888-8888-8888-888888888888" },
     { "key": "estimateId", "value": "99999999-9999-9999-9999-999999999999" },
     { "key": "purchaseDemandId", "value": "cccccccc-cccc-cccc-cccc-cccccccccccc" },
+    { "key": "purchaseOrderFlowDemandId", "value": "" },
     { "key": "purchaseOrderId", "value": "dddddddd-dddd-dddd-dddd-dddddddddddd" },
     { "key": "purchaseOrderIdempotencyKey", "value": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" },
+    { "key": "purchaseOrderFlowIdempotencyKey", "value": "" },
     { "key": "authToken", "value": "" }
   ],
   "item": [
@@ -1472,7 +1474,8 @@
               "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
               "pm.test('Response is an array', function () { pm.expect(body).to.be.an('array'); });",
-              "if (body.length > 0) { pm.collectionVariables.set('purchaseDemandId', body[0].id); }"
+              "pm.test('An open purchase demand is available', function () { pm.expect(body).to.not.be.empty; });",
+              "if (body.length > 0) { pm.collectionVariables.set('purchaseOrderFlowDemandId', body[0].id); }"
             ] }
           }],
           "request": {
@@ -1486,7 +1489,7 @@
           "event": [
             {
               "listen": "prerequest",
-              "script": { "exec": ["if (!pm.collectionVariables.get('purchaseOrderIdempotencyKey')) { pm.collectionVariables.set('purchaseOrderIdempotencyKey', pm.variables.replaceIn('{{$guid}}')); }"] }
+              "script": { "exec": ["const demandId = pm.collectionVariables.get('purchaseOrderFlowDemandId'); if (!demandId) { throw new Error('Run List open purchase demands after creating an insufficient-stock demand before creating a Purchase Order.'); } pm.collectionVariables.set('purchaseOrderFlowIdempotencyKey', pm.variables.replaceIn('{{$guid}}')); pm.collectionVariables.unset('purchaseOrderId'); pm.collectionVariables.unset('stockReceiptId');"] }
             },
             {
               "listen": "test",
@@ -1502,11 +1505,11 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{purchaseOrderIdempotencyKey}}" }
+              { "key": "Idempotency-Key", "value": "{{purchaseOrderFlowIdempotencyKey}}" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"demandIds\": [\"{{purchaseDemandId}}\"],\n  \"lines\": [\n    {\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"quantity\": 10\n    }\n  ]\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"demandIds\": [\"{{purchaseOrderFlowDemandId}}\"],\n  \"lines\": [\n    {\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"quantity\": 10\n    }\n  ]\n}" },
             "url": "{{baseUrl}}/api/purchase-orders",
-            "description": "Cria uma ordem orientada por demanda. Para um request misto, mantenha demandIds e acrescente outra linha ad hoc. A quantidade deve cobrir a soma sugerida das demandas selecionadas."
+            "description": "Cria uma ordem orientada por demanda com uma chave de idempotência nova a cada execução do passo. Rode antes List open purchase demands e mantenha o retry seguinte com o mesmo body e chave. Para um request misto, mantenha demandIds e acrescente outra linha ad hoc. A quantidade deve cobrir a soma sugerida das demandas selecionadas."
           }
         },
         {
@@ -1523,9 +1526,9 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Idempotency-Key", "value": "{{purchaseOrderIdempotencyKey}}" }
+              { "key": "Idempotency-Key", "value": "{{purchaseOrderFlowIdempotencyKey}}" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"demandIds\": [\"{{purchaseDemandId}}\"],\n  \"lines\": [\n    {\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"quantity\": 10\n    }\n  ]\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"demandIds\": [\"{{purchaseOrderFlowDemandId}}\"],\n  \"lines\": [\n    {\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"quantity\": 10\n    }\n  ]\n}" },
             "url": "{{baseUrl}}/api/purchase-orders",
             "description": "Repete exatamente header e body. Retorna 200 para uma ordem OPEN já confirmada, sem nova compra externa; também recupera PENDING_SUBMISSION após 502/503."
           }

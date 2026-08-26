@@ -93,9 +93,11 @@ apenas a origem, sem `/api`: para a execução local, use `http://localhost:8080
 | `authToken` | Preenchida automaticamente pelo passo 0 (`Login (bootstrap admin)`); as demais requisições a usam via `Authorization: Bearer {{authToken}}`. |
 | `customerId`, `vehicleId`, `technicianId`, `stockItemId`, `serviceOrderId`, `executionId`, `serviceExecutionId`, `diagnosisId` e `estimateId` | A coleção as atualiza automaticamente quando a respectiva requisição de criação/diagnóstico obtém sucesso. |
 | `stockReservationId` | É preenchida pelo script de `Retry stock reservation` quando houver `reservationId`; se a reserva já ocorreu na decisão, copie `executions[0].stockReservationId` da resposta da decisão para consultar ou consumir a reserva. |
-| `purchaseDemandId` | É preenchida por `List open purchase demands` com a primeira demanda retornada. |
+| `purchaseDemandId` | Variável para testes manuais isolados de Purchase Order. |
+| `purchaseOrderFlowDemandId` | É preenchida por `List open purchase demands` com a primeira demanda retornada e é usada pelo fluxo principal de Purchase Order. |
 | `purchaseOrderId` | É preenchida pelas criações de Purchase Order confirmadas pelo simulador. |
-| `purchaseOrderIdempotencyKey` | Identifica o comando de criação. Preserve o mesmo UUID e body em retries; gere outro UUID para uma compra diferente. |
+| `purchaseOrderIdempotencyKey` | Identifica o comando de criação ad hoc. Preserve o mesmo UUID e body em retries; gere outro UUID para uma compra diferente. |
+| `purchaseOrderFlowIdempotencyKey` | É gerada pela collection ao executar `Create Purchase Order from demand`; o `Retry same Purchase Order` reutiliza-a automaticamente. |
 | `customerTaxId` | Informe o CPF/CNPJ sem formatação usado para o Customer; é utilizado somente por `Identify customer by CPF/CNPJ`. |
 | `catalogServiceId` | Preenchida automaticamente por `Registrations / Service Catalog / Create catalog service` (passo 3); identifica o serviço informado no diagnóstico (passo 8). |
 
