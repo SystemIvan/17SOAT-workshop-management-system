@@ -6,6 +6,8 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
         .CatalogServiceNotFoundForNewWorkException;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .ServiceOrderStockItemNotFoundException;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
         .ServiceOrderVehicleArchivedException;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
         .ServiceOrderVehicleNotFoundException;
@@ -47,6 +49,12 @@ class ServiceLifecycleExceptionHandler {
     ResponseEntity<ErrorResponse> handleVehicleArchived(ServiceOrderVehicleArchivedException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse("VEHICLE_ARCHIVED", exception.getMessage()));
+    }
+
+    @ExceptionHandler(ServiceOrderStockItemNotFoundException.class)
+    ResponseEntity<ErrorResponse> handleStockItemNotFound(ServiceOrderStockItemNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse("STOCK_ITEM_NOT_FOUND", exception.getMessage()));
     }
 
     @ExceptionHandler(InvalidServiceOrderException.class)
