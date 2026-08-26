@@ -100,8 +100,10 @@ class GenerateEstimateUseCaseTest {
         assertEquals(diagnosisId, estimate.diagnosisId());
         assertEquals(customerId, estimate.customerId());
         assertEquals(NOW, estimate.createdAt());
+
+        // Sem indisponibilidade registrada, a validade é de 24 horas.
         assertEquals(
-                NOW.plusSeconds(48 * 60 * 60),
+                NOW.plusSeconds(24 * 60 * 60),
                 estimate.expiresAt()
         );
 
@@ -165,26 +167,94 @@ class GenerateEstimateUseCaseTest {
 
     @Test
     void revalidatesAndCopiesAvailabilityToTheEstimate() {
-        ServiceOrder serviceOrder = diagnosedServiceOrderWithStockRequirement();
+        ServiceOrder serviceOrder =
+                diagnosedServiceOrderWithStockRequirement();
+
         UUID diagnosisId = serviceOrder.openDiagnosisId();
-        UUID stockItemId = serviceOrder.serviceExecutions().getFirst().stockRequirements().getFirst().stockItemId();
-        RepairStockAssessmentApi assessmentApi = command -> assessmentResult(command, stockItemId);
-        GenerateEstimateUseCase useCase = new GenerateEstimateUseCase(
-                new InMemoryServiceOrderRepository(serviceOrder), new InMemoryEstimateRepository(), Clock.fixed(NOW, ZoneOffset.UTC),
-                event -> { }, assessmentApi);
 
-        Estimate estimate = useCase.execute(serviceOrder.id(), diagnosisId).estimate();
+        UUID stockItemId = serviceOrder
+                .serviceExecutions()
+                .getFirst()
+                .stockRequirements()
+                .getFirst()
+                .stockItemId();
 
-        assertEquals(1, estimate.lines().getFirst().stockAvailability().size());
-        assertEquals(2, estimate.lines().getFirst().stockAvailability().getFirst().shortageQuantity());
-        assertEquals(2, serviceOrder.serviceExecutions().getFirst().stockAvailability().getFirst().shortageQuantity());
+        RepairStockAssessmentApi assessmentApi =
+                command -> assessmentResult(command, stockItemId);
+
+        GenerateEstimateUseCase useCase =
+                new GenerateEstimateUseCase(
+                        new InMemoryServiceOrderRepository(serviceOrder),
+                        new InMemoryEstimateRepository(),
+                        Clock.fixed(NOW, ZoneOffset.UTC),
+                        event -> { },
+                        assessmentApi
+                );
+
+        Estimate estimate =
+                useCase.execute(serviceOrder.id(), diagnosisId)
+                        .estimate();
+
+        assertEquals(
+                1,
+                estimate.lines()
+                        .getFirst()
+                        .stockAvailability()
+                        .size()
+        );
+
+        assertEquals(
+                2,
+                estimate.lines()
+                        .getFirst()
+                        .stockAvailability()
+                        .getFirst()
+                        .shortageQuantity()
+        );
+
+        assertEquals(
+                2,
+                serviceOrder.serviceExecutions()
+                        .getFirst()
+                        .stockAvailability()
+                        .getFirst()
+                        .shortageQuantity()
+        );
+
+        // Havendo qualquer indisponibilidade, a validade é de 48 horas.
+        assertEquals(
+                NOW.plusSeconds(48 * 60 * 60),
+                estimate.expiresAt()
+        );
     }
 
-    private static RepairStockAssessmentResult assessmentResult(RepairStockAssessmentCommand command, UUID stockItemId) {
-        UUID executionId = command.executions().getFirst().serviceExecutionId();
-        return new RepairStockAssessmentResult(List.of(new RepairStockAssessmentExecutionResult(executionId, List.of(
-                new RepairStockAssessmentResultLine(stockItemId, 3, 1, 2,
-                        RepairStockAvailabilityStatus.INSUFFICIENT_QUANTITY, NOW)))));
+    private static RepairStockAssessmentResult assessmentResult(
+            RepairStockAssessmentCommand command,
+            UUID stockItemId) {
+
+        UUID executionId =
+                command.executions()
+                        .getFirst()
+                        .serviceExecutionId();
+
+        return new RepairStockAssessmentResult(
+                List.of(
+                        new RepairStockAssessmentExecutionResult(
+                                executionId,
+                                List.of(
+                                        new RepairStockAssessmentResultLine(
+                                                stockItemId,
+                                                3,
+                                                1,
+                                                2,
+                                                RepairStockAvailabilityStatus
+                                                        .INSUFFICIENT_QUANTITY,
+                                                NOW
+                                        )
+                                )
+                        )
+                )
+        );
     }
 
     @Test
@@ -312,9 +382,24 @@ class GenerateEstimateUseCaseTest {
 
     private ServiceOrder diagnosedServiceOrderWithStockRequirement() {
         ServiceOrder serviceOrder = diagnosedServiceOrder();
-        UUID executionId = serviceOrder.serviceExecutions().getFirst().id();
-        serviceOrder.attachStockRequirement(executionId, new StockRequirement(
-                UUID.randomUUID(), StockItemType.PART, 3, "Filtro", Money.brl(BigDecimal.ONE), false));
+
+        UUID executionId =
+                serviceOrder.serviceExecutions()
+                        .getFirst()
+                        .id();
+
+        serviceOrder.attachStockRequirement(
+                executionId,
+                new StockRequirement(
+                        UUID.randomUUID(),
+                        StockItemType.PART,
+                        3,
+                        "Filtro",
+                        Money.brl(BigDecimal.ONE),
+                        false
+                )
+        );
+
         return serviceOrder;
     }
 
@@ -356,7 +441,8 @@ class GenerateEstimateUseCaseTest {
 
         @Override
         public boolean existsByDiagnosisId(UUID diagnosisId) {
-            return data.values().stream()
+            return data.values()
+                    .stream()
                     .anyMatch(estimate ->
                             estimate.diagnosisId()
                                     .equals(diagnosisId));
@@ -366,7 +452,8 @@ class GenerateEstimateUseCaseTest {
         public List<Estimate> findSentExpiredAtOrBefore(
                 Instant now) {
 
-            return data.values().stream()
+            return data.values()
+                    .stream()
                     .filter(estimate ->
                             estimate.status()
                                     == EstimateStatus.SENT)
