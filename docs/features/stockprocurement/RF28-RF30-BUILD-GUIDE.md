@@ -97,4 +97,3 @@ purchase-order-receiving
 low-stock-detection
     policy → occurrence → LOW_STOCK demand → decisão manual de compra
 ```
-

@@ -1,8 +1,11 @@
 # ADR 005: Inter-Module Integration Contract — Java Ports vs REST Interno
 
-**Status:** Accepted  
-**Date:** 2026-08-25  
-**Deciders:** Time de Desenvolvimento   
+**Status:** Accepted
+
+**Date:** 2026-08-25
+
+**Deciders:** Time de Desenvolvimento
+
 **Affected By:** Todos os módulos (`registration`, `servicelifecycle`, `stockprocurement`, `identity`)
 
 ---
