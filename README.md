@@ -278,8 +278,21 @@ retornados em respostas `201 Created` são os que devem ser usados no restante d
    com `{"diagnosisId":"{{diagnosisId}}"}`. O script de pré-requisição usa o `diagnosisId` salvo pela coleção, mesmo
    que exista uma variável de ambiente com o mesmo nome. Espere `201 Created`, guarde o `estimateId` definido pelo
    script e use `Get estimate` (`GET {{baseUrl}}/api/estimates/{{estimateId}}`) para conferir `lines`, seus
-   `serviceExecutionId`, preço do serviço, itens comerciais e `stockAvailability`. Os requisitos ficam congelados e a
-   disponibilidade é revalidada ao gerar o orçamento, atualizando a mesma demanda quando ainda houver insuficiência.
+   `serviceExecutionId`, preço do serviço, itens comerciais, `stockAvailability`, o `lineTotal` calculado em cada linha
+   e o `total` consolidado da Estimate.
+
+   Os totais são calculados pelo servidor exclusivamente a partir dos snapshots comerciais congelados na Estimate:
+
+   - `lineTotal = servicePrice + soma(priceSnapshot × quantity)` dos Stock Items da linha;
+   - `total = soma dos lineTotal` de todas as linhas da Estimate.
+
+   Dessa forma, o consumidor da API não precisa recalcular o valor comercial do orçamento nem consultar novamente
+   Service Catalog ou Stock Items para obter os preços. Os requisitos permanecem congelados e a disponibilidade é
+   revalidada ao gerar o orçamento, atualizando a mesma demanda quando ainda houver insuficiência.
+
+   Para o exemplo deste roteiro, com serviço de `150.00 BRL` e uma unidade do item de estoque de `45.90 BRL`, a linha
+   deve apresentar um `lineTotal` de `195.90 BRL`. Como há apenas uma linha, o `total` da Estimate também deve ser
+   `195.90 BRL`.
 
 10. Decida todas as linhas consultadas em `Decide estimate lines`:
 
