@@ -5,10 +5,10 @@
 | Feature | `estimate-generation` |
 | Status | Approved |
 | Responsável | Matheus Campagnone |
-| Atualizado em | 2026-08-25 |
+| Atualizado em | 2026-08-27 |
 | Aprovado por | Matheus Apostulo |
 | Aprovado em | 2026-08-25 |
-| Referências | Architecture docs; Miro; `stock-domain-foundation`; `purchase-order-creation`; AD-013 |
+| Referências | Architecture docs; Miro; `stock-domain-foundation`; `purchase-order-creation`; AD-013; BL-008 |
 
 ## Revisão material por disponibilidade e Purchase Demand
 
@@ -22,6 +22,29 @@ Além de congelar o snapshot comercial, a geração válida da Estimate deve con
 `StockRequirement` de cada Service Execution apresentada e revalidar sua disponibilidade. A partir desse momento não se
 anexa, remove nem altera requirement nessa execução. A consulta não cria reserva, não compromete unidades e não altera
 `availableQuantity`; uma insuficiência apenas cria ou atualiza a Purchase Demand pertencente a Stock & Procurement.
+
+## Totais comerciais — BL-008
+
+A representação comercial da Estimate apresenta valores consolidados sem exigir que o consumidor da API recalcule os
+snapshots comerciais retornados.
+
+Cada linha expõe `lineTotal`, calculado pelo servidor a partir do snapshot comercial congelado:
+
+```text
+lineTotal
+    = servicePrice
+    + soma(priceSnapshot * quantity)
+```
+
+A Estimate também expõe `total`, correspondente à soma dos totais de todas as linhas:
+
+```text
+total
+    = soma(lineTotal)
+```
+
+Os cálculos utilizam exclusivamente os dados comerciais já congelados na Estimate e não realizam nova consulta ao
+Service Catalog ou ao Stock & Procurement.
 
 ## Problema e resultado esperado
 
@@ -40,6 +63,8 @@ Ao final da geração:
 - as Service Executions daquele Diagnosis são representadas comercialmente sem transferir a propriedade do trabalho
   para a Estimate;
 - os dados comerciais necessários ficam congelados como snapshot;
+- cada linha apresenta `lineTotal`, calculado a partir do preço do serviço e dos Stock Items comerciais da linha;
+- a Estimate apresenta `total`, correspondente à soma dos `lineTotal`;
 - o conjunto de `StockRequirement` de cada Service Execution apresentada fica congelado para uma futura
   tentativa de reserva;
 - cada item apresenta a disponibilidade observada na geração e eventual quantidade insuficiente, sem prometer saldo ao
@@ -60,6 +85,7 @@ Ao final da geração:
 - O Diagnosis já pode ter registrado Purchase Demands para requirements insuficientes.
 - O sistema gera uma Estimate correspondente ao Diagnosis aberto.
 - A Estimate revalida e mantém snapshots comerciais e informativos das Service Executions e dos Stock Requirements.
+- A Estimate apresenta `lineTotal` em cada linha e `total` consolidado.
 - O prazo de aprovação é calculado a partir da disponibilidade observada dos Stock Requirements.
 - Após a criação bem-sucedida da Estimate, o sistema produz `EstimateGenerated`.
 - A capability de Notification poderá reagir ao evento e comunicar o Customer.
@@ -94,6 +120,11 @@ Ao final da geração:
 - Dados comerciais provenientes de Stock Items devem ser copiados para a Estimate quando necessários à apresentação
   comercial.
 - Alterações posteriores em Service Catalog ou Stock Item não podem modificar retroativamente uma Estimate já gerada.
+- Cada linha da Estimate apresenta `lineTotal`, composto pelo preço do serviço e pelos Stock Items comerciais
+  multiplicados por suas quantidades.
+- A Estimate apresenta `total`, correspondente à soma dos `lineTotal`.
+- `lineTotal` e `total` são calculados pelo servidor exclusivamente a partir dos snapshots comerciais congelados.
+- Uma linha sem Stock Items possui `lineTotal` igual ao próprio `servicePrice`.
 
 ### Snapshot de disponibilidade
 
@@ -142,7 +173,8 @@ Ao final da geração:
 - implementação do canal de Notification;
 - alteração do fluxo de Diagnosis já existente;
 - revisão ou versionamento posterior de Estimate;
-- cálculo de ETA real de fornecedor ou prazo adicional de reposição.
+- cálculo de ETA real de fornecedor ou prazo adicional de reposição;
+- recálculo de totais por consulta viva ao Service Catalog ou Stock & Procurement.
 
 ## Critérios de aceite
 
@@ -163,6 +195,12 @@ Ao final da geração:
 - [ ] Uma insuficiência atualiza a mesma Purchase Demand originada no Diagnosis, sem duplicação e sem criar Purchase
       Order automaticamente.
 - [ ] Rejeição ou expiração da Estimate não elimina a Purchase Demand correspondente.
+- [x] Cada linha da Estimate apresenta `lineTotal`.
+- [x] `lineTotal` corresponde ao `servicePrice` mais `priceSnapshot × quantity` de cada Stock Item da linha.
+- [x] Uma linha sem Stock Items apresenta `lineTotal` igual ao `servicePrice`.
+- [x] A Estimate apresenta `total` consolidado.
+- [x] `total` corresponde à soma dos `lineTotal`.
+- [x] `lineTotal` e `total` são derivados exclusivamente dos snapshots comerciais congelados.
 - [x] A Estimate possui `expiresAt` persistido.
 - [x] Quando todos os Stock Items estão disponíveis, a Estimate possui prazo de aprovação de 24 horas.
 - [x] Quando qualquer Stock Item está indisponível, a Estimate possui prazo de aprovação de 48 horas.

@@ -396,4 +396,28 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.paths['/api/service-orders'].post.responses['404']").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders'].post.responses['409']").exists());
     }
+
+    @Test
+    void documentEstimateTotalsContract() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(
+                        "$.paths['/api/service-orders/{serviceOrderId}/estimates'].post.responses['201']")
+                        .exists())
+                .andExpect(jsonPath(
+                        "$.paths['/api/estimates/{estimateId}'].get.responses['200']")
+                        .exists())
+                .andExpect(jsonPath(
+                        "$.components.schemas.EstimateResponse.properties.total")
+                        .exists())
+                .andExpect(jsonPath(
+                        "$.components.schemas.LineResponse.properties.lineTotal")
+                        .exists())
+                .andExpect(jsonPath(
+                        "$.components.schemas.MoneyResponse.properties.value")
+                        .exists())
+                .andExpect(jsonPath(
+                        "$.components.schemas.MoneyResponse.properties.currency")
+                        .exists());
+    }
 }

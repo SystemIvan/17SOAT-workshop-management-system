@@ -5,11 +5,12 @@
 | Feature | `estimate-generation` |
 | Status | Approved |
 | Responsável | Matheus Campagnone |
-| Atualizado em | 2026-08-26 |
+| Atualizado em | 2026-08-27 |
 | Aprovado por | Matheus Apostulo |
 | Aprovado em | 2026-08-25 |
 | Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-25) |
 | Decisão arquitetural | AD-013 — política de expiração de Estimate |
+| Regra de negócio | BL-008 — totais consolidados da Estimate |
 
 ## Gate de aprovação
 
@@ -31,6 +32,20 @@ A geração também passa a calcular o `expiresAt` conforme a disponibilidade ob
 
 O cálculo do prazo é responsabilidade de uma política de domínio dedicada e permanece separado do mecanismo que executa
 a expiração automática.
+
+A representação HTTP da Estimate também deve expor os totais comerciais derivados definidos pelo BL-008:
+
+```text
+lineTotal
+    = servicePrice
+    + soma(priceSnapshot * quantity)
+
+total
+    = soma(lineTotal)
+```
+
+Os cálculos utilizam exclusivamente os snapshots comerciais já congelados na Estimate e não realizam nova consulta ao
+Service Catalog ou ao Stock & Procurement.
 
 A geração continuará:
 
@@ -111,6 +126,23 @@ existirem vários Stock Requirements para o mesmo item.
 
 Alterações posteriores no estoque ou na Service Order não mudam a fotografia persistida na Estimate.
 
+Para o BL-008, `EstimateLine` fornece `lineTotal()`, calculado como o preço do serviço somado ao valor dos Stock Items
+da linha, multiplicando cada `priceSnapshot` por sua `quantity`.
+
+Conceitualmente:
+
+```text
+stockItemsTotal
+    = soma(priceSnapshot * quantity)
+
+lineTotal
+    = servicePrice + stockItemsTotal
+```
+
+Quando a linha não possui Stock Items, `lineTotal` corresponde ao próprio `servicePrice`.
+
+O cálculo utiliza somente os dados comerciais já congelados na Estimate.
+
 ### `Estimate`
 
 As invariantes existentes permanecem.
@@ -136,6 +168,16 @@ SENT -> EXPIRED
 ```
 
 A regra de domínio responsável pela transição não recalcula o prazo original.
+
+O `total` consolidado exposto no contrato HTTP é derivado das linhas:
+
+```text
+total
+    = soma(lineTotal)
+```
+
+Não é necessária persistência adicional de `lineTotal` ou `total`, pois os valores podem ser derivados
+deterministicamente do snapshot comercial já persistido.
 
 ## Política de expiração
 
@@ -229,6 +271,9 @@ Não haverá `REQUIRES_NEW`, chamada after-commit nem compensação. Execuções
 O lock da Service Order preserva a serialização já exigida entre geração e `AttachStockRequirementUseCase`: o anexo
 termina antes do congelamento ou é rejeitado depois dele.
 
+O cálculo de `lineTotal` e `total` não introduz operação externa ou nova leitura de dados; ambos são derivados dos
+snapshots comerciais já existentes.
+
 ## Mecanismo de expiração automática
 
 O cálculo de `expiresAt` e a execução da expiração são responsabilidades separadas.
@@ -302,6 +347,9 @@ fotografia histórica.
 
 O `expiresAt` permanece persistido na própria Estimate e é utilizado como fonte de verdade pelo mecanismo de expiração.
 
+O BL-008 não exige migration adicional. `lineTotal` e `total` são derivados de `servicePrice`, `priceSnapshot` e
+`quantity`, já disponíveis no snapshot comercial persistido.
+
 Classificação de dados: **no seed required**. Testes usam fixtures dedicadas.
 
 ## Evento `EstimateGenerated`
@@ -326,6 +374,8 @@ Ele continua publicado dentro da transação após as persistências. Consumers 
 commit; uma falha transacional anterior não produz notificação de Estimate inexistente.
 
 Notification recebe o prazo já calculado e não deve implementar novamente a política de 24h/48h.
+
+O BL-008 não altera o contrato de `EstimateGenerated`.
 
 ## Contratos HTTP
 
@@ -357,6 +407,25 @@ Exemplo:
 
 O `expiresAt` retornado pela representação da Estimate corresponde ao valor persistido durante a geração.
 
+O BL-008 adiciona de forma aditiva ao response:
+
+- `lineTotal: MoneyResponse` em cada `LineResponse`;
+- `total: MoneyResponse` no nível raiz de `EstimateResponse`.
+
+`lineTotal` é calculado como:
+
+```text
+servicePrice + soma(priceSnapshot * quantity)
+```
+
+`total` corresponde a:
+
+```text
+soma(lineTotal)
+```
+
+Os dois valores são calculados pelo servidor e não fazem parte do request.
+
 Nenhum preço, quantidade comercial ou campo existente será removido ou renomeado.
 
 ## Falhas esperadas
@@ -372,6 +441,8 @@ Além das falhas atuais:
 
 Uma falha não cria Estimate parcial, não congela requirements e não altera demanda.
 
+O cálculo de `lineTotal` e `total` não introduz novo input ou novo código de erro HTTP.
+
 Respostas não expõem SQL, saldo de itens alheios ao orçamento ou packages internos.
 
 ## Concorrência e idempotência
@@ -383,7 +454,8 @@ Respostas não expõem SQL, saldo de itens alheios ao orçamento ou packages int
 - repetir após commit continua falhando como Estimate já existente e não reavalia o snapshot histórico;
 - o snapshot não promete unidades e não substitui a revalidação atômica na aprovação;
 - o scheduler atua somente sobre Estimates elegíveis à expiração;
-- a transição para `EXPIRED` é condicionada ao estado `SENT`, evitando reexpirar uma Estimate já finalizada.
+- a transição para `EXPIRED` é condicionada ao estado `SENT`, evitando reexpirar uma Estimate já finalizada;
+- `lineTotal` e `total` são determinísticos para o mesmo snapshot comercial.
 
 ## Segurança
 
@@ -391,6 +463,7 @@ Respostas não expõem SQL, saldo de itens alheios ao orçamento ou packages int
 - RF27 recebe somente IDs e quantidades operacionais;
 - Estimate não expõe Customer ou Vehicle dentro da disponibilidade;
 - `expiresAt` é calculado pelo servidor e não pode ser fornecido pelo Customer;
+- `lineTotal` e `total` são calculados pelo servidor e não podem ser fornecidos pelo Customer;
 - nenhum endpoint administrativo é criado para forçar horário ou expiração;
 - nenhum log contém payload completo, preço, saldo de itens não solicitados ou dados pessoais;
 - a ausência de autenticação permanece finding de plataforma e não será simulada nesta feature.
@@ -401,10 +474,13 @@ Na implementação:
 
 - documentar `stockAvailability`, enum, quantidades e semântica de snapshot no Springdoc;
 - documentar `expiresAt` como instante limite para decisão do Customer;
-- atualizar testes do OpenAPI gerado;
-- atualizar `Get estimate` e o fluxo de geração na coleção Postman;
-- atualizar o README, pois a coleção muda, mostrando demanda criada no Diagnosis e revalidada na Estimate;
+- documentar `lineTotal` e `total` no contrato OpenAPI;
+- atualizar testes do OpenAPI gerado para exigir `lineTotal` e `total`;
+- atualizar `Generate estimate` e `Get estimate` na coleção Postman para validar os totais;
+- atualizar o README com a leitura de `lineTotal` e `total` no fluxo manual;
 - preservar `/swagger-ui.html` e `/v3/api-docs` como fontes executáveis.
+
+Não é necessário adicionar endpoint específico para totais.
 
 Não é necessário adicionar endpoint específico de expiração à coleção Postman.
 
@@ -417,6 +493,27 @@ Testes unitários de `EstimateExpirationPolicy` devem validar:
 - todos os Stock Items disponíveis -> 24 horas;
 - qualquer Stock Item indisponível -> 48 horas;
 - cálculo determinístico a partir do instante recebido.
+
+### Totais comerciais
+
+`EstimateLineTest` deve validar:
+
+- serviço somado aos Stock Items;
+- multiplicação de `priceSnapshot` pela `quantity`;
+- linha sem Stock Items;
+- moeda do resultado.
+
+`EstimateResponseTest` deve validar:
+
+- exposição de `lineTotal` em cada linha;
+- exposição de `total` na raiz da Estimate;
+- soma dos `lineTotal` no valor consolidado.
+
+`OpenApiContractTest` deve validar:
+
+- `lineTotal` no schema das linhas;
+- `total` no schema da Estimate;
+- estrutura monetária usada pelos campos.
 
 ### Geração
 
@@ -449,6 +546,7 @@ Também devem permanecer verdes:
 - Stock Reservation;
 - `ModuleStructureTest`;
 - suíte completa de Estimate;
+- `OpenApiContractTest`;
 - `mvnw verify`;
 - `git diff --check`.
 
@@ -458,6 +556,9 @@ Também devem permanecer verdes:
 - criar Purchase Order automaticamente;
 - resolver Purchase Demand por rejeição ou expiração;
 - modificar estruturalmente o contrato `EstimateGenerated`;
+- persistir redundantemente `lineTotal` ou `total`;
+- criar endpoint separado para cálculo de totais;
+- recalcular os totais por consulta viva ao Service Catalog ou Stock & Procurement;
 - ETA real de reposição;
 - integração com fornecedor externo para cálculo de prazo;
 - prazo adicional baseado em ETA de fornecedor;
@@ -470,9 +571,15 @@ Também devem permanecer verdes:
 - [x] Technical Spec revisada e aprovada por humano em 2026-08-25.
 - [x] Política AD-013 de 24h/48h implementada.
 - [x] Política de cálculo isolada do mecanismo de expiração.
+- [x] BL-008 implementado como cálculo derivado dos snapshots comerciais.
+- [x] `lineTotal` exposto em cada linha da resposta.
+- [x] `total` exposto na raiz da resposta.
 - [x] Testes unitários da política de expiração verdes.
 - [x] Testes de `GenerateEstimateUseCase` verdes.
-- [x] Suíte relacionada a Estimate: 55 testes, 0 falhas, 0 erros.
+- [x] `EstimateLineTest` verde.
+- [x] `EstimateResponseTest` verde.
+- [x] `OpenApiContractTest` verde.
+- [x] OpenAPI, Postman e README atualizados para refletir os totais.
 - [x] Implementation Plan atualizado para refletir a implementação.
 - [x] `mvnw verify` completo executado após a atualização final.
 - [x] `git diff --check` executado antes do commit.
