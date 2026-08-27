@@ -101,7 +101,6 @@ class GenerateEstimateUseCaseTest {
         assertEquals(customerId, estimate.customerId());
         assertEquals(NOW, estimate.createdAt());
 
-        // Sem indisponibilidade registrada, a validade é de 24 horas.
         assertEquals(
                 NOW.plusSeconds(24 * 60 * 60),
                 estimate.expiresAt()
@@ -221,7 +220,6 @@ class GenerateEstimateUseCaseTest {
                         .shortageQuantity()
         );
 
-        // Havendo qualquer indisponibilidade, a validade é de 48 horas.
         assertEquals(
                 NOW.plusSeconds(48 * 60 * 60),
                 estimate.expiresAt()
