@@ -7,11 +7,15 @@ import java.util.UUID;
 public record PurchaseOrderResponse(
         UUID id,
         String externalReference,
-        OpenPurchaseOrderStatus status,
+        PurchaseOrderStatusResponse status,
         List<PurchaseOrderLineResponse> lines,
         List<UUID> demandIds,
         Instant createdAt,
-        Instant openedAt) {
+        Instant openedAt,
+        Instant closedAt,
+        UUID closedByUserAccountId,
+        UUID receiptId,
+        Instant receivedAt) {
 
     public PurchaseOrderResponse {
         lines = List.copyOf(lines);

@@ -306,10 +306,12 @@ ServiceOrder/Estimate DTO contracts, persistence, tests and RF07–RF08 stories.
 
 **Consequences:** If AD-001 confirms the premise, ServiceCatalog belongs under `customer` with its own repository.
 Price changes affect only future selections; ServiceExecution and Estimate retain copied name/price values. The
-cross-module lookup mechanism remains subject to AD-011.
+cross-module lookup mechanism follows AD-011 (resolved: in-process Java ports, see ADR-005), as already
+implemented by `CatalogServiceEligibilityPort`.
 
-**Likely Jira/story implications:** RF07–RF08 may be planned now with AD-001 and, for integration, AD-011 noted as
-dependencies. Stories should separate catalog CRUD from consumer integration and test snapshot immutability.
+**Likely Jira/story implications:** RF07–RF08 may be planned now with AD-001; AD-011 is resolved and no longer a
+dependency for the integration mechanism. Stories should separate catalog CRUD from consumer integration and test
+snapshot immutability.
 
 **Can work continue without resolving it?** Resolved within Ivan's scope, but ServiceCatalog implementation must
 wait for AD-001 to validate the decision's module-mapping premise.
@@ -617,14 +619,15 @@ representation; every command that changes ServiceOrder state must keep maintain
 
 ### AD-011 — Choose in-process module integration contracts
 
-**Status:** Team Decision Required
+**Status:** Resolved (2026-08-25)
 
 **Scope:** Whole-team decision
 
 **Blocking:**
 
-- Blocks final cross-module integration contracts.
-- Does not block isolated aggregate/use-case development with mocks.
+- Historically blocked final cross-module integration contracts; no longer blocking now that Option A is
+  ratified.
+- Did not block isolated aggregate/use-case development with mocks.
 
 **Related Epic / responsibility:** All epics.
 
@@ -636,6 +639,9 @@ scope and public interfaces.
 
 **Conflicting evidence:** Context Map says Registrations exposes OHS REST. Accepted RFC says consumer-owned port
 implemented by a direct Java adapter in the same process. `PROJECT-STRUCTURE.md` says port + adapter if needed.
+This conflict is resolved for the current modular monolith by the decision below; the Context Map's OHS/REST
+description is scoped to a possible future microservices extraction, not the contract in force today (see
+`docs/adr/ADR-005-inter-module-integration-contract.md`).
 
 **Options:**
 
@@ -649,14 +655,23 @@ Option B — Internal REST calls between modules.
 - Advantages: resembles future service extraction.
 - Disadvantages: unnecessary network-style failure/serialization inside one process.
 
-**Recommended option:** Option A. It best matches the accepted RFC, current structure and MVP simplicity.
+**Selected option:** Option A, ratified by the team via `docs/adr/ADR-005-inter-module-integration-contract.md`
+(Approval Checklist item 1, 2026-08-25). It best matches the accepted RFC, current structure and MVP simplicity,
+and is already implemented in `servicelifecycle.serviceorder` → `registration.servicecatalog`. No internal REST
+endpoint between modules should be created for this purpose while the system remains a modular monolith. If the
+team later decides to extract a module into a separate microservice, the consumer port swaps its in-process
+adapter for an HTTP client against the OHS already described in the Miro Context Map — that swap is deferred to
+a future ADR opened when the extraction is actually decided, not anticipated here.
 
 **Impact of the decision:** Application ports, infrastructure adapters, DTOs, events, tests, module exposure and
 Miro Context Map wording.
 
-**Can work continue without resolving it?** Yes with mocks; integration stories cannot finalize.
+**Can work continue without resolving it?** Resolved; any new synchronous cross-module integration must follow
+Option A (consumer-owned port + in-process public API), per ADR-005.
 
-**Temporary safe assumption, if any:** Consumers declare their own interfaces and depend only on UUID/value DTOs.
+**Temporary safe assumption, if any:** Not applicable; the decision is resolved. The remaining open item is
+updating the Miro Context Map to mark `Registrations`' OHS/REST exposure as the mechanism of a possible future
+microservices extraction, not the contract in force today (ADR-005 Approval Checklist item 2).
 
 ### AD-012 — Define domain-event delivery guarantees
 
@@ -1036,7 +1051,8 @@ Priority reflects blocking power, downstream impact and dependencies—not decis
    AD-001; consumers retain historical snapshots.
 5. **AD-005 — Registration deletion semantics**: resolved with logical deactivation/archival and implemented for
    Customer; Vehicle and ServiceCatalog remain pending.
-6. **AD-011 — Cross-module integration**: team-owned; contracts can be mocked meanwhile.
+6. **AD-011 — Cross-module integration**: resolved (2026-08-25) in favor of Option A (in-process Java ports +
+   domain events), see ADR-005; no longer needs mocking as a placeholder for the contract shape.
 7. **AD-016 — Identity/authorization ownership**: resolved as an internal Identity/Auth module (Option A);
    Customer/Technician remain domain references, not credential owners.
 8. **AD-017 — Schema migration policy**: shared; resolve before several epics alter the database concurrently.
@@ -1061,15 +1077,13 @@ AD-001 and must not be treated as approval of the shared context mapping.
 
 ### Pending but non-blocking
 
-- **AD-011 — cross-module contracts:** does not block catalog CRUD or Jira planning; it blocks only finalizing the
-  ServiceCatalog lookup adapter used by Service Lifecycle.
 - **AD-016 — identity and authorization ownership:** resolved (Option A, internal Identity/Auth module); does
   not block pure domain/use-case work while the module is implemented.
 - **AD-017 — schema migration policy:** does not block model/story planning or short-lived local work; it must be
   resolved before several epics integrate shared schema changes.
 - **AD-006 through AD-009, AD-014, AD-015, AD-018 and AD-019:** belong to the team or other owners and do not
   block Ivan's registration backlog except through the specific integration dependencies already identified.
-  AD-010 and AD-013 are resolved (see above) and no longer part of this pending group.
+  AD-010, AD-011 and AD-013 are resolved (see above) and no longer part of this pending group.
 - **AD-012 — event delivery guarantees:** remains deferred and does not block registration work.
 
 ### Blocking
@@ -1092,7 +1106,6 @@ The following decisions must not be made by Ivan alone:
 | AD-001 | Defines every bounded-context/module mapping | Jira planning and Customer-local work can continue; Vehicle/ServiceCatalog code cannot |
 | AD-007 | Owns Epic 4 aggregate/transaction boundary | Yes |
 | AD-009 | Couples Epic 2 pricing to Epic 4 stock | Yes |
-| AD-011 | Establishes all inter-module contracts | Yes with mocks |
 | AD-014 | Owns Notification module/channel | Yes |
 | AD-017 | Establishes shared database change policy | Yes briefly |
 | AD-018 | Changes external-integration/delivery scope | Yes |
@@ -1116,8 +1129,6 @@ These items do not need a new architecture decision once their related decision,
 - Add Spring Security/JWT dependencies and filters after AD-016; the technology choice itself is already accepted.
 - Add Swagger/OpenAPI documentation to existing REST APIs.
 - Add use-case, controller, persistence and end-to-end integration tests.
-- Configure JaCoCo and enforce the official 80% critical-domain threshold in active CI.
-- Enable/fix CI; the current workflow is fully commented out.
 - Complete `README.md` with local execution and project objectives.
 - Run and document the required vulnerability scan.
 - Correct Docker documentation examples after comparing them with actual dependencies/endpoints.
@@ -1132,7 +1143,8 @@ These items do not need a new architecture decision once their related decision,
 - Remove or mark Payment Gateway as future/unconfirmed after AD-018.
 - Add External Supplier System to the relevant C4 view if retained.
 - Give the polling ADR an explicit status after AD-015.
-- Document exact public ports, REST contracts and event payloads after AD-011/AD-012.
+- Document exact public ports and event payloads now that AD-011 is resolved (see ADR-005); internal REST
+  contracts do not apply since Option A was ratified. Event payloads remain pending AD-012.
 - Add Vehicle and ServiceCatalog to `PROJECT-STRUCTURE.md` only after team-owned AD-001 validates the conditional
   AD-003/AD-004 placement; other missing aggregates remain subject to their owners' decisions.
 - Resolve the official private/public repository wording with FIAP/course guidance.
@@ -1158,7 +1170,8 @@ The existing file is exactly `AGENTS.md` at the repository root. No duplicate fi
 ### Remaining guidance dependencies
 
 - Add the final Miro-context-to-package mapping only after AD-001.
-- Add definitive cross-module and event-delivery rules only after AD-011/AD-012.
+- Cross-module integration rules can now be added: AD-011 is resolved (see ADR-005). Event-delivery rules
+  remain pending AD-012.
 - Add final authorization, tracking and migration rules only after AD-015/AD-016/AD-017.
 
 ## Consistency Check After Synchronization
@@ -1182,11 +1195,12 @@ The existing file is exactly `AGENTS.md` at the repository root. No duplicate fi
 - **Actual architectural decisions identified:** 19.
 - **Ivan / my assigned scope:** 4 (AD-002 through AD-005).
 - **Explicitly approved by Ivan:** 4 (Option A for AD-002 through AD-005).
-- **Team Decision Required:** 9.
+- **Team Decision Required:** 8.
 - **Currently blocking Ivan's Jira planning:** 0.
 - **Currently blocking part of Ivan's implementation:** 1 (AD-001), which gates the conditionally resolved AD-003
   and AD-004.
-- **Resolved:** 9 (AD-002, AD-003, AD-004 and AD-005, approved by Ivan; AD-006, AD-008 and AD-015, ratified by the
+- **Resolved:** 10 (AD-002, AD-003, AD-004 and AD-005, approved by Ivan; AD-006, AD-008 and AD-015, ratified by the
   team on 23 August 2026; AD-010, ratified by the team on 24 August 2026; AD-016, ratified by the team on
-  24 August 2026).
+  24 August 2026; AD-011, ratified by the team on 25 August 2026 via
+  `docs/adr/ADR-005-inter-module-integration-contract.md`).
 - **Deferred:** 1 (AD-012).

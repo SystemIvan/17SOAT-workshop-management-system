@@ -7,6 +7,8 @@ import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.m
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateStockItem;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.repository.EstimateRepository;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.service.EstimateExpirationPolicy;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .ServiceOrderStockItemNotFoundException;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceExecution;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockAvailabilitySnapshot;
@@ -18,6 +20,7 @@ import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.app
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentExecution;
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentLine;
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.api.RepairStockAssessmentResult;
+import br.com.fiap.workshop_management_system.stockprocurement.stock.application.exception.StockItemNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -154,12 +157,16 @@ public class GenerateEstimateUseCase {
         serviceOrder.freezeStockRequirements(diagnosisId);
 
         if (repairStockAssessmentApi != null) {
-            RepairStockAssessmentResult result =
-                    repairStockAssessmentApi.assessAndRecord(
+            RepairStockAssessmentResult result;
+            try {
+                result = repairStockAssessmentApi.assessAndRecord(
                             new RepairStockAssessmentCommand(
                                     toAssessmentExecutions(executions)
                             )
                     );
+            } catch (StockItemNotFoundException exception) {
+                throw new ServiceOrderStockItemNotFoundException();
+            }
 
             serviceOrder.recordStockAvailability(
                     diagnosisId,

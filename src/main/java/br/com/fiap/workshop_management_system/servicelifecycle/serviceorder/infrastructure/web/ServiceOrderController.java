@@ -155,7 +155,7 @@ public class ServiceOrderController {
             @ApiResponse(responseCode = "400", description = "Invalid diagnosis request"),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Service order, technician or Catalog Service not found"),
+                    description = "Service order, technician, Catalog Service or Stock Item not found"),
             @ApiResponse(
                     responseCode = "409",
                     description = "Diagnosis is unavailable or a Catalog Service is archived")
@@ -211,7 +211,7 @@ public class ServiceOrderController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Service execution started"),
             @ApiResponse(responseCode = "404", description = "Service order or service execution not found"),
-            @ApiResponse(responseCode = "409", description = "Service execution is not in the ready status")
+            @ApiResponse(responseCode = "409", description = "Service execution is not ready or has no technician assigned")
     })
     public ResponseEntity<ServiceOrderResponse> startExecution(
             @PathVariable UUID id, @PathVariable UUID executionId) {

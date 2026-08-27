@@ -78,6 +78,8 @@ class SecurityAuthorizationTest {
     void purchaseOrderEndpointsRejectRequestsWithoutAToken() throws Exception {
         mockMvc.perform(get("/api/purchase-demands"))
                 .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/purchase-orders/" + UUID.randomUUID() + "/receipt"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -91,6 +93,9 @@ class SecurityAuthorizationTest {
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/purchase-orders/" + UUID.randomUUID() + "/receipt")
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden());
     }
 
@@ -106,6 +111,9 @@ class SecurityAuthorizationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/purchase-orders/" + UUID.randomUUID() + "/receipt")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
     }
 
     @Test

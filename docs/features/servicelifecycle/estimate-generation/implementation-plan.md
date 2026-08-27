@@ -5,7 +5,7 @@
 | Feature | `estimate-generation` |
 | Status | Implemented |
 | Responsável | Matheus Campagnone |
-| Atualizado em | 2026-08-25 |
+| Atualizado em | 2026-08-26 |
 | Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-25) |
 | Especificação técnica | `./technical-spec.md` (`Approved` em 2026-08-25) |
 | Decisão arquitetural | AD-013 — política de expiração de Estimate |
@@ -81,8 +81,8 @@ A política de cálculo do prazo permanece separada do mecanismo automático de 
 - [x] Executar testes unitários de `EstimateExpirationPolicy`.
 - [x] Executar testes de `GenerateEstimateUseCase`.
 - [x] Executar suíte relacionada a Estimate.
-- [ ] Executar `mvnw verify` completo após a atualização final.
-- [ ] Executar `git diff --check` antes do commit.
+- [x] Executar `mvnw verify` completo após a atualização final.
+- [x] Executar `git diff --check` antes do commit.
 
 ## Critérios de conclusão
 
@@ -98,8 +98,8 @@ A política de cálculo do prazo permanece separada do mecanismo automático de 
 - [x] Testes específicos da política de expiração passaram com 2 testes, 0 falhas e 0 erros.
 - [x] Testes de `GenerateEstimateUseCase` passaram com 6 testes, 0 falhas e 0 erros.
 - [x] Suíte relacionada a Estimate passou com 55 testes, 0 falhas e 0 erros.
-- [ ] Build completo final validado após atualização da documentação.
-- [ ] Diff final validado antes do commit.
+- [x] Build completo final validado após atualização da documentação.
+- [x] Diff final validado antes do commit.
 
 ## Evidências e segurança
 
@@ -113,3 +113,18 @@ todos disponíveis
 
 qualquer indisponibilidade
     -> createdAt + 48h
+```
+
+Validação final em 2026-08-26 após integrar `dev`:
+
+- conflito de `GenerateEstimateUseCase` resolvido preservando a política AD-013 e o mapeamento de
+  `StockItemNotFoundException` introduzido em `dev`;
+- testes focados: 12 testes, 0 falhas e 0 erros;
+- `mvnw clean verify`: 635 testes, 0 falhas, 0 erros e 0 ignorados;
+- `ModuleStructureTest`: 2 testes, 0 falhas e 0 erros;
+- JaCoCo: todos os limites de cobertura atendidos;
+- `git diff --check`: sem erros.
+
+Revisão de segurança da integração: nenhuma nova entrada controlada pelo cliente, credencial, dado pessoal, migração
+ou dependência foi adicionada. O prazo permanece calculado no servidor, e o tratamento de Stock Item inexistente
+preserva o erro HTTP estável sem expor detalhes internos.

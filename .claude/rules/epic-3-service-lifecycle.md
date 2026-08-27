@@ -46,6 +46,11 @@ Fonte: `docs/Architecture.md` §4.3/4.4, `docs/Architecture-Decisions.md`,
 ## Regras de fronteira já aceitas (aplicam-se aqui)
 
 - Nenhuma importação de pacote interno de outro módulo (`registration`, `stockprocurement`); use IDs,
-  eventos de domínio ou port/adapter (AD-011 ainda pendente — use mocks/interfaces próprias enquanto
-  isso).
+  eventos de domínio ou port/adapter. **AD-011 foi resolvida em 2026-08-25** — o time ratificou Option A
+  (portas Java in-process no consumidor + API pública `application/api` no módulo dono, chamada dentro do
+  mesmo processo; reações assíncronas continuam via `ApplicationEventPublisher`/`@EventListener`), ver
+  `../../docs/adr/ADR-005-inter-module-integration-contract.md`. Nenhum endpoint REST interno entre módulos
+  deve ser criado para isso enquanto o sistema for um monólito modular; a exposição OHS/REST descrita no
+  Context Map do Miro passa a valer só numa eventual extração futura para microsserviços, decidida em ADR
+  própria quando ocorrer.
 - `ModuleStructureTest` deve continuar verde após qualquer mudança estrutural.

@@ -95,4 +95,58 @@ class StockItemTest {
         assertThrows(IllegalStateException.class, () -> item.reserve(new Quantity(1)));
         assertThrows(IllegalArgumentException.class, () -> item.assessReservation(new Quantity(0)));
     }
+
+    @Test
+    void receivesIntoActiveOrInactiveItemsWithoutChangingActivation() {
+        StockItem item = item(StockItemType.PART, 2);
+        item.deactivate();
+
+        StockItemReceiptBalance balance = item.receive(new Quantity(3));
+
+        assertEquals(new Quantity(2), balance.availableBefore());
+        assertEquals(new Quantity(5), balance.availableAfter());
+        assertEquals(new Quantity(5), item.availableQuantity());
+        assertFalse(item.active());
+    }
+
+    @Test
+    void rejectsInvalidOrOverflowingReceipts() {
+        StockItem item = item(StockItemType.PART, Integer.MAX_VALUE);
+
+        assertThrows(IllegalArgumentException.class, () -> item.receive(new Quantity(0)));
+        assertThrows(ArithmeticException.class, () -> item.receive(new Quantity(1)));
+        assertEquals(new Quantity(Integer.MAX_VALUE), item.availableQuantity());
+    }
+
+    @Test
+    void assessesOptionalLowStockPolicyWithStrictMinimumComparison() {
+        StockItem item = StockItem.create(new Sku("SKU"), "Supply", StockItemType.SUPPLY,
+                new Price(BigDecimal.ONE, CurrencyCode.BRL), new Quantity(4),
+                new LowStockPolicy(new Quantity(5), new Quantity(12)));
+
+        assertEquals(LowStockStatus.LOW, item.assessLowStock().status());
+        assertEquals(new Quantity(8), item.assessLowStock().suggestedPurchaseQuantity());
+
+        item.receive(new Quantity(1));
+
+        assertEquals(LowStockStatus.NORMAL, item.assessLowStock().status());
+        assertEquals(null, item.assessLowStock().suggestedPurchaseQuantity());
+    }
+
+    @Test
+    void configuresAndDisablesPolicyOnlyForActiveItems() {
+        StockItem item = item(StockItemType.PART, 2);
+        LowStockPolicy policy = new LowStockPolicy(new Quantity(3), new Quantity(8));
+
+        assertEquals(LowStockStatus.NOT_CONFIGURED, item.assessLowStock().status());
+        item.configureLowStockPolicy(policy);
+        assertEquals(policy, item.lowStockPolicy());
+        item.disableLowStockPolicy();
+        item.disableLowStockPolicy();
+        assertEquals(LowStockStatus.NOT_CONFIGURED, item.assessLowStock().status());
+
+        item.deactivate();
+        assertThrows(StockItemInactiveException.class, () -> item.configureLowStockPolicy(policy));
+        assertEquals(LowStockStatus.NOT_CONFIGURED, item.assessLowStock().status());
+    }
 }

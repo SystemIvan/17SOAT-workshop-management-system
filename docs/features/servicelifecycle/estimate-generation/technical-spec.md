@@ -5,7 +5,7 @@
 | Feature | `estimate-generation` |
 | Status | Approved |
 | Responsável | Matheus Campagnone |
-| Atualizado em | 2026-08-25 |
+| Atualizado em | 2026-08-26 |
 | Aprovado por | Matheus Apostulo |
 | Aprovado em | 2026-08-25 |
 | Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-25) |
@@ -473,6 +473,6 @@ Também devem permanecer verdes:
 - [x] Testes unitários da política de expiração verdes.
 - [x] Testes de `GenerateEstimateUseCase` verdes.
 - [x] Suíte relacionada a Estimate: 55 testes, 0 falhas, 0 erros.
-- [ ] Implementation Plan atualizado para refletir a implementação.
-- [ ] `mvnw verify` completo executado após a atualização final.
-- [ ] `git diff --check` executado antes do commit.
+- [x] Implementation Plan atualizado para refletir a implementação.
+- [x] `mvnw verify` completo executado após a atualização final.
+- [x] `git diff --check` executado antes do commit.
