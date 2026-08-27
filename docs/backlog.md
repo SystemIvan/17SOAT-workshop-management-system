@@ -19,7 +19,8 @@ por suas próprias aprovações funcional e técnica.
 ## BL-002 — Operações de inventário de Stock Item
 
 - **Contexto:** Stock & Procurement.
-- **Status:** feature futura.
+- **Status:** parcialmente entregue por RF29/RF30; permanecem futuros os ajustes administrativos, rastreabilidade
+  ampliada, unidade de medida e reconciliação agendada.
 - **Origem:** `docs/features/stockprocurement/stock-domain-foundation/functional-spec.md`.
 - **Problema:** o catálogo mantém somente a quantidade disponível inicial e não altera saldos após a criação.
 - **Evolução a avaliar:** recebimento, retirada administrativa, justificativa, ajustes, nível mínimo, rastreabilidade e

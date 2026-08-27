@@ -8,7 +8,7 @@
 | Atualizado em | 2026-08-25 |
 | Aprovado por | Matheus Apostulo |
 | Aprovado em | 2026-08-25 |
-| Referências | Architecture docs; Miro; `stock-domain-foundation`; `purchase-order-creation` |
+| Referências | Architecture docs; Miro; `stock-domain-foundation`; `purchase-order-creation`; AD-013 |
 
 ## Revisão material por disponibilidade e Purchase Demand
 
@@ -45,6 +45,10 @@ Ao final da geração:
 - cada item apresenta a disponibilidade observada na geração e eventual quantidade insuficiente, sem prometer saldo ao
   Customer;
 - insuficiências revalidam a mesma Purchase Demand registrada desde o Diagnosis, sem criar ordem de compra automática;
+- a Estimate recebe um `expiresAt` calculado conforme a disponibilidade de estoque observada na geração;
+- Estimates com todos os itens disponíveis possuem janela de aprovação de 24 horas;
+- Estimates com qualquer item indisponível possuem janela de aprovação de 48 horas;
+- Estimates ainda em estado `SENT` são automaticamente expiradas quando `expiresAt` é atingido;
 - é produzido o evento `EstimateGenerated`, permitindo que a capability de Notification reaja sem conhecer a
   implementação interna de Estimate.
 
@@ -56,8 +60,11 @@ Ao final da geração:
 - O Diagnosis já pode ter registrado Purchase Demands para requirements insuficientes.
 - O sistema gera uma Estimate correspondente ao Diagnosis aberto.
 - A Estimate revalida e mantém snapshots comerciais e informativos das Service Executions e dos Stock Requirements.
+- O prazo de aprovação é calculado a partir da disponibilidade observada dos Stock Requirements.
 - Após a criação bem-sucedida da Estimate, o sistema produz `EstimateGenerated`.
 - A capability de Notification poderá reagir ao evento e comunicar o Customer.
+- Enquanto a Estimate permanecer `SENT`, o sistema verifica periodicamente se seu `expiresAt` foi atingido.
+- Ao atingir `expiresAt`, uma Estimate ainda `SENT` passa para `EXPIRED`.
 
 ## Regras de negócio
 
@@ -108,25 +115,34 @@ Ao final da geração:
 
 ### Expiração
 
-- A Estimate deve permitir representar uma data limite por meio de `expiresAt`.
-- A duração que determina `expiresAt` não será fixada nesta feature enquanto a decisão arquitetural correspondente
-  permanecer aberta.
-- Nenhuma regra de 24 horas, 48 horas ou prazo de reposição será hard-coded nesta entrega.
+- Toda Estimate gerada deve possuir uma data limite de aprovação representada por `expiresAt`.
+- O instante utilizado como referência para o cálculo é o momento de geração da Estimate.
+- Quando todos os Stock Items necessários estiverem disponíveis, `expiresAt` deve corresponder a 24 horas após a
+  geração da Estimate.
+- Quando qualquer Stock Item necessário estiver indisponível ou possuir quantidade insuficiente, `expiresAt` deve
+  corresponder a 48 horas após a geração da Estimate.
+- A decisão de 24 ou 48 horas é realizada durante a geração da Estimate a partir do snapshot de disponibilidade.
+- O valor calculado de `expiresAt` é persistido na própria Estimate.
+- O mecanismo responsável pela expiração automática não recalcula a política de duração.
+- O mecanismo de expiração considera apenas Estimates no estado `SENT`.
+- Uma Estimate `SENT` cujo `expiresAt` tenha sido atingido deve transicionar para `EXPIRED`.
+- A verificação de Estimates vencidas é executada periodicamente por um scheduler.
+- O scheduler utiliza o `expiresAt` persistido como fonte de verdade para determinar se a Estimate venceu.
+- A política de cálculo do prazo e o mecanismo de expiração permanecem separados: a primeira determina `expiresAt`;
+  o segundo executa a transição de estado quando esse instante é atingido.
 
 ## Fora de escopo
 
 - decisão do Customer sobre as linhas da Estimate;
 - aprovação ou rejeição de Service Executions;
-- fechamento da Estimate;
-- expiração automática ou scheduler;
-- regra definitiva de duração do prazo de aprovação;
 - reserva, liberação ou consumo de Stock Items;
 - seleção, criação ou envio de Purchase Order; somente o registro/reconciliação da Purchase Demand pertence à integração
   funcional com RF27;
 - execução e tracking das Service Executions;
 - implementação do canal de Notification;
 - alteração do fluxo de Diagnosis já existente;
-- revisão ou versionamento posterior de Estimate.
+- revisão ou versionamento posterior de Estimate;
+- cálculo de ETA real de fornecedor ou prazo adicional de reposição.
 
 ## Critérios de aceite
 
@@ -147,5 +163,11 @@ Ao final da geração:
 - [ ] Uma insuficiência atualiza a mesma Purchase Demand originada no Diagnosis, sem duplicação e sem criar Purchase
       Order automaticamente.
 - [ ] Rejeição ou expiração da Estimate não elimina a Purchase Demand correspondente.
-- [x] A feature permite representar `expiresAt` sem hard-code da duração do prazo.
+- [x] A Estimate possui `expiresAt` persistido.
+- [x] Quando todos os Stock Items estão disponíveis, a Estimate possui prazo de aprovação de 24 horas.
+- [x] Quando qualquer Stock Item está indisponível, a Estimate possui prazo de aprovação de 48 horas.
+- [x] A política de duração é aplicada durante a geração da Estimate.
+- [x] O mecanismo de expiração utiliza o `expiresAt` persistido e não recalcula a duração.
+- [x] Uma Estimate `SENT` vencida pode transicionar automaticamente para `EXPIRED`.
+- [x] A verificação automática de expiração é executada periodicamente por scheduler.
 - [x] Nenhum comportamento de Notification é implementado dentro do domínio de Estimate.

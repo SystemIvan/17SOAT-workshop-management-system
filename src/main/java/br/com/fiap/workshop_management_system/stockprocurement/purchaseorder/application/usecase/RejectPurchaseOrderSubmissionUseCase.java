@@ -1,6 +1,8 @@
 package br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.usecase;
 
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.exception.PurchaseDemandNotFoundException;
+import br.com.fiap.workshop_management_system.stockprocurement.lowstock.domain.model.LowStockOccurrenceStatus;
+import br.com.fiap.workshop_management_system.stockprocurement.lowstock.domain.repository.LowStockOccurrenceRepository;
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.application.exception.PurchaseOrderNotFoundException;
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.domain.model.PurchaseDemand;
 import br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.domain.model.PurchaseOrder;
@@ -21,21 +23,25 @@ public class RejectPurchaseOrderSubmissionUseCase {
 
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final PurchaseDemandRepository demandRepository;
+    private final LowStockOccurrenceRepository occurrenceRepository;
     private final Clock clock;
 
     @Autowired
     public RejectPurchaseOrderSubmissionUseCase(
             PurchaseOrderRepository purchaseOrderRepository,
-            PurchaseDemandRepository demandRepository) {
-        this(purchaseOrderRepository, demandRepository, Clock.systemUTC());
+            PurchaseDemandRepository demandRepository,
+            LowStockOccurrenceRepository occurrenceRepository) {
+        this(purchaseOrderRepository, demandRepository, occurrenceRepository, Clock.systemUTC());
     }
 
     RejectPurchaseOrderSubmissionUseCase(
             PurchaseOrderRepository purchaseOrderRepository,
             PurchaseDemandRepository demandRepository,
+            LowStockOccurrenceRepository occurrenceRepository,
             Clock clock) {
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.demandRepository = demandRepository;
+        this.occurrenceRepository = occurrenceRepository;
         this.clock = clock;
     }
 
@@ -52,9 +58,20 @@ public class RejectPurchaseOrderSubmissionUseCase {
 
         order.reject(rejectionCode, rejectedAt);
         demands.forEach(demand -> demand.release(order.id(), rejectedAt));
+        demands.forEach(demand -> resolveReleasedClosedLowStockDemand(demand, rejectedAt));
         demandRepository.saveAll(demands);
         purchaseOrderRepository.save(order);
         return order;
+    }
+
+    private void resolveReleasedClosedLowStockDemand(PurchaseDemand demand, Instant rejectedAt) {
+        if (demand.origin() != br.com.fiap.workshop_management_system.stockprocurement.purchaseorder.domain.model
+                .PurchaseDemandOrigin.LOW_STOCK) {
+            return;
+        }
+        occurrenceRepository.findByPurchaseDemandIdForUpdate(demand.id())
+                .filter(occurrence -> occurrence.status() == LowStockOccurrenceStatus.CLOSED)
+                .ifPresent(occurrence -> demand.resolve(rejectedAt));
     }
 
     private Instant currentTime() {

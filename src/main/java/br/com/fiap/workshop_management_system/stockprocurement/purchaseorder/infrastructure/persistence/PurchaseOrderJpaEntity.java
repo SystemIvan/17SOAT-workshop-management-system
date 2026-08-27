@@ -51,6 +51,12 @@ public class PurchaseOrderJpaEntity implements Persistable<UUID> {
     @Column(name = "opened_at")
     private Instant openedAt;
 
+    @Column(name = "closed_at")
+    private Instant closedAt;
+
+    @Column(name = "closed_by_user_account_id")
+    private UUID closedByUserAccountId;
+
     @ElementCollection
     @CollectionTable(name = "purchase_order_lines", joinColumns = @JoinColumn(name = "purchase_order_id"))
     private List<PurchaseOrderLineEmbeddable> lines = new ArrayList<>();
@@ -73,6 +79,8 @@ public class PurchaseOrderJpaEntity implements Persistable<UUID> {
             Instant createdAt,
             Instant updatedAt,
             Instant openedAt,
+            Instant closedAt,
+            UUID closedByUserAccountId,
             List<PurchaseOrderLineEmbeddable> lines,
             Set<UUID> selectedDemandIds) {
         this.id = id;
@@ -84,6 +92,8 @@ public class PurchaseOrderJpaEntity implements Persistable<UUID> {
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.openedAt = openedAt;
+        this.closedAt = closedAt;
+        this.closedByUserAccountId = closedByUserAccountId;
         this.lines = lines;
         this.selectedDemandIds = selectedDemandIds;
     }
@@ -128,6 +138,14 @@ public class PurchaseOrderJpaEntity implements Persistable<UUID> {
 
     public Instant getOpenedAt() {
         return openedAt;
+    }
+
+    public Instant getClosedAt() {
+        return closedAt;
+    }
+
+    public UUID getClosedByUserAccountId() {
+        return closedByUserAccountId;
     }
 
     public List<PurchaseOrderLineEmbeddable> getLines() {

@@ -107,6 +107,7 @@ class ServiceOrderControllerCompleteExecutionTest {
         transactionTemplate.executeWithoutResult(status -> {
             ServiceOrder serviceOrder = serviceOrderRepository.findById(serviceOrderId).orElseThrow();
             serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+            serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
             serviceOrder.startExecution(executionId);
             serviceOrderRepository.save(serviceOrder);
         });

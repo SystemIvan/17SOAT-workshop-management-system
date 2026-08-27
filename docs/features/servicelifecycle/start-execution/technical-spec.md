@@ -5,144 +5,85 @@
 | Feature | `start-execution` |
 | Status | Approved |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-08-20 |
+| Atualizado em | 2026-08-26 |
 | Aprovado por | Matheus Apostulo |
-| Aprovado em | 2026-08-20 |
-| Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-20) |
+| Aprovado em | 2026-08-26 |
+| Especificação funcional | `./functional-spec.md` (`Approved` em 2026-08-26) |
 
-## Revisão proposta por `stock-item-reservation`
+## Objetivo e escopo
 
-`ServiceExecution.start()` continua a exigir exatamente `READY`. Esta revisão substitui o valor persistido
-e contratual `AWAITING_PART` por `AWAITING_ITEMS`, cuja migration, JPA, OpenAPI e Postman são executados
-pelo plano `stock-item-reservation`. Não há alias JSON para o status antigo.
+Impedir a transição de `ServiceExecution` de `READY` para `IN_PROGRESS` quando não houver
+`assignedTechnicianId`. A regra pertence ao domínio da `ServiceExecution`, pois deve valer para todos os
+adaptadores e fluxos que iniciem uma execução.
 
-Separação e retirada física podem demorar, mas não mudam uma execução `READY` para `AWAITING_ITEMS`; logo,
-não introduzem condição adicional no endpoint de início. Os testes de RF20 devem cobrir `READY` estável e a
-rejeição em `AWAITING_ITEMS`, sem criar migration própria ou dependência interna de Stock & Procurement.
+Não há mudança de path, verbo, request ou forma da resposta do endpoint existente
+`POST /api/service-orders/{id}/executions/{executionId}/start`. A mudança contratual é somente o novo
+caso de falha: execução `READY` sem Technician atribuído retorna `409 INVALID_STATE_TRANSITION`.
 
-## Gate de aprovação
-
-Nenhum `implementation-plan.md` pode ser criado e nenhuma implementação/teste pode começar antes da
-aprovação humana explícita desta especificação.
-
-## Objetivo técnico e escopo
-
-O comportamento de RF20 já está implementado (`StartExecutionUseCase`, `ServiceOrder.startExecution`,
-`ServiceExecution.start`, endpoint `POST /api/service-orders/{id}/executions/{executionId}/start`),
-escrito antes do gate de SDD do projeto. Diferente de RF19, esta feature **não** propõe nenhuma mudança
-de comportamento de domínio, contrato HTTP ou tratamento de erro — tudo o que RF20 precisa já existe e
-já está correto:
-
-- `ServiceExecution.start()` já rejeita qualquer status diferente de `READY` com `IllegalStateException`;
-- `ServiceLifecycleExceptionHandler` (criado durante RF19, `servicelifecycle/ServiceLifecycleExceptionHandler.java`)
-  já mapeia esse `IllegalStateException` para `409 INVALID_STATE_TRANSITION` — nenhum handler novo é
-  necessário, ele já cobre "transições de estado inválidas em RF20-RF22" por desenho;
-  `ServiceOrderFinder` já mapeia `ServiceOrder`/`ServiceExecution` inexistentes para `404 NOT_FOUND`.
-
-Esta especificação cobre exclusivamente a lacuna real: **não existe nenhum teste dedicado** a este fluxo
-(nem de caso de uso, nem HTTP) — RF20 hoje só é exercitado como efeito colateral de
-`ServiceOrderControllerAssignTechnicianTest.authorizeAndComplete`, que existe para preparar uma execução
-`COMPLETED`, não para validar RF20 em si. Esta feature adiciona essa cobertura e a documentação Swagger
-do endpoint, sem alterar comportamento.
-
-Esta feature não implementará:
-
-- exigir `assignedTechnicianId` preenchido como pré-condição para iniciar — permanece pendente conforme
-  a `functional-spec.md`, decisão de time;
-- qualquer verificação/alteração de `TechnicianStatus` — depende de AD-006, `Team Decision Required`;
-- autorização por papel — depende de AD-016, `Team Decision Required`;
-- qualquer mudança em `AssignTechnicianUseCase`, `UpdateExecutionProgressUseCase` ou `CompleteExecutionUseCase`.
+Não estão no escopo: validar disponibilidade/especialidade do Technician (AD-006), limitar o ator que
+inicia a execução (AD-016), alterar `AssignTechnicianUseCase`, criar histórico de atribuição ou alterar
+o fluxo de conclusão. Uma execução que já tenha iniciado continua podendo ser concluída conforme RF22.
 
 ## Contexto e desenho
 
-Nenhuma mudança de bounded context, módulo ou aggregate. `StartExecutionUseCase` já depende só de
-`ServiceOrderRepository` (nenhuma dependência de `technician` é necessária para RF20, ao contrário de
-RF19). `ServiceOrder.startExecution(UUID serviceExecutionId)` localiza a `ServiceExecution` via
-`findExecution` (mesmo helper usado por RF19/RF21/RF22) e delega a ela, depois recalcula o
-`statusSnapshot` (AD-010, Option B — comportamento preservado, decisão de time ainda pendente).
+O bounded context continua sendo `servicelifecycle`; não há dependência nova entre módulos.
 
-Nenhum pacote de `registration` ou `stockprocurement` é tocado. `ModuleStructureTest` deve continuar
-verde sem exceções adicionais — não há dependência nova a adicionar.
+`StartExecutionUseCase` carrega a `ServiceOrder`, chama `ServiceOrder.startExecution(executionId)` e
+persiste o aggregate. `ServiceOrder` delega a transição a `ServiceExecution.start()`. Este último método
+passará a:
 
-## Interfaces e fluxo de dados
+1. exigir o status `READY`, como hoje;
+2. exigir `assignedTechnicianId != null`;
+3. somente então alterar o status para `IN_PROGRESS`.
 
-Endpoint já existe e não muda de path, verbo ou payload:
+A ordem preserva o erro de status para qualquer estado diferente de `READY`; para `READY` sem
+atribuição, uma `IllegalStateException` de regra de negócio é lançada antes de qualquer mutação.
+`diagnosisAssigneeId` não participa da validação porque representa o responsável pelo diagnóstico, não
+o responsável pela execução.
 
-```
-POST /api/service-orders/{id}/executions/{executionId}/start
-Body: nenhum
-Sucesso: 200 OK com ServiceOrderResponse (executions[].status = "IN_PROGRESS" para a execução iniciada)
-```
+## Interfaces, falhas e documentação
 
-Contratos de erro (já implementados, sem mudança):
+| Situação | HTTP | Código estável | Efeito |
+|---|---:|---|---|
+| Execução `READY` com `assignedTechnicianId` | 200 | — | status vira `IN_PROGRESS` |
+| Execução `READY` sem `assignedTechnicianId` | 409 | `INVALID_STATE_TRANSITION` | estado não muda |
+| Execução em status diferente de `READY` | 409 | `INVALID_STATE_TRANSITION` | estado não muda |
+| Service Order/execução inexistente | 404 | `NOT_FOUND` | — |
 
-| Situação | Comportamento atual |
-|---|---|
-| `ServiceOrder` ou `ServiceExecution` inexistente | `404` `NOT_FOUND` (`ServiceOrderFinder`/`findExecution`) |
-| `ServiceExecution` em status diferente de `READY` | `409` `INVALID_STATE_TRANSITION` (`ServiceLifecycleExceptionHandler`) |
+O `ServiceLifecycleExceptionHandler` já converte `IllegalStateException` para
+`409 INVALID_STATE_TRANSITION`; nenhum handler novo é necessário. Atualizar as anotações Springdoc do
+endpoint, a collection Postman e o README com a etapa obrigatória de atribuir um Technician antes de
+iniciar.
 
-Único gap de interface, não funcional: o endpoint não tem anotações `@ApiResponses` no Swagger, ao
-contrário de `assignTechnician`, `performDiagnosis` etc. Esta feature adiciona as anotações refletindo a
-tabela acima, seguindo o padrão já usado no método `assignTechnician` de `ServiceOrderController`.
+## Persistência e dados
 
-## Persistência e dados de bootstrap
-
-Nenhuma mudança de schema. O status da `ServiceExecution` já é persistido via `ServiceExecutionJpaEntity`
-e recarregado corretamente — comportamento exercitado indiretamente por
-`ServiceOrderControllerAssignTechnicianTest.authorizeAndComplete`, que chama o endpoint `/start` como
-passo intermediário. Nenhuma migration nova é necessária. Nenhum dado novo é criado; os testes reutilizam
-os mesmos builders/fixtures de `ServiceOrderTest`/`ServiceExecutionTest`.
-
-## Segurança e operação
-
-- Sem mudança de autorização: o endpoint continua público, mesma limitação conhecida de todo
-  `servicelifecycle`, dependente de AD-016.
-- Nenhum dado pessoal ou segredo é manipulado; os IDs são `UUID` opacos.
-- Nenhuma dependência nova é adicionada.
+Classificação: **nenhum seed necessário**. `assignedTechnicianId` já existe na entidade/tabela de
+execução e permanece anulável para suportar estados anteriores a `READY`; portanto, não haverá migration
+Flyway, alteração de schema ou dado de bootstrap.
 
 ## Estratégia de testes
 
-Hoje só existe cobertura indireta (ver acima) e o teste de domínio de `ServiceExecution.start()`
-implícito em `ServiceExecutionTest`/`ServiceOrderTest` (a confirmar na implementação: se já cobre `READY`
-→ `IN_PROGRESS` e a rejeição em outros status, não é reescrito). Esta feature adiciona:
+- Domínio: execução `READY` sem Technician não inicia e mantém `READY`; com Technician, inicia.
+- Caso de uso: `StartExecutionUseCase` rejeita execução pronta sem atribuição e mantém o aggregate.
+- HTTP MockMvc: endpoint retorna `409` e `INVALID_STATE_TRANSITION` para o novo cenário; o caminho feliz
+  prepara a atribuição e continua retornando `200`/`IN_PROGRESS`.
+- Contrato: atualizar teste OpenAPI, se necessário, e a collection Postman para atribuir antes de iniciar.
+- Estrutura: executar `ModuleStructureTest` e os gates `make test` e `make verify`.
 
-### Domínio (revisar cobertura existente, sem mudança de comportamento)
+## Segurança
 
-- Confirmar que `ServiceExecutionTest`/`ServiceOrderTest` já cobrem `start()` bem-sucedido a partir de
-  `READY` e a rejeição (`IllegalStateException`) a partir de pelo menos um status não-`READY`; se não
-  cobrirem, adicionar caso de domínio mínimo — sem alterar `ServiceExecution.start()`.
-
-### Aplicação (`StartExecutionUseCase`, novo — `StartExecutionUseCaseTest`)
-
-Testes com repository fake cobrindo, no mesmo estilo de `AssignTechnicianUseCaseTest`:
-
-- início bem-sucedido de uma `ServiceExecution` em status `READY` (helper que autoriza sem
-  `StockRequirement`, como `newAuthorizedServiceOrder` de `AssignTechnicianUseCaseTest`, já produz `READY`
-  porque `allMatch` numa lista vazia é `true`);
-- `IllegalStateException` ao tentar iniciar uma execução em status diferente de `READY` (ex.: `PENDING`,
-  recém-diagnosticada sem autorizar);
-- `NoSuchElementException` quando a `ServiceOrder` não existe.
-
-### HTTP (`ServiceOrderController`, novo — `ServiceOrderControllerStartExecutionTest`)
-
-Testes MockMvc cobrindo, no mesmo estilo de `ServiceOrderControllerAssignTechnicianTest`:
-
-- `200 OK` com `executions[].status = "IN_PROGRESS"` no início bem-sucedido a partir de `READY`;
-- `404 NOT_FOUND` para `ServiceOrder` ou `ServiceExecution` inexistentes;
-- `409 INVALID_STATE_TRANSITION` ao iniciar uma execução ainda `PENDING` (sem autorizar) e uma já
-  `IN_PROGRESS` (iniciar duas vezes).
-
-### Modulith
-
-- `ModuleStructureTest` deve continuar verde; nenhuma dependência nova é introduzida.
+| Item | Avaliação |
+|---|---|
+| Validação e mass assignment | N/A: endpoint não recebe corpo; a validação é regra interna do aggregate. |
+| Autenticação/autorização | N/A nesta alteração: permanece a limitação de AD-016. |
+| Exposição de dados | Mitigado: retorno reutiliza `ErrorResponse` estável, sem detalhes internos. |
+| Dados, logs e segredos | N/A: sem campos, logs ou dependências novos. |
+| Persistência | Mitigado: sem migration e sem alteração de schema. |
 
 ## Decisões propostas para aprovação técnica
 
-- [ ] Nenhuma mudança de comportamento de domínio, contrato HTTP ou tratamento de erro é feita nesta
-      feature — escopo é 100% cobertura de teste + anotações Swagger.
-- [ ] `StartExecutionUseCaseTest` e `ServiceOrderControllerStartExecutionTest` seguem o mesmo padrão
-      estrutural (fakes in-memory, nomes de método) de `AssignTechnicianUseCaseTest` e
-      `ServiceOrderControllerAssignTechnicianTest`.
-- [ ] Nenhuma verificação de `assignedTechnicianId` é adicionada a `StartExecutionUseCase` nesta feature
-      (permanece pendente, decisão de time).
-- [ ] Nenhuma migration nova é necessária.
+- [x] A guarda foi implementada em `ServiceExecution.start()`, após a validação de `READY` e antes da
+      mudança para `IN_PROGRESS`.
+- [x] A ausência de Technician reutiliza `IllegalStateException` e o contrato `409 INVALID_STATE_TRANSITION`.
+- [x] Não houve migration, seed, dependência nova ou mudança de payload.
+- [x] Postman, README, OpenAPI e testes de domínio/aplicação/HTTP foram atualizados na implementação.

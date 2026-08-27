@@ -45,6 +45,12 @@ public class EstimateController {
 
     @PostMapping("/service-orders/{serviceOrderId}/estimates")
     @Operation(summary = "Generate an estimate from the open diagnosis")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Estimate generated"),
+            @ApiResponse(responseCode = "400", description = "Invalid estimate request"),
+            @ApiResponse(responseCode = "404", description = "Service order or Stock Item not found"),
+            @ApiResponse(responseCode = "409", description = "Diagnosis is unavailable or already has an estimate")
+    })
     public ResponseEntity<EstimateResponse> generate(
             @PathVariable UUID serviceOrderId,
             @Valid @RequestBody GenerateEstimateRequest request) {

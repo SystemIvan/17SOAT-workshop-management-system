@@ -26,8 +26,13 @@
     { "key": "diagnosisId", "value": "88888888-8888-8888-8888-888888888888" },
     { "key": "estimateId", "value": "99999999-9999-9999-9999-999999999999" },
     { "key": "purchaseDemandId", "value": "cccccccc-cccc-cccc-cccc-cccccccccccc" },
+    { "key": "purchaseOrderFlowDemandId", "value": "" },
+    { "key": "lowStockPurchaseDemandId", "value": "" },
+    { "key": "lowStockSuggestedQuantity", "value": "" },
     { "key": "purchaseOrderId", "value": "dddddddd-dddd-dddd-dddd-dddddddddddd" },
     { "key": "purchaseOrderIdempotencyKey", "value": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" },
+    { "key": "purchaseOrderFlowIdempotencyKey", "value": "" },
+    { "key": "lowStockPurchaseOrderIdempotencyKey", "value": "" },
     { "key": "authToken", "value": "" }
   ],
   "item": [
@@ -643,6 +648,46 @@
           }
         },
         {
+          "name": "Configure low stock policy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Policy is returned', function () { pm.expect(pm.response.json().lowStockPolicy.minimumQuantity).to.eql(5); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"minimumQuantity\": 5,\n  \"targetQuantity\": 12\n}" },
+            "url": "{{baseUrl}}/api/stock-items/{{stockItemId}}/low-stock-policy"
+          }
+        },
+        {
+          "name": "Search low stock items",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"] }
+            }
+          ],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/stock-items?lowStock=true&active=true" }
+        },
+        {
+          "name": "Disable low stock policy",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "exec": ["pm.test('Status code is 204', function () { pm.response.to.have.status(204); });"] }
+            }
+          ],
+          "request": { "method": "DELETE", "url": "{{baseUrl}}/api/stock-items/{{stockItemId}}/low-stock-policy" }
+        },
+        {
           "name": "Get stock item",
           "event": [
             {
@@ -1253,6 +1298,34 @@
       "description": "Depende de uma ServiceExecution já AUTHORIZED por \"Estimates / Decide estimate lines\" (decisão APPROVED); por isso roda depois de \"Estimates\", não dentro de \"Service Lifecycle\".",
       "item": [
         {
+          "name": "Assign technician before starting execution",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "const executionId = pm.variables.get('executionId');",
+                  "const execution = pm.response.json().executions.find((item) => item.id === executionId);",
+                  "pm.test('Execution has the assigned technician', function () { pm.expect(execution.assignedTechnicianId).to.eql(pm.variables.get('technicianId')); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"technicianId\": \"{{technicianId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/assign-technician",
+            "description": "Obrigatório antes de Start execution. Uma execução READY sem assignedTechnicianId recebe 409/INVALID_STATE_TRANSITION ao iniciar."
+          }
+        },
+        {
           "name": "Start execution",
           "event": [
             {
@@ -1269,7 +1342,8 @@
           ],
           "request": {
             "method": "POST",
-            "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/start"
+              "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/start",
+              "description": "Requer execution READY e Technician atribuído no passo anterior; caso contrário retorna 409/INVALID_STATE_TRANSITION."
           }
         },
         {
@@ -1443,13 +1517,225 @@
               "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
               "const body = pm.response.json();",
               "pm.test('Response is an array', function () { pm.expect(body).to.be.an('array'); });",
-              "if (body.length > 0) { pm.collectionVariables.set('purchaseDemandId', body[0].id); }"
+              "pm.test('An open purchase demand is available', function () { pm.expect(body).to.not.be.empty; });",
+              "if (body.length > 0) { pm.collectionVariables.set('purchaseOrderFlowDemandId', body[0].id); }"
             ] }
           }],
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/purchase-demands?origin=PENDING_REPAIR&stockItemId={{stockItemId}}",
             "description": "Lista apenas demandas OPEN. Diagnosis e Estimate registram ou atualizam PENDING_REPAIR ao observar INSUFFICIENT_QUANTITY; a falha de reserva após aprovação também pode reconciliar a mesma demanda."
+          }
+        },
+        {
+          "name": "List open low-stock purchase demands",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Response is an array', function () { pm.expect(body).to.be.an('array'); });",
+              "pm.test('An open LOW_STOCK purchase demand is available', function () { pm.expect(body).to.not.be.empty; });",
+              "pm.test('Only LOW_STOCK demands are returned', function () { body.forEach(function (demand) { pm.expect(demand.origin).to.eql('LOW_STOCK'); }); });",
+              "if (body.length > 0) { pm.collectionVariables.set('lowStockPurchaseDemandId', body[0].id); pm.collectionVariables.set('lowStockSuggestedQuantity', String(body[0].suggestedQuantity)); }"
+            ] }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/purchase-demands?origin=LOW_STOCK&stockItemId={{stockItemId}}",
+            "description": "Lista as demandas OPEN de reposição preventiva para o Stock Item selecionado. Antes, configure uma Low Stock Policy cujo minimumQuantity seja maior que o availableQuantity; a detecção cria ou atualiza a demanda LOW_STOCK."
+          }
+        },
+        {
+          "name": "Create Purchase Order from low-stock demand",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "exec": ["const demandId = pm.collectionVariables.get('lowStockPurchaseDemandId'); const suggestedQuantity = Number(pm.collectionVariables.get('lowStockSuggestedQuantity')); if (!demandId || !Number.isInteger(suggestedQuantity) || suggestedQuantity <= 0) { throw new Error('Run List open low-stock purchase demands before creating this Purchase Order.'); } pm.collectionVariables.set('lowStockPurchaseOrderIdempotencyKey', pm.variables.replaceIn('{{$guid}}')); pm.collectionVariables.unset('purchaseOrderId'); pm.collectionVariables.unset('stockReceiptId');"] }
+            },
+            {
+              "listen": "test",
+              "script": { "exec": [
+                "pm.test('Status code is 200 or 201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                "const body = pm.response.json();",
+                "pm.test('Purchase order id is present', function () { pm.expect(body.id).to.be.a('string').and.not.empty; });",
+                "pm.collectionVariables.set('purchaseOrderId', body.id);"
+              ] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{lowStockPurchaseOrderIdempotencyKey}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"demandIds\": [\"{{lowStockPurchaseDemandId}}\"],\n  \"lines\": [\n    {\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"quantity\": {{lowStockSuggestedQuantity}}\n    }\n  ]\n}" },
+            "url": "{{baseUrl}}/api/purchase-orders",
+            "description": "Cria uma Purchase Order para a demanda LOW_STOCK retornada pela request anterior. A quantidade é preenchida com suggestedQuantity, pois a linha precisa cobrir a sugestão da demanda selecionada."
+          }
+        },
+        {
+          "name": "Create Purchase Order from demand",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "exec": ["const demandId = pm.collectionVariables.get('purchaseOrderFlowDemandId'); if (!demandId) { throw new Error('Run List open purchase demands after creating an insufficient-stock demand before creating a Purchase Order.'); } pm.collectionVariables.set('purchaseOrderFlowIdempotencyKey', pm.variables.replaceIn('{{$guid}}')); pm.collectionVariables.unset('purchaseOrderId'); pm.collectionVariables.unset('stockReceiptId');"] }
+            },
+            {
+              "listen": "test",
+              "script": { "exec": [
+                "pm.test('Status code is 200 or 201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                "const body = pm.response.json();",
+                "pm.test('Purchase order id is present', function () { pm.expect(body.id).to.be.a('string').and.not.empty; });",
+                "pm.collectionVariables.set('purchaseOrderId', body.id);"
+              ] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{purchaseOrderFlowIdempotencyKey}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"demandIds\": [\"{{purchaseOrderFlowDemandId}}\"],\n  \"lines\": [\n    {\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"quantity\": 10\n    }\n  ]\n}" },
+            "url": "{{baseUrl}}/api/purchase-orders",
+            "description": "Cria uma ordem orientada por demanda com uma chave de idempotência nova a cada execução do passo. Rode antes List open purchase demands e mantenha o retry seguinte com o mesmo body e chave. Para um request misto, mantenha demandIds e acrescente outra linha ad hoc. A quantidade deve cobrir a soma sugerida das demandas selecionadas."
+          }
+        },
+        {
+          "name": "Retry same Purchase Order",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Same purchase order id is returned', function () { pm.expect(body.id).to.eql(pm.collectionVariables.get('purchaseOrderId')); });"
+            ] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{purchaseOrderFlowIdempotencyKey}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"demandIds\": [\"{{purchaseOrderFlowDemandId}}\"],\n  \"lines\": [\n    {\n      \"stockItemId\": \"{{stockItemId}}\",\n      \"quantity\": 10\n    }\n  ]\n}" },
+            "url": "{{baseUrl}}/api/purchase-orders",
+            "description": "Repete exatamente header e body. Retorna 200 para uma ordem OPEN já confirmada, sem nova compra externa; também recupera PENDING_SUBMISSION após 502/503."
+          }
+        },
+        {
+          "name": "Get Purchase Order",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Purchase order is OPEN', function () { pm.expect(pm.response.json().status).to.eql('OPEN'); });"
+            ] }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/purchase-orders/{{purchaseOrderId}}",
+            "description": "Retorna Purchase Orders funcionalmente confirmadas nos estados OPEN ou CLOSED."
+          }
+        },
+        {
+          "name": "List Purchase Orders pending delivery",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Response is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+            ] }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/purchase-orders?status=OPEN",
+            "description": "Lista somente Purchase Orders abertas, pendentes de confirmação integral de entrega."
+          }
+        },
+        {
+          "name": "Close Purchase Order",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Purchase order is CLOSED', function () { pm.expect(body.status).to.eql('CLOSED'); });",
+              "pm.test('Closing audit is present', function () { pm.expect(body.closedAt).to.be.a('string'); pm.expect(body.closedByUserAccountId).to.be.a('string'); });",
+              "pm.collectionVariables.set('purchaseOrderClosedAt', body.closedAt);"
+            ] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/purchase-orders/{{purchaseOrderId}}/close",
+            "description": "Confirma a entrega integral sem body. O fechamento não altera o saldo dos Stock Items."
+          }
+        },
+        {
+          "name": "Retry close Purchase Order",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Closing audit is unchanged', function () { pm.expect(body.closedAt).to.eql(pm.collectionVariables.get('purchaseOrderClosedAt')); });"
+            ] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/purchase-orders/{{purchaseOrderId}}/close",
+            "description": "Repete o fechamento terminal de forma idempotente; não troca autoria, instante ou saldo."
+          }
+        },
+        {
+          "name": "Receive Purchase Order",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+              "const body = pm.response.json();",
+              "pm.test('Receipt is complete', function () { pm.expect(body.id).to.be.a('string'); pm.expect(body.lines).to.be.an('array').and.not.empty; });",
+              "pm.collectionVariables.set('stockReceiptId', body.id);"
+            ] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/purchase-orders/{{purchaseOrderId}}/receipt",
+            "description": "Registra a entrada integral da ordem CLOSED sem body. Linhas, quantidades, saldo e auditoria são derivados no servidor."
+          }
+        },
+        {
+          "name": "Retry Purchase Order Receipt",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Same receipt is returned', function () { pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('stockReceiptId')); });"
+            ] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/purchase-orders/{{purchaseOrderId}}/receipt",
+            "description": "Replay seguro: não duplica Receipt, movimento ou saldo e republica a tentativa pós-commit."
+          }
+        },
+        {
+          "name": "Get Purchase Order Receipt",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Receipt id matches', function () { pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('stockReceiptId')); });"
+            ] }
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/purchase-orders/{{purchaseOrderId}}/receipt",
+            "description": "Consulta o Receipt e os snapshots imutáveis da Purchase Order."
           }
         },
         {

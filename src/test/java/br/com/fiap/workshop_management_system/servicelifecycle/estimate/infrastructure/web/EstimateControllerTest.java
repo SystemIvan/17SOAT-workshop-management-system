@@ -3,6 +3,8 @@ package br.com.fiap.workshop_management_system.servicelifecycle.estimate.infrast
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.DiagnosisItem;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Money;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockItemType;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockRequirement;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.VehicleSnapshot;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -137,5 +139,38 @@ class EstimateControllerTest {
                                 .content("{}")
                 )
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsEstimateWhenAnExistingDiagnosisReferencesMissingStockItem() throws Exception {
+        ServiceOrder serviceOrder = ServiceOrder.create(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015),
+                "Initial assessment"
+        );
+        serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
+        serviceOrder.performDiagnosis(List.of(new DiagnosisItem(
+                UUID.randomUUID(),
+                "Troca de oleo",
+                Money.brl(new BigDecimal("120.00")),
+                List.of()
+        )), UUID.randomUUID(), java.time.Instant.EPOCH);
+        serviceOrder.attachStockRequirement(serviceOrder.serviceExecutions().getFirst().id(), new StockRequirement(
+                UUID.randomUUID(),
+                StockItemType.PART,
+                1,
+                "Filtro de oleo",
+                Money.brl(new BigDecimal("25.00")),
+                false
+        ));
+        serviceOrderRepository.save(serviceOrder);
+
+        mockMvc.perform(post("/api/service-orders/{serviceOrderId}/estimates", serviceOrder.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"diagnosisId\":\"" + serviceOrder.openDiagnosisId() + "\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("STOCK_ITEM_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Stock item was not found"));
     }
 }

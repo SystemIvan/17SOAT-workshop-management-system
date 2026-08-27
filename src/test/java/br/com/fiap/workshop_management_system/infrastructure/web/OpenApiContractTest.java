@@ -150,6 +150,18 @@ class OpenApiContractTest {
     }
 
     @Test
+    void documentStartExecutionContract() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(
+                        "$.paths['/api/service-orders/{id}/executions/{executionId}/start'].post.responses['200']")
+                        .exists())
+                .andExpect(jsonPath(
+                        "$.paths['/api/service-orders/{id}/executions/{executionId}/start'].post.responses['409']")
+                        .exists());
+    }
+
+    @Test
     void documentServiceOrderStatusProjectionAliases() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())

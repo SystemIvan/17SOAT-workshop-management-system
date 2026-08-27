@@ -63,6 +63,38 @@ A feature `jwt-authentication` introduziu o quarto módulo Spring Modulith, reso
 - `docs/adr/ADR-003-authentication-strategy.md` foi promovida de `Proposed` para `Accepted`. Ver
   `docs/features/platform/jwt-authentication/` para a trilha SDD completa.
 
+## Atualização de implementação — 26 de agosto de 2026 (I)
+
+A feature `ci-coverage-quality-gate` tornou o build Maven a fonte única da política de cobertura e ativou o CI.
+
+- `./mvnw clean verify` executa a suíte completa, incluindo `ModuleStructureTest`, gera os relatórios JaCoCo e reprova
+  cobertura global de linhas abaixo de 80%.
+- `jacoco:check` aplica o limite no elemento `BUNDLE`; Maven Enforcer reprova uma execução que não produza
+  `target/site/jacoco/jacoco.xml`.
+- O workflow `CI` usa Temurin 21, Maven Wrapper, permissões somente de leitura e um check estável `Quality gate` em Pull
+  Requests e pushes para `dev` e `main`.
+- Relatórios Surefire/Failsafe e JaCoCo são publicados como artifacts por 30 dias, inclusive depois de falhas quando os
+  arquivos tiverem sido produzidos.
+- As actions oficiais são fixadas por SHA completo; o workflow não recebe secrets, não usa Maven global e não calcula
+  cobertura por parsing de relatório.
+
+## Atualização de implementação — 26 de agosto de 2026: RF30 (I)
+
+A feature `low-stock-detection` estende o módulo `stockprocurement` com reposição preventiva por item, sem criar um
+módulo Notifications, scheduler ou Purchase Order automática.
+
+- `LowStockPolicy` é um value object opcional de `StockItem`: aceita mínimo não negativo e alvo estritamente maior;
+  a condição é estrita (`availableQuantity < minimumQuantity`) e a sugestão é `targetQuantity - availableQuantity`.
+- `LowStockOccurrence` mantém um ciclo histórico por item, com no máximo uma ocorrência `OPEN`, demanda `LOW_STOCK`
+  imutavelmente vinculada e encerramentos explícitos para recuperação, desabilitação, desativação ou recebimento do
+  ciclo comprado.
+- A avaliação ocorre dentro das transações de configuração, cadastro e reserva. O listener de `StockItemsRestockedEvent`
+  roda depois do commit em uma nova transação, fechando o ciclo recebido antes de reavaliar o saldo.
+- As consultas de Stock Item somente calculam e expõem policy, status, ocorrência e sugestão; o filtro `lowStock` não
+  produz escrita. Os endpoints administrativos permanecem protegidos para `MANAGER` e `ADMIN`.
+- A notificação é um efeito consumer-owned, publicado apenas na abertura e consumido `AFTER_COMMIT` por adapter de log
+  sanitizado. Falhas de entrega não revertem estoque, demanda ou ocorrência.
+
 ## 1. Tech Challenge overview
 
 ### 1.1 Problema oficial (A)
@@ -369,7 +401,8 @@ módulos para Vehicle, Service Catalog, Estimate, Purchase Order, Notification o
 - Há testes unitários para Customer, Technician, Part, ServiceOrder e ServiceExecution, além do smoke test Spring
   e do teste de fronteiras do Modulith.
 - Não foram encontrados testes próprios de use case, controller ou persistência.
-- JaCoCo não está configurado no `pom.xml`; o workflow de CI e seu check de cobertura estão totalmente comentados.
+- Na baseline de 10 de agosto, JaCoCo ainda não estava configurado e o workflow de CI permanecia comentado. O estado
+  vigente está descrito na atualização de implementação de 26 de agosto de 2026.
 - Spring Security/JWT, Swagger/OpenAPI, Actuator e cache não aparecem nas dependências atuais.
 
 ### Documentação e configuração atuais (I)
@@ -444,7 +477,7 @@ sujeitos às decisões dos respectivos responsáveis/time; este documento não c
 | Supplier integration | Ausente | Adapter futuro seria infrastructure | Gateway + ACL | Ampliação do grupo ainda não implementada |
 | JWT/autorização | Ausente | Preocupação transversal/infrastructure ainda não descrita | ADR aceita Spring Security + JWT | Requisito oficial não implementado |
 | API docs | REST controllers sem OpenAPI | DTOs/controllers por módulo | C4 mostra REST API | Swagger obrigatório não implementado |
-| Testes | Domain tests, smoke e boundary test | Mesmo espelhamento; use case/controller ainda pendentes | DoD pede unit/integration | Cobertura/integração insuficientes para o requisito |
+| Testes | Suíte unitária/de integração, fronteiras Modulith e quality gate Maven de 80% | Testes por camada e contexto | DoD pede unit/integration | Cobertura automatizada; rastreabilidade por requisito segue evoluindo |
 | Database | MySQL/JPA, H2 em testes, `ddl-auto=update` | MySQL 8 | ADR MySQL aceita | Banco alinhado; migrations/schema ainda ausentes |
 | Containers | Dockerfile + Compose | Parte da estrutura relevante | C4 mostra app + MySQL | Artefatos presentes; documentação tem referências inválidas |
 | Métrica de tempo médio | Ausente | Não definida | Apenas Performance Analytics genérico | Requisito oficial não identificado/implementado |
@@ -467,9 +500,11 @@ sujeitos às decisões dos respectivos responsáveis/time; este documento não c
 
 ### 6.2 Reposição de estoque (B)
 
-Indisponibilidade ou nível baixo dispara criação de Purchase Order. A integração com o fornecedor fica atrás de
-Gateway + Anti-Corruption Layer. Após fechamento/recebimento, Stock registra os itens, reavalia demandas pendentes,
-reserva material e publica o evento que libera as execuções.
+Indisponibilidade ou nível baixo pode originar uma Purchase Demand, que o Stock Manager usa para criar uma Purchase
+Order; não existe compra automática. A integração com o fornecedor fica atrás de Gateway + Anti-Corruption Layer.
+RF28 fecha integralmente uma ordem `OPEN` e registra a auditoria sem modificar saldo. RF29 cria o aggregate imutável
+`StockReceipt`, registra uma entrada por linha e publica `StockItemsRestockedEvent`; Service Lifecycle consome o evento
+depois do commit para reavaliar reservas em `AWAITING_ITEMS`, sem acoplamento inverso com Stock & Procurement.
 
 ### 6.3 Reparo adicional (B)
 
@@ -632,7 +667,7 @@ situação de implementação.
 | Justificar banco de dados | **ADR-001: Escolha do Banco de Dados (MySQL)** | Covered | ADR aceita |
 | RESTful API documentada por Swagger | C4 mostra REST API | Partially covered | Swagger/OpenAPI não foi identificado |
 | Dockerfile e docker-compose | C4 Level 2 + arquivos existentes no repositório | Covered | Verificação funcional pertence à etapa de implementação |
-| Cobertura mínima de 80% | Requisito oficial e DoD de testes | Partially covered | Política/ferramenta de enforcement não está ativa/consolidada |
+| Cobertura mínima de 80% | Requisito oficial e DoD de testes | Covered | `jacoco:check` e Maven Enforcer aplicam o gate em `verify`; o workflow `CI` executa o mesmo comando |
 | Execução local simples/README | `README.md`, `DOCKER.md` e containers | Partially covered | README atual ainda não é completo |
 | Event Storming dos fluxos obrigatórios | **Ordenação**, **Hotspots**, **Pivotal Events, Actors, Commands and Policies** | Covered | Fluxos de SO e Stock estão representados com alternativas |
 | Diagramas DDD e Ubiquitous Language | **Aggregates and Bounded Contexts**, **Context Map**, **3. Ubiquitous Language** | Covered | Existem divergências de versão registradas abaixo |
@@ -672,7 +707,8 @@ situação de implementação.
   pretendida, apesar de possuírem fronteiras no Miro.
 - O módulo `parts` modela Part individual, conforme `PROJECT-STRUCTURE.md`, enquanto o Miro define Stock como
   aggregate contendo StockItem`s e separa PurchaseOrder.
-- Spring Security/JWT, Swagger/OpenAPI e enforcement de cobertura não aparecem no `pom.xml` atual.
+- O enforcement de cobertura está configurado no `pom.xml`; seu estado vigente está descrito na atualização de
+  implementação de 26 de agosto de 2026.
 - A estratégia Hibernate `ddl-auto=update` existe, mas migrations versionadas não foram identificadas.
 
 Essas observações não autorizam refatoração automática. Como `PROJECT-STRUCTURE.md` é autoritativo para a direção
