@@ -35,7 +35,7 @@
 		<jjwt.version>0.12.6</jjwt.version>
 		<dependency-check.version>13.0.0</dependency-check.version>
 		<!-- Overrides the version managed by spring-boot-starter-parent 4.1.0 (11.0.22), which is
-		     affected by 8 critical and 5 high CVEs. 11.0.25 is the lowest release that clears all of
+		     affected by 8 critical and 6 high CVEs. 11.0.25 is the lowest release that clears all of
 		     them; Spring Boot 4.1.1 only reaches 11.0.24, so upgrading the parent is not enough.
 		     See docs/security/vulnerability-report.md. -->
 		<tomcat.version>11.0.25</tomcat.version>
