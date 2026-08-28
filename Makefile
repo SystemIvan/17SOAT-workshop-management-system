@@ -6,7 +6,8 @@ endif
 COMPOSE := docker compose
 
 .PHONY: help test coverage verify compile build clean run run-dev \
-	docker-build docker-up docker-up-interactive docker-down docker-reset docker-logs docker-ps db-shell e2e
+	docker-build docker-up docker-up-interactive docker-down docker-reset docker-logs docker-ps db-shell e2e \
+	sca
 
 help:
 	@echo "Workshop Management System"
@@ -28,12 +29,22 @@ help:
 	@echo "  make docker-logs   Follow application logs"
 	@echo "  make db-shell      Open the MySQL client"
 	@echo ""
+	@echo "Security:"
+	@echo "  make sca           Run OWASP Dependency-Check over every declared dependency"
+	@echo "                     (export NVD_API_KEY first; the raw report lands in"
+	@echo "                     target/dependency-check/ and is never committed)"
+	@echo ""
 	@echo "E2E:"
 	@echo "  make e2e           Run the Postman collection as an E2E smoke suite via Newman"
 	@echo "                     (requires the app reachable, e.g. after make docker-up; override with BASE_URL=...)"
 
 test:
 	$(MVNW) test
+
+# Deliberately not bound to a Maven lifecycle phase, so `make verify` keeps its current cost.
+# skipTestScope=false includes test-scope dependencies, as required by the challenge baseline.
+sca:
+	$(MVNW) org.owasp:dependency-check-maven:check -DskipTestScope=false -Dnvd.api.key=$(NVD_API_KEY)
 
 coverage:
 	$(MVNW) clean verify
