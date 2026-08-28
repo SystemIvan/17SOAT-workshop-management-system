@@ -127,10 +127,10 @@ class ServiceOrderTest {
         ServiceOrder serviceOrder = newServiceOrder();
         UUID executionId = diagnoseWithOneExecution(serviceOrder);
 
-        assertThrows(IllegalStateException.class, () -> serviceOrder.startExecution(executionId));
+        assertThrows(IllegalStateException.class, () -> serviceOrder.startExecution(executionId, java.time.Instant.now()));
 
         authorizeExecution(serviceOrder, executionId);
-        serviceOrder.startExecution(executionId);
+        serviceOrder.startExecution(executionId, java.time.Instant.now());
 
         assertEquals(ServiceExecutionStatus.IN_PROGRESS, serviceOrder.serviceExecutions().get(0).status());
         assertEquals(ServiceOrderStatus.IN_PROGRESS, serviceOrder.status());
@@ -144,7 +144,7 @@ class ServiceOrderTest {
 
         assertThrows(IllegalStateException.class, () -> serviceOrder.updateExecutionProgress(executionId, "iniciando"));
 
-        serviceOrder.startExecution(executionId);
+        serviceOrder.startExecution(executionId, java.time.Instant.now());
         serviceOrder.updateExecutionProgress(executionId, "50% concluído");
     }
 
@@ -153,9 +153,9 @@ class ServiceOrderTest {
         ServiceOrder serviceOrder = newServiceOrder();
         UUID executionId = diagnoseWithOneExecution(serviceOrder);
         authorizeExecution(serviceOrder, executionId);
-        serviceOrder.startExecution(executionId);
+        serviceOrder.startExecution(executionId, java.time.Instant.now());
 
-        serviceOrder.completeExecution(executionId);
+        serviceOrder.completeExecution(executionId, java.time.Instant.now());
 
         assertEquals(ServiceExecutionStatus.COMPLETED, serviceOrder.serviceExecutions().get(0).status());
         assertEquals(ServiceOrderStatus.COMPLETED, serviceOrder.status());
@@ -174,8 +174,8 @@ class ServiceOrderTest {
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), approvedExecutionId);
         serviceOrder.rejectExecutionFromEstimate(UUID.randomUUID(), rejectedExecutionId);
         serviceOrder.confirmTechnicianAssignment(approvedExecutionId, UUID.randomUUID());
-        serviceOrder.startExecution(approvedExecutionId);
-        serviceOrder.completeExecution(approvedExecutionId);
+        serviceOrder.startExecution(approvedExecutionId, java.time.Instant.now());
+        serviceOrder.completeExecution(approvedExecutionId, java.time.Instant.now());
 
         assertEquals(ServiceOrderStatus.COMPLETED, serviceOrder.status());
     }
@@ -203,8 +203,8 @@ class ServiceOrderTest {
         assertThrows(IllegalStateException.class, () -> serviceOrder.finalize(true));
 
         authorizeExecution(serviceOrder, executionId);
-        serviceOrder.startExecution(executionId);
-        serviceOrder.completeExecution(executionId);
+        serviceOrder.startExecution(executionId, java.time.Instant.now());
+        serviceOrder.completeExecution(executionId, java.time.Instant.now());
 
         assertThrows(IllegalStateException.class, () -> serviceOrder.finalize(false));
 
@@ -218,8 +218,8 @@ class ServiceOrderTest {
         ServiceOrder serviceOrder = newServiceOrder();
         UUID executionId = diagnoseWithOneExecution(serviceOrder);
         authorizeExecution(serviceOrder, executionId);
-        serviceOrder.startExecution(executionId);
-        serviceOrder.completeExecution(executionId);
+        serviceOrder.startExecution(executionId, java.time.Instant.now());
+        serviceOrder.completeExecution(executionId, java.time.Instant.now());
         serviceOrder.finalize(true);
 
         serviceOrder.markEstimateSentWithPendingLines();
@@ -251,8 +251,8 @@ class ServiceOrderTest {
         ServiceOrder serviceOrder = newServiceOrder();
         UUID executionId = diagnoseWithOneExecution(serviceOrder);
         authorizeExecution(serviceOrder, executionId);
-        serviceOrder.startExecution(executionId);
-        serviceOrder.completeExecution(executionId);
+        serviceOrder.startExecution(executionId, java.time.Instant.now());
+        serviceOrder.completeExecution(executionId, java.time.Instant.now());
 
         assertThrows(IllegalStateException.class, () -> serviceOrder.definePriority(Priority.URGENT));
     }
@@ -262,8 +262,8 @@ class ServiceOrderTest {
         ServiceOrder serviceOrder = newServiceOrder();
         UUID executionId = diagnoseWithOneExecution(serviceOrder);
         authorizeExecution(serviceOrder, executionId);
-        serviceOrder.startExecution(executionId);
-        serviceOrder.completeExecution(executionId);
+        serviceOrder.startExecution(executionId, java.time.Instant.now());
+        serviceOrder.completeExecution(executionId, java.time.Instant.now());
         serviceOrder.finalize(true);
 
         assertThrows(IllegalStateException.class, () -> serviceOrder.definePriority(Priority.URGENT));
@@ -322,7 +322,7 @@ class ServiceOrderTest {
         ServiceOrder serviceOrder = newServiceOrder();
         UUID firstExecutionId = diagnoseWithOneExecution(serviceOrder);
         authorizeExecution(serviceOrder, firstExecutionId);
-        serviceOrder.startExecution(firstExecutionId);
+        serviceOrder.startExecution(firstExecutionId, java.time.Instant.now());
         assertEquals(ServiceExecutionStatus.IN_PROGRESS, serviceOrder.serviceExecutions().get(0).status());
         assertNull(serviceOrder.openDiagnosisId());
 

@@ -12,6 +12,8 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
         .ServiceOrderVehicleNotFoundException;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.InvalidServiceOrderException;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model
+        .InvalidExecutionTimePeriodException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -26,6 +28,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  */
 @RestControllerAdvice(basePackages = "br.com.fiap.workshop_management_system.servicelifecycle")
 class ServiceLifecycleExceptionHandler {
+
+    @ExceptionHandler(InvalidExecutionTimePeriodException.class)
+    ResponseEntity<ErrorResponse> handleInvalidExecutionTimePeriod(InvalidExecutionTimePeriodException exception) {
+        return ResponseEntity.badRequest()
+                .body(new ErrorResponse("INVALID_EXECUTION_TIME_PERIOD", exception.getMessage()));
+    }
 
     @ExceptionHandler(CatalogServiceNotFoundForNewWorkException.class)
     ResponseEntity<ErrorResponse> handleCatalogServiceNotFound(CatalogServiceNotFoundForNewWorkException ex) {

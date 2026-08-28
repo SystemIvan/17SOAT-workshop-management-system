@@ -66,6 +66,7 @@ class OpenApiContractTest {
                 .andExpect(jsonPath("$.paths['/api/parts']").doesNotExist())
                 .andExpect(jsonPath("$.paths['/api/service-orders'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/service-orders/metrics/average-execution-time'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/status'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/service-orders/{id}/diagnosis'].post").exists())
@@ -159,6 +160,29 @@ class OpenApiContractTest {
                 .andExpect(jsonPath(
                         "$.paths['/api/service-orders/{id}/executions/{executionId}/start'].post.responses['409']")
                         .exists());
+    }
+
+    @Test
+    void documentAverageServiceExecutionTimeContractInHours() throws Exception {
+        String operation = "$.paths['/api/service-orders/metrics/average-execution-time'].get";
+
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(operation + ".responses['200']").exists())
+                .andExpect(jsonPath(operation + ".responses['400']").exists())
+                .andExpect(jsonPath(operation + ".responses['401']").exists())
+                .andExpect(jsonPath(operation + ".responses['403']").exists())
+                .andExpect(jsonPath(operation + ".parameters[?(@.name == 'from')].required").value(true))
+                .andExpect(jsonPath(operation + ".parameters[?(@.name == 'to')].required").value(true))
+                .andExpect(jsonPath("$.components.schemas.AverageServiceExecutionTimeResponse.properties.unit.enum",
+                        hasItem("HOURS")))
+                .andExpect(jsonPath(
+                        "$.components.schemas.ExecutionTimeAverageResponse.properties.averageHours").exists())
+                .andExpect(jsonPath(
+                        "$.components.schemas.ExecutionTimeAverageResponse.properties.averageSeconds").doesNotExist())
+                .andExpect(jsonPath(
+                        "$.components.schemas.ExecutionTimeAverageResponse.properties.averageMilliseconds")
+                        .doesNotExist());
     }
 
     @Test

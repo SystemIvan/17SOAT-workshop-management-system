@@ -160,6 +160,32 @@ class SecurityAuthorizationTest {
     }
 
     @Test
+    void averageExecutionTimeMetricAllowsOnlyManagerAndAdmin() throws Exception {
+        String endpoint = "/api/service-orders/metrics/average-execution-time";
+
+        mockMvc.perform(get(endpoint)
+                        .param("from", "2026-08-01T00:00:00Z")
+                        .param("to", "2026-09-01T00:00:00Z"))
+                .andExpect(status().isUnauthorized());
+
+        for (Role role : new Role[]{Role.CUSTOMER, Role.TECHNICIAN}) {
+            mockMvc.perform(get(endpoint)
+                            .header("Authorization", "Bearer " + tokenFor(role, UUID.randomUUID()))
+                            .param("from", "2026-08-01T00:00:00Z")
+                            .param("to", "2026-09-01T00:00:00Z"))
+                    .andExpect(status().isForbidden());
+        }
+
+        for (Role role : new Role[]{Role.MANAGER, Role.ADMIN}) {
+            mockMvc.perform(get(endpoint)
+                            .header("Authorization", "Bearer " + tokenFor(role, null))
+                            .param("from", "2026-08-01T00:00:00Z")
+                            .param("to", "2026-09-01T00:00:00Z"))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test
     void estimateGenerationRejectsTechnicianRole() throws Exception {
         String token = tokenFor(Role.TECHNICIAN, UUID.randomUUID());
 

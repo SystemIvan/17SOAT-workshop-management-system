@@ -62,6 +62,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/service-orders/*/estimates")
                         .hasAnyAuthority("MANAGER", "ADMIN")
 
+                        .requestMatchers(HttpMethod.GET, "/api/service-orders/metrics/average-execution-time")
+                        .hasAnyAuthority("MANAGER", "ADMIN")
+
                         .requestMatchers(HttpMethod.POST, "/api/estimates/*/decisions")
                         .hasAnyAuthority("CUSTOMER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/estimates/**")

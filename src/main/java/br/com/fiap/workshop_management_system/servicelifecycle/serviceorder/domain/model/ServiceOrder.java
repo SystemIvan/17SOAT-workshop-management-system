@@ -212,8 +212,8 @@ public class ServiceOrder {
     /**
      * RF20 - iniciar execução de um serviço.
      */
-    public void startExecution(UUID serviceExecutionId) {
-        findExecution(serviceExecutionId).start();
+    public void startExecution(UUID serviceExecutionId, Instant startedAt) {
+        findExecution(serviceExecutionId).start(startedAt);
         recomputeStatusSnapshot(false);
     }
 
@@ -227,8 +227,8 @@ public class ServiceOrder {
     /**
      * RF22 - concluir execução de um serviço.
      */
-    public void completeExecution(UUID serviceExecutionId) {
-        findExecution(serviceExecutionId).complete();
+    public void completeExecution(UUID serviceExecutionId, Instant completedAt) {
+        findExecution(serviceExecutionId).complete(completedAt);
         recomputeStatusSnapshot(false);
     }
 
