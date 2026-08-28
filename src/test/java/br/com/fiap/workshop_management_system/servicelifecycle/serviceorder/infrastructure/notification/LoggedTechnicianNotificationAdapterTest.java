@@ -50,4 +50,23 @@ class LoggedTechnicianNotificationAdapterTest {
         assertTrue(message.contains(serviceOrderId.toString()));
         assertTrue(message.contains(technicianId.toString()));
     }
+
+    @Test
+    void logsAnInfoLineWithMaterialsReservedDetails() {
+        UUID serviceOrderId = UUID.randomUUID();
+        UUID serviceExecutionId = UUID.randomUUID();
+        UUID technicianId = UUID.randomUUID();
+        UUID stockReservationId = UUID.randomUUID();
+
+        adapter.notifyMaterialsReserved(serviceOrderId, serviceExecutionId, technicianId, stockReservationId);
+
+        assertEquals(1, appender.list.size());
+        ILoggingEvent event = appender.list.get(0);
+        assertEquals(Level.INFO, event.getLevel());
+        String message = event.getFormattedMessage();
+        assertTrue(message.contains(serviceOrderId.toString()));
+        assertTrue(message.contains(serviceExecutionId.toString()));
+        assertTrue(message.contains(technicianId.toString()));
+        assertTrue(message.contains(stockReservationId.toString()));
+    }
 }
