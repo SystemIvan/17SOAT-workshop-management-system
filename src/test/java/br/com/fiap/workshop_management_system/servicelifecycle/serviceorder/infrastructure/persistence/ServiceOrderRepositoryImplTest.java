@@ -17,6 +17,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -38,6 +39,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @SpringBootTest
 class ServiceOrderRepositoryImplTest {
+
+    private static final Instant STARTED_AT = Instant.parse("2026-08-28T14:00:00.123456Z");
+    private static final Instant COMPLETED_AT = Instant.parse("2026-08-28T15:30:00.654321Z");
 
     @Autowired
     private ServiceOrderRepository repository;
@@ -78,6 +82,37 @@ class ServiceOrderRepositoryImplTest {
             assertEquals(technicianId, execution.assignedTechnicianId());
             assertEquals(diagnosedByTechnicianId, execution.diagnosedByTechnicianId());
             assertEquals(diagnosedAt, execution.diagnosedAt());
+        });
+    }
+
+    @Test
+    void persistsAndReloadsExecutionTransitionTimestamps() {
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+
+        UUID serviceOrderId = transactionTemplate.execute(status -> {
+            ServiceOrder serviceOrder = ServiceOrder.create(
+                    UUID.randomUUID(), UUID.randomUUID(),
+                    new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015), "Initial assessment");
+            serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
+            DiagnosisItem item = new DiagnosisItem(
+                    UUID.randomUUID(), "Troca de óleo", Money.brl(BigDecimal.TEN), List.of());
+            serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), Instant.EPOCH);
+            UUID executionId = serviceOrder.serviceExecutions().getFirst().id();
+            serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+            serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
+            serviceOrder.startExecution(executionId, STARTED_AT);
+            serviceOrder.completeExecution(executionId, COMPLETED_AT);
+
+            repository.save(serviceOrder);
+            entityManager.flush();
+            entityManager.clear();
+            return serviceOrder.id();
+        });
+
+        transactionTemplate.executeWithoutResult(status -> {
+            var execution = repository.findById(serviceOrderId).orElseThrow().serviceExecutions().getFirst();
+            assertEquals(STARTED_AT, execution.startedAt());
+            assertEquals(COMPLETED_AT, execution.completedAt());
         });
     }
 

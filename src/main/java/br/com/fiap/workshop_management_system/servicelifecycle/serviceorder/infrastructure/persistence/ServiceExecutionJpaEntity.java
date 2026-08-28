@@ -53,6 +53,8 @@ public class ServiceExecutionJpaEntity {
     private Instant diagnosedAt;
     private boolean stockRequirementsFrozen;
     private UUID stockReservationId;
+    private Instant startedAt;
+    private Instant completedAt;
 
     @ElementCollection
     @CollectionTable(name = "service_execution_stock_requirements", joinColumns = @JoinColumn(name = "service_execution_id"))
@@ -78,6 +80,8 @@ public class ServiceExecutionJpaEntity {
             UUID assignedTechnicianId,
             UUID diagnosedByTechnicianId,
             Instant diagnosedAt,
+            Instant startedAt,
+            Instant completedAt,
             boolean stockRequirementsFrozen,
             UUID stockReservationId,
             List<StockRequirementEmbeddable> stockRequirements,
@@ -94,6 +98,8 @@ public class ServiceExecutionJpaEntity {
         this.assignedTechnicianId = assignedTechnicianId;
         this.diagnosedByTechnicianId = diagnosedByTechnicianId;
         this.diagnosedAt = diagnosedAt;
+        this.startedAt = startedAt;
+        this.completedAt = completedAt;
         this.stockRequirementsFrozen = stockRequirementsFrozen;
         this.stockReservationId = stockReservationId;
         this.stockRequirements = stockRequirements;
@@ -154,6 +160,14 @@ public class ServiceExecutionJpaEntity {
 
     public UUID getStockReservationId() {
         return stockReservationId;
+    }
+
+    public Instant getStartedAt() {
+        return startedAt;
+    }
+
+    public Instant getCompletedAt() {
+        return completedAt;
     }
 
     public List<StockRequirementEmbeddable> getStockRequirements() {

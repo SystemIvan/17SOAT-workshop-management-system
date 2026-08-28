@@ -3,13 +3,18 @@ package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.dom
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ServiceExecutionTest {
+
+    private static final Instant STARTED_AT = Instant.parse("2026-08-28T10:00:00Z");
+    private static final Instant COMPLETED_AT = Instant.parse("2026-08-28T11:30:00Z");
 
     private ServiceOrder serviceOrderWithOneExecution() {
         ServiceOrder serviceOrder = ServiceOrder.create(
@@ -45,7 +50,7 @@ class ServiceExecutionTest {
 
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
         assertEquals(ServiceExecutionStatus.AWAITING_ITEMS, serviceOrder.serviceExecutions().get(0).status());
-        assertThrows(IllegalStateException.class, () -> serviceOrder.startExecution(executionId));
+        assertThrows(IllegalStateException.class, () -> serviceOrder.startExecution(executionId, java.time.Instant.now()));
 
         UUID reservationId = UUID.randomUUID();
         serviceOrder.confirmStockReservation(executionId, reservationId);
@@ -53,7 +58,7 @@ class ServiceExecutionTest {
         assertEquals(ServiceExecutionStatus.READY, serviceOrder.serviceExecutions().get(0).status());
         assertEquals(reservationId, serviceOrder.serviceExecutions().get(0).stockReservationId());
         serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
-        serviceOrder.startExecution(executionId);
+        serviceOrder.startExecution(executionId, java.time.Instant.now());
         assertEquals(ServiceExecutionStatus.IN_PROGRESS, serviceOrder.serviceExecutions().get(0).status());
     }
 
@@ -63,7 +68,7 @@ class ServiceExecutionTest {
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
 
-        assertThrows(IllegalStateException.class, () -> serviceOrder.completeExecution(executionId));
+        assertThrows(IllegalStateException.class, () -> serviceOrder.completeExecution(executionId, java.time.Instant.now()));
     }
 
     @Test
@@ -72,9 +77,92 @@ class ServiceExecutionTest {
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
 
-        assertThrows(IllegalStateException.class, () -> serviceOrder.startExecution(executionId));
+        assertThrows(IllegalStateException.class, () -> serviceOrder.startExecution(executionId, java.time.Instant.now()));
 
         assertEquals(ServiceExecutionStatus.READY, serviceOrder.serviceExecutions().get(0).status());
+    }
+
+    @Test
+    void recordsImmutableStartAndCompletionInstantsFromStatusTransitions() {
+        ServiceOrder serviceOrder = serviceOrderWithOneExecution();
+        UUID executionId = serviceOrder.serviceExecutions().getFirst().id();
+        serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+        serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
+
+        serviceOrder.startExecution(executionId, STARTED_AT);
+        serviceOrder.completeExecution(executionId, COMPLETED_AT);
+
+        ServiceExecution execution = serviceOrder.serviceExecutions().getFirst();
+        assertEquals(STARTED_AT, execution.startedAt());
+        assertEquals(COMPLETED_AT, execution.completedAt());
+    }
+
+    @Test
+    void acceptsZeroExecutionDuration() {
+        ServiceOrder serviceOrder = serviceOrderWithOneExecution();
+        UUID executionId = serviceOrder.serviceExecutions().getFirst().id();
+        serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+        serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
+        serviceOrder.startExecution(executionId, STARTED_AT);
+
+        serviceOrder.completeExecution(executionId, STARTED_AT);
+
+        assertEquals(STARTED_AT, serviceOrder.serviceExecutions().getFirst().completedAt());
+    }
+
+    @Test
+    void rejectsCompletionBeforeStartWithoutChangingTheExecution() {
+        ServiceOrder serviceOrder = serviceOrderWithOneExecution();
+        UUID executionId = serviceOrder.serviceExecutions().getFirst().id();
+        serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+        serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
+        serviceOrder.startExecution(executionId, STARTED_AT);
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> serviceOrder.completeExecution(executionId, STARTED_AT.minusSeconds(1)));
+
+        ServiceExecution execution = serviceOrder.serviceExecutions().getFirst();
+        assertEquals(ServiceExecutionStatus.IN_PROGRESS, execution.status());
+        assertNull(execution.completedAt());
+    }
+
+    @Test
+    void legacyReconstitutionKeepsExecutionTimestampsAbsent() {
+        ServiceExecution execution = ServiceExecution.reconstitute(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "Troca de óleo",
+                Money.brl(BigDecimal.TEN),
+                ServiceExecutionStatus.COMPLETED,
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                List.of());
+
+        assertNull(execution.startedAt());
+        assertNull(execution.completedAt());
+    }
+
+    @Test
+    void rejectsReconstitutionWithCompletionButNoStartTimestamp() {
+        assertThrows(IllegalArgumentException.class, () -> ServiceExecution.reconstitute(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "Troca de óleo",
+                Money.brl(BigDecimal.TEN),
+                ServiceExecutionStatus.COMPLETED,
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                Instant.EPOCH,
+                null,
+                COMPLETED_AT,
+                false,
+                null,
+                List.of(),
+                List.of()));
     }
 
     @Test
@@ -83,7 +171,7 @@ class ServiceExecutionTest {
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
         serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
-        serviceOrder.startExecution(executionId);
+        serviceOrder.startExecution(executionId, java.time.Instant.now());
 
         serviceOrder.updateExecutionProgress(executionId, "Peça trocada, aguardando teste");
 
@@ -120,8 +208,8 @@ class ServiceExecutionTest {
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
         serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
-        serviceOrder.startExecution(executionId);
-        serviceOrder.completeExecution(executionId);
+        serviceOrder.startExecution(executionId, java.time.Instant.now());
+        serviceOrder.completeExecution(executionId, java.time.Instant.now());
 
         assertThrows(IllegalStateException.class,
                 () -> serviceOrder.attachStockRequirement(executionId, newStockRequirement()));
@@ -164,7 +252,7 @@ class ServiceExecutionTest {
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
         serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
         serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
-        serviceOrder.startExecution(executionId);
+        serviceOrder.startExecution(executionId, java.time.Instant.now());
 
         assertThrows(IllegalStateException.class,
                 () -> serviceOrder.attachStockRequirement(executionId, newStockRequirement()));

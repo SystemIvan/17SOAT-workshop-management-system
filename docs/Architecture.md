@@ -95,6 +95,23 @@ módulo Notifications, scheduler ou Purchase Order automática.
 - A notificação é um efeito consumer-owned, publicado apenas na abertura e consumido `AFTER_COMMIT` por adapter de log
   sanitizado. Falhas de entrega não revertem estoque, demanda ou ocorrência.
 
+## Atualização de implementação — 28 de agosto de 2026: tempo médio de execução (I)
+
+A feature `average-service-execution-time` implementa a decisão AD-019 ratificada na ADR-006 dentro de
+`servicelifecycle.serviceorder`, sem criar um bounded context de Analytics.
+
+- `ServiceExecution` registra `startedAt` e `completedAt` em UTC nas mudanças para `IN_PROGRESS` e `COMPLETED`; o MVP
+  não modela pausas, retomadas nem ajustes retroativos.
+- A migration `V20260828150535__add_service_execution_timestamps.sql` adiciona colunas `TIMESTAMP(6)` anuláveis,
+  constraint de ordem temporal e índice para a consulta. Registros legados permanecem sem timestamps e não recebem
+  backfill; a classificação é **no seed required**.
+- Uma porta de leitura dedicada agrega no banco as execuções concluídas, globalmente e por `catalogServiceId`, usando
+  `completedAt` em um intervalo inclusivo/exclusivo e sem materializar agregados `ServiceOrder`.
+- `GET /api/service-orders/metrics/average-execution-time` é restrito a `MANAGER` e `ADMIN`. O contrato retorna
+  quantidade de amostras e média exclusivamente em horas, com duas casas decimais e média nula quando não há amostras.
+- Domínio, casos de uso, persistência, migration, endpoint, autorização e OpenAPI possuem cobertura automatizada; o
+  roteiro Postman executa a consulta imediatamente depois da conclusão de uma execução.
+
 ## 1. Tech Challenge overview
 
 ### 1.1 Problema oficial (A)
@@ -630,6 +647,7 @@ Relações relevantes expostas pelos diagramas:
 | IDs e snapshots entre aggregates | Definida | Evitar acoplamento e preservar histórico |
 | Domain events entre contexts | Definida em nível conceitual | Consistência eventual sem transação distribuída |
 | Spring Security + JWT | Aceita | Atender ao requisito com menor complexidade no MVP |
+| Tempo médio por `ServiceExecution` (`startedAt` → `completedAt`) | Aceita/implementada (AD-019, ADR-006) | Medir tempo transcorrido das execuções concluídas, sob demanda e exclusivamente em horas |
 | Decisão de Estimate por linha | Refinamento mais recente | Permitir aprovação parcial sem recriar execuções |
 | `statusSnapshot` atualizado em comandos (AD-010) | Implementado e presente no refinamento recente; ratificação do time pendente | Preservar comportamento atual sem declarar a alternativa compartilhada resolvida |
 | `TaxId` imutável no Customer (AD-002) | Aceita por Ivan; não implementada | Centralizar a validação de CPF/CNPJ como invariante do domínio |
@@ -659,7 +677,7 @@ situação de implementação.
 | CRUD de Service Catalog | ServiceCatalog, RF07–RF08; AD-004/AD-005 | Partially covered | Cadastro/preço e desativação estão definidos; list/detail e contratos REST seguem incompletos |
 | CRUD de peças/insumos e estoque | Stock/StockItem, RF25–RF30 | Partially covered | O modelo foca operação de estoque, não explicita todo o CRUD administrativo |
 | Listar/detalhar Service Orders | C4/API e read models do Event Storming | Covered | RF34 implementado: `GET /api/service-orders` (filtros `status`/`customerId`/`technicianId`/`priority`, combináveis com AND) e `GET /api/service-orders/{id}`; ver `docs/features/servicelifecycle/list-service-orders/` |
-| Tempo médio de execução | Performance Analytics como generic subdomain | Not identified | Não há evento temporal, métrica, consulta ou modelo definido |
+| Tempo médio de execução | AD-019, ADR-006 e `average-service-execution-time` | Covered | Timestamps das transições, agregação global/por catálogo e endpoint administrativo apresentam a média em horas |
 | JWT nas APIs administrativas | ADR 002 | Covered | Implementação/autorização ainda deve seguir a matriz final de papéis |
 | Validar CPF/CNPJ e placa | TaxId e LicensePlate VOs | Covered | Regras foram descritas no DDD tático |
 | Testes unitários e de integração | DoD + estratégia do repositório | Partially covered | Não há matriz de fluxos/cobertura por requisito no Miro |
@@ -726,7 +744,6 @@ AD-001: mapear os conceitos do Miro para os módulos definidos ou atualizar form
 - Garantias do event bus: transação, outbox, idempotência, retry, ordenação e observabilidade.
 - Scheduler/mensageria para expiração de Estimate.
 - Regra de preço total, descontos, impostos e eventual pagamento/faturamento.
-- Cálculo e exposição do tempo médio de execução.
 - Canal real ou simulado de Notification.
 - Contrato e resiliência da integração com fornecedor.
 - Escopo e ferramenta do vulnerability scan.

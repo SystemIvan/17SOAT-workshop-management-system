@@ -33,6 +33,8 @@
     { "key": "purchaseOrderIdempotencyKey", "value": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" },
     { "key": "purchaseOrderFlowIdempotencyKey", "value": "" },
     { "key": "lowStockPurchaseOrderIdempotencyKey", "value": "" },
+    { "key": "metricFrom", "value": "" },
+    { "key": "metricTo", "value": "" },
     { "key": "authToken", "value": "" }
   ],
   "item": [
@@ -1424,6 +1426,60 @@
             "method": "POST",
             "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/complete"
           }
+        },
+        {
+          "name": "Get average execution time",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const now = Date.now();",
+                  "pm.collectionVariables.set('metricFrom', new Date(now - 86400000).toISOString());",
+                  "pm.collectionVariables.set('metricTo', new Date(now + 86400000).toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Metric is presented only in hours', function () {",
+                  "    pm.expect(body.unit).to.eql('HOURS');",
+                  "    pm.expect(body.global).to.have.property('averageHours');",
+                  "    pm.expect(body.global).to.not.have.property('averageSeconds');",
+                  "    pm.expect(body.global).to.not.have.property('averageMilliseconds');",
+                  "});",
+                  "pm.test('Completed execution contributes to global and catalog averages', function () {",
+                  "    pm.expect(body.global.sampleCount).to.be.at.least(1);",
+                  "    pm.expect(body.global.averageHours).to.be.a('number');",
+                  "    const group = body.byCatalogService.find((item) => item.catalogServiceId === pm.variables.get('catalogServiceId'));",
+                  "    pm.expect(group).to.not.be.undefined;",
+                  "    pm.expect(group.sampleCount).to.be.at.least(1);",
+                  "    pm.expect(group.averageHours).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/service-orders/metrics/average-execution-time?from={{metricFrom}}&to={{metricTo}}",
+            "description": "Consulta administrativa para MANAGER ou ADMIN. O pre-request cobre as últimas e próximas 24 horas, incluindo a execução recém-concluída. O período filtra completedAt com from inclusivo e to exclusivo; todas as médias públicas usam HOURS."
+          },
+          "response": [
+            {
+              "name": "Average execution time in hours",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "cookie": [],
+              "body": "{\n  \"completedFromInclusive\": \"2026-08-27T12:00:00Z\",\n  \"completedToExclusive\": \"2026-08-29T12:00:00Z\",\n  \"unit\": \"HOURS\",\n  \"global\": {\n    \"sampleCount\": 1,\n    \"averageHours\": 1.50\n  },\n  \"byCatalogService\": [\n    {\n      \"catalogServiceId\": \"77777777-7777-7777-7777-777777777777\",\n      \"sampleCount\": 1,\n      \"averageHours\": 1.50\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Finalize service order",

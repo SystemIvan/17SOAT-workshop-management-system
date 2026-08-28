@@ -117,6 +117,7 @@ apenas a origem, sem `/api`: para a execução local, use `http://localhost:8080
 | `purchaseOrderFlowIdempotencyKey` | É gerada pela collection ao executar `Create Purchase Order from demand`; o `Retry same Purchase Order` reutiliza-a automaticamente. |
 | `customerTaxId` | Informe o CPF/CNPJ sem formatação usado para o Customer; é utilizado somente por `Identify customer by CPF/CNPJ`. |
 | `catalogServiceId` | Preenchida automaticamente por `Registrations / Service Catalog / Create catalog service` (passo 3); identifica o serviço informado no diagnóstico (passo 8). |
+| `metricFrom` e `metricTo` | Preenchidas automaticamente por `Get average execution time` com uma janela de 24 horas antes e depois da execução da request. Podem ser substituídas por instantes ISO-8601 para uma consulta manual. |
 
 As requisições `Create customer`, `Create vehicle`, `Create catalog service` e `Create stock item` têm um script de
 pré-requisição que gera CPF (com dígitos verificadores válidos), placa, chassi, nome de serviço e SKU únicos a cada
@@ -348,7 +349,24 @@ retornados em respostas `201 Created` são os que devem ser usados no restante d
     respectivamente, `IN_PROGRESS`, `IN_PROGRESS` e `COMPLETED`. Repita o ciclo para cada linha aprovada antes de
     finalizar a ordem.
 
-14. Quando todas as execuções estiverem `COMPLETED` ou `REJECTED`, envie `Finalize service order`:
+14. Depois de `Complete execution`, envie `Get average execution time`:
+
+    ```http
+    GET {{baseUrl}}/api/service-orders/metrics/average-execution-time?from={{metricFrom}}&to={{metricTo}}
+    ```
+
+    O endpoint aceita somente JWT de `MANAGER` ou `ADMIN`; o login bootstrap do passo 0 usa `ADMIN`. O script da
+    coleção define uma janela que inclui a conclusão recém-registrada. Espere `200 OK`, `unit: "HOURS"`,
+    `global.sampleCount >= 1` e um item de `byCatalogService` cujo `catalogServiceId` seja o criado no passo 3.
+    `averageHours` possui duas casas decimais e pode ser `0.00` para uma execução instantânea; sem amostras, a
+    contagem é zero, a média é `null` e os grupos ficam vazios. Não há campos em segundos ou milissegundos.
+
+    O filtro considera `completedAt >= from` e `completedAt < to`. Somente transições realizadas após a adoção da
+    feature possuem `startedAt` e `completedAt`; registros legados não recebem backfill e, portanto, não entram na
+    métrica. Pausas e retomadas não são modeladas neste MVP: a duração é o tempo transcorrido entre a mudança para
+    `IN_PROGRESS` e a mudança para `COMPLETED`.
+
+15. Quando todas as execuções estiverem `COMPLETED` ou `REJECTED`, envie `Finalize service order`:
 
     ```http
     POST {{baseUrl}}/api/service-orders/{{serviceOrderId}}/finalize
@@ -357,7 +375,7 @@ retornados em respostas `201 Created` são os que devem ser usados no restante d
     com `{"vehicleDelivered":true}`. Espere `200 OK` e `statusSnapshot: "DELIVERED"`. O valor `false`, ou tentar
     finalizar antes de a ordem estar concluída, retorna conflito (`409`).
 
-15. Durante o roteiro, use tanto `Get service order` quanto `Get service order status`. O primeiro retorna o retrato
+16. Durante o roteiro, use tanto `Get service order` quanto `Get service order status`. O primeiro retorna o retrato
     completo, inclusive `executions` e `statusSnapshot`; o segundo retorna somente `{ "id", "status" }`. No contrato
     atual, `ServiceOrderResponse.status` está marcado como obsoleto; para a leitura completa, use
     `statusSnapshot` como o campo de acompanhamento.

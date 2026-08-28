@@ -113,6 +113,7 @@ E2E_STEPS := \
 	"Start execution" \
 	"Update execution progress" \
 	"Complete execution" \
+	"Get average execution time" \
 	"Get service order status" \
 	"Finalize service order"
 

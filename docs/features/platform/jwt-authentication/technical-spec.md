@@ -129,6 +129,7 @@ functional-spec):
 | `StockReservationController` (`/api/stock-reservations/**`) | `MANAGER`, `ADMIN` |
 | `PurchaseDemandController` (`/api/purchase-demands/**`) | `MANAGER`, `ADMIN` |
 | `PurchaseOrderController` (`/api/purchase-orders/**`) | `MANAGER`, `ADMIN` |
+| `GET /api/service-orders/metrics/average-execution-time` | `MANAGER`, `ADMIN` |
 | `ServiceOrderController` — criação, diagnóstico, atribuição, prioridade, progresso, conclusão, anexar peça, finalizar | `MANAGER`, `TECHNICIAN`, `ADMIN` |
 | `ServiceOrderController` — `GET /api/service-orders/{id}/status` (tracking) | `CUSTOMER`, `MANAGER`, `TECHNICIAN`, `ADMIN` (qualquer papel autenticado; checagem de posse fica para uma feature futura) |
 | `EstimateController` — geração de Estimate | `MANAGER`, `ADMIN` |

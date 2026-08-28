@@ -1,6 +1,8 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.infrastructure.web;
 
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.AssignDiagnosisAssigneeRequest;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto
+        .AverageServiceExecutionTimeResponse;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.AssignTechnicianRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ChangeServiceOrderPriorityRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.CreateServiceOrderRequest;
@@ -21,6 +23,8 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.FinalizeServiceOrderUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.GetServiceOrderStatusUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.GetServiceOrderUseCase;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase
+        .GetAverageServiceExecutionTimeUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.ListServiceOrdersUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.PerformDiagnosisUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.usecase.RetryStockReservationUseCase;
@@ -31,6 +35,7 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.doma
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderSearchCriteria;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -45,7 +50,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.format.annotation.DateTimeFormat;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -68,6 +75,7 @@ public class ServiceOrderController {
     private final FinalizeServiceOrderUseCase finalizeServiceOrderUseCase;
     private final AttachStockRequirementUseCase attachStockRequirementUseCase;
     private final RetryStockReservationUseCase retryStockReservationUseCase;
+    private final GetAverageServiceExecutionTimeUseCase getAverageServiceExecutionTimeUseCase;
 
     public ServiceOrderController(
             CreateServiceOrderUseCase createServiceOrderUseCase,
@@ -83,7 +91,8 @@ public class ServiceOrderController {
             CompleteExecutionUseCase completeExecutionUseCase,
             FinalizeServiceOrderUseCase finalizeServiceOrderUseCase,
             AttachStockRequirementUseCase attachStockRequirementUseCase,
-            RetryStockReservationUseCase retryStockReservationUseCase) {
+            RetryStockReservationUseCase retryStockReservationUseCase,
+            GetAverageServiceExecutionTimeUseCase getAverageServiceExecutionTimeUseCase) {
         this.createServiceOrderUseCase = createServiceOrderUseCase;
         this.getServiceOrderUseCase = getServiceOrderUseCase;
         this.getServiceOrderStatusUseCase = getServiceOrderStatusUseCase;
@@ -98,6 +107,7 @@ public class ServiceOrderController {
         this.finalizeServiceOrderUseCase = finalizeServiceOrderUseCase;
         this.attachStockRequirementUseCase = attachStockRequirementUseCase;
         this.retryStockReservationUseCase = retryStockReservationUseCase;
+        this.getAverageServiceExecutionTimeUseCase = getAverageServiceExecutionTimeUseCase;
     }
 
     @PostMapping
@@ -126,6 +136,26 @@ public class ServiceOrderController {
             @RequestParam(required = false) Priority priority) {
         return ResponseEntity.ok(listServiceOrdersUseCase.execute(
                 new ServiceOrderSearchCriteria(status, customerId, technicianId, priority)));
+    }
+
+    @GetMapping("/metrics/average-execution-time")
+    @Operation(summary = "Get average service execution time in hours")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Execution-time averages returned"),
+            @ApiResponse(responseCode = "400", description = "Invalid or missing period"),
+            @ApiResponse(responseCode = "401", description = "Authentication required"),
+            @ApiResponse(responseCode = "403", description = "Manager or Admin role required")
+    })
+    public ResponseEntity<AverageServiceExecutionTimeResponse> getAverageExecutionTime(
+            @Parameter(description = "Inclusive completion instant in ISO-8601 format", required = true)
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            Instant from,
+            @Parameter(description = "Exclusive completion instant in ISO-8601 format", required = true)
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            Instant to) {
+        return ResponseEntity.ok(getAverageServiceExecutionTimeUseCase.execute(from, to));
     }
 
     @GetMapping("/{id}")

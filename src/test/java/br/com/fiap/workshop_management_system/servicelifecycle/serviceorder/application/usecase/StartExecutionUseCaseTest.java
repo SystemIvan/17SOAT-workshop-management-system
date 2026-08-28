@@ -10,6 +10,9 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.doma
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,15 +22,18 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StartExecutionUseCaseTest {
 
+    private static final Instant STARTED_AT = Instant.parse("2026-08-28T10:00:00.123456Z");
     private final VehicleSnapshot vehicleSnapshot = new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015);
 
     @Test
     void startsAReadyExecutionAndMovesItToInProgress() {
         InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository();
-        StartExecutionUseCase useCase = new StartExecutionUseCase(serviceOrders);
+        StartExecutionUseCase useCase = new StartExecutionUseCase(
+                serviceOrders, Clock.fixed(STARTED_AT, ZoneOffset.UTC));
 
         ServiceOrder serviceOrder = newReadyServiceOrder();
         UUID executionId = serviceOrder.serviceExecutions().get(0).id();
@@ -37,6 +43,8 @@ class StartExecutionUseCaseTest {
         ServiceOrderResponse response = useCase.execute(serviceOrder.id(), executionId);
 
         assertEquals(ServiceExecutionStatus.IN_PROGRESS, response.executions().get(0).status());
+        assertEquals(STARTED_AT, serviceOrder.serviceExecutions().getFirst().startedAt());
+        assertTrue(serviceOrders.findByIdForUpdateCalled);
     }
 
     @Test
@@ -90,10 +98,17 @@ class StartExecutionUseCaseTest {
 
     private static final class InMemoryServiceOrderRepository implements ServiceOrderRepository {
         private final Map<UUID, ServiceOrder> byId = new HashMap<>();
+        private boolean findByIdForUpdateCalled;
 
         @Override
         public Optional<ServiceOrder> findById(UUID id) {
             return Optional.ofNullable(byId.get(id));
+        }
+
+        @Override
+        public Optional<ServiceOrder> findByIdForUpdate(UUID id) {
+            findByIdForUpdateCalled = true;
+            return findById(id);
         }
 
         @Override

@@ -108,7 +108,7 @@ class ServiceOrderControllerCompleteExecutionTest {
             ServiceOrder serviceOrder = serviceOrderRepository.findById(serviceOrderId).orElseThrow();
             serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
             serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
-            serviceOrder.startExecution(executionId);
+            serviceOrder.startExecution(executionId, java.time.Instant.now());
             serviceOrderRepository.save(serviceOrder);
         });
     }

@@ -999,14 +999,18 @@ Option B — Implement real supplier and/or payment integrations.
 
 ### AD-019 — Define average service-execution time semantics
 
-**Status:** Team Decision Required
+**Status:** Resolved
+
+**Decision:** Option A — calcular a duração transcorrida de cada `ServiceExecution` concluída entre `startedAt` e
+`completedAt`, com agregação sob demanda no módulo `servicelifecycle`.
+
+**Resolved on:** 28 August 2026, ratified by Ivan Gomes in ADR-006.
 
 **Scope:** Whole-team decision
 
 **Blocking:**
 
-- Blocks the official performance-monitoring story.
-- Does not block Ivan.
+- No longer blocks the official performance-monitoring story.
 
 **Related Epic / responsibility:** Management/reporting; likely Epic 3 or a cross-cutting story.
 
@@ -1020,7 +1024,7 @@ Analytics generically; current model records progress notes but no explicit star
 
 **Options:**
 
-Option A — Average active execution time from `startedAt` to `completedAt` for completed ServiceExecutions.
+Option A — Average elapsed execution time from `startedAt` to `completedAt` for completed ServiceExecutions.
 
 - Advantages: clear and directly attributable to workshop work.
 - Disadvantages: excludes diagnosis, approval and waiting for parts.
@@ -1030,14 +1034,17 @@ Option B — Average end-to-end SO duration from received to completed/delivered
 - Advantages: reflects customer experience.
 - Disadvantages: mixes operational work with approval/stock/customer delays.
 
-**Recommended option:** Option A for the literal “tempo médio de execução dos serviços”; expose end-to-end lead
-time later as a distinct metric.
+**Recommended option:** Option A, selected and ratified in ADR-006. Each completed `ServiceExecution` is one sample;
+the period uses `completedAt`, results are global and grouped by `catalogServiceId`, and each result returns its sample
+count. The average is presented in hours, including fractional values. The MVP uses only status-transition timestamps
+and does not model pause or resume intervals. End-to-end lead time remains a separate future metric.
 
 **Impact of the decision:** ServiceExecution timestamps, persistence, queries/read model, API, tests and Jira story.
 
-**Can work continue without resolving it?** Yes outside analytics; timestamps should not be guessed first.
+**Can work continue without resolving it?** Resolved. The feature may proceed through the SDD gates defined in
+`AGENTS.md`.
 
-**Temporary safe assumption, if any:** Preserve domain events for start/completion so either metric remains possible.
+**Temporary safe assumption, if any:** Not applicable; ADR-006 is the authoritative decision.
 
 ## Decisions Affecting My Work
 
@@ -1081,9 +1088,9 @@ AD-001 and must not be treated as approval of the shared context mapping.
   not block pure domain/use-case work while the module is implemented.
 - **AD-017 — schema migration policy:** does not block model/story planning or short-lived local work; it must be
   resolved before several epics integrate shared schema changes.
-- **AD-006 through AD-009, AD-014, AD-015, AD-018 and AD-019:** belong to the team or other owners and do not
+- **AD-006 through AD-009, AD-014, AD-015 and AD-018:** belong to the team or other owners and do not
   block Ivan's registration backlog except through the specific integration dependencies already identified.
-  AD-010, AD-011 and AD-013 are resolved (see above) and no longer part of this pending group.
+  AD-010, AD-011, AD-013 and AD-019 are resolved (see above) and no longer part of this pending group.
 - **AD-012 — event delivery guarantees:** remains deferred and does not block registration work.
 
 ### Blocking
@@ -1109,7 +1116,6 @@ The following decisions must not be made by Ivan alone:
 | AD-014 | Owns Notification module/channel | Yes |
 | AD-017 | Establishes shared database change policy | Yes briefly |
 | AD-018 | Changes external-integration/delivery scope | Yes |
-| AD-019 | Defines an official cross-cutting business metric | Yes |
 
 AD-012 is shared but intentionally deferred; it does not need immediate team resolution while event contracts are
 only being designed and mocked.
@@ -1132,7 +1138,6 @@ These items do not need a new architecture decision once their related decision,
 - Complete `README.md` with local execution and project objectives.
 - Run and document the required vulnerability scan.
 - Correct Docker documentation examples after comparing them with actual dependencies/endpoints.
-- Add the average-time query/read model after AD-019.
 
 ## Documentation Gaps
 
@@ -1194,13 +1199,13 @@ The existing file is exactly `AGENTS.md` at the repository root. No duplicate fi
 
 - **Actual architectural decisions identified:** 19.
 - **Ivan / my assigned scope:** 4 (AD-002 through AD-005).
-- **Explicitly approved by Ivan:** 4 (Option A for AD-002 through AD-005).
-- **Team Decision Required:** 8.
+- **Explicitly approved by Ivan:** 5 (Option A for AD-002 through AD-005 and AD-019).
+- **Team Decision Required:** 7.
 - **Currently blocking Ivan's Jira planning:** 0.
 - **Currently blocking part of Ivan's implementation:** 1 (AD-001), which gates the conditionally resolved AD-003
   and AD-004.
-- **Resolved:** 10 (AD-002, AD-003, AD-004 and AD-005, approved by Ivan; AD-006, AD-008 and AD-015, ratified by the
-  team on 23 August 2026; AD-010, ratified by the team on 24 August 2026; AD-016, ratified by the team on
-  24 August 2026; AD-011, ratified by the team on 25 August 2026 via
+- **Resolved:** 11 (AD-002, AD-003, AD-004, AD-005 and AD-019, approved by Ivan; AD-006, AD-008 and AD-015,
+  ratified by the team on 23 August 2026; AD-010 and AD-016, ratified by the team on 24 August 2026; AD-011,
+  ratified by the team on 25 August 2026 via
   `docs/adr/ADR-005-inter-module-integration-contract.md`).
 - **Deferred:** 1 (AD-012).

@@ -1,7 +1,7 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model;
 
-import java.util.ArrayList;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,6 +26,8 @@ public class ServiceExecution {
     private UUID assignedTechnicianId;
     private boolean stockRequirementsFrozen;
     private UUID stockReservationId;
+    private Instant startedAt;
+    private Instant completedAt;
 
     static ServiceExecution start(
             UUID diagnosisId,
@@ -66,6 +68,8 @@ public class ServiceExecution {
             UUID assignedTechnicianId,
             UUID diagnosedByTechnicianId,
             Instant diagnosedAt,
+            Instant startedAt,
+            Instant completedAt,
             boolean stockRequirementsFrozen,
             UUID stockReservationId,
             List<StockRequirement> stockRequirements,
@@ -75,6 +79,14 @@ public class ServiceExecution {
         execution.status = status;
         execution.authorizedByEstimateId = authorizedByEstimateId;
         execution.assignedTechnicianId = assignedTechnicianId;
+        if (completedAt != null && startedAt == null) {
+            throw new IllegalArgumentException("ServiceExecution completedAt requires startedAt");
+        }
+        if (startedAt != null && completedAt != null && completedAt.isBefore(startedAt)) {
+            throw new IllegalArgumentException("ServiceExecution completedAt must not be before startedAt");
+        }
+        execution.startedAt = startedAt;
+        execution.completedAt = completedAt;
         execution.stockRequirementsFrozen = stockRequirementsFrozen;
         execution.stockReservationId = stockReservationId;
         execution.stockRequirements.addAll(stockRequirements);
@@ -101,6 +113,8 @@ public class ServiceExecution {
                 status,
                 authorizedByEstimateId,
                 assignedTechnicianId,
+                null,
+                null,
                 null,
                 null,
                 false,
@@ -182,11 +196,15 @@ public class ServiceExecution {
     /**
      * RF20 - iniciar execução de um serviço.
      */
-    void start() {
+    void start(Instant startedAt) {
         requireStatus(ServiceExecutionStatus.READY);
         if (assignedTechnicianId == null) {
             throw new IllegalStateException("A technician must be assigned before starting a ServiceExecution");
         }
+        if (startedAt == null) {
+            throw new IllegalArgumentException("ServiceExecution startedAt must not be null");
+        }
+        this.startedAt = startedAt;
         this.status = ServiceExecutionStatus.IN_PROGRESS;
     }
 
@@ -201,8 +219,18 @@ public class ServiceExecution {
     /**
      * RF22 - concluir execução de um serviço.
      */
-    void complete() {
+    void complete(Instant completedAt) {
         requireStatus(ServiceExecutionStatus.IN_PROGRESS);
+        if (completedAt == null) {
+            throw new IllegalArgumentException("ServiceExecution completedAt must not be null");
+        }
+        if (startedAt == null) {
+            throw new IllegalStateException("ServiceExecution must have startedAt before completion");
+        }
+        if (completedAt.isBefore(startedAt)) {
+            throw new IllegalStateException("ServiceExecution completedAt must not be before startedAt");
+        }
+        this.completedAt = completedAt;
         this.status = ServiceExecutionStatus.COMPLETED;
     }
 
@@ -259,6 +287,14 @@ public class ServiceExecution {
 
     public UUID stockReservationId() {
         return stockReservationId;
+    }
+
+    public Instant startedAt() {
+        return startedAt;
+    }
+
+    public Instant completedAt() {
+        return completedAt;
     }
 
     public List<StockRequirement> stockRequirements() {
