@@ -60,6 +60,38 @@ o Maven Wrapper. No resumo de cada execução, a seção **Artifacts** disponibi
 Um novo commit cancela a execução obsoleta da mesma proposta. A proteção das branches deve exigir o contexto exato
 `Quality gate`; renomear o job requer coordenar antes a regra correspondente no GitHub.
 
+### Security scan
+
+O workflow `Security scan` é separado do `CI` de propósito: ele não participa do check obrigatório `Quality gate`, para
+que os scans não deixem toda Pull Request mais lenta nem a bloqueiem por uma CVE publicada em biblioteca de terceiros.
+Ele é disparado manualmente (**Actions → Security scan → Run workflow**) e tem dois jobs:
+
+- `Dependency-Check (SCA)`, que analisa as dependências do `pom.xml`. Requer o secret `NVD_API_KEY`;
+- `OWASP ZAP (DAST)`, que sobe a aplicação via Docker Compose e a escaneia a partir do contrato OpenAPI, autenticado
+  como `ADMIN`.
+
+Os artifacts ficam disponíveis por 30 dias:
+
+- `dependency-check-report-*`, com o relatório HTML/JSON do OWASP Dependency-Check;
+- `zap-report-*`, com o relatório HTML/JSON do OWASP ZAP.
+
+**O output bruto dessas ferramentas nunca é commitado** — o repositório é público, e manter no histórico do Git o mapa
+de quais vulnerabilidades existiam em qual versão continua explorável mesmo após a correção. A análise narrativa fica
+em `docs/security/vulnerability-report.md`, e referencia qual execução de CI gerou cada evidência.
+
+Para rodar localmente:
+
+```bash
+export NVD_API_KEY=<chave da NVD>
+make sca            # analise de dependencias
+
+make docker-up      # sobe a aplicacao
+make dast           # escaneia a API em execucao; use DAST_BASE_URL=... para outro host
+```
+
+Se a porta 3306 já estiver ocupada, use `DB_PORT=3307 make docker-up`. No Git Bash do Windows o alvo `dast` já define
+`MSYS_NO_PATHCONV=1`, sem o qual o volume do ZAP não é montado.
+
 ## E2E smoke suite (Postman/Newman)
 
 Every request in the Postman collection asserts its HTTP status and key response fields via `pm.test`, so it

@@ -498,7 +498,7 @@ sujeitos às decisões dos respectivos responsáveis/time; este documento não c
 | Database | MySQL/JPA, H2 em testes, `ddl-auto=update` | MySQL 8 | ADR MySQL aceita | Banco alinhado; migrations/schema ainda ausentes |
 | Containers | Dockerfile + Compose | Parte da estrutura relevante | C4 mostra app + MySQL | Artefatos presentes; documentação tem referências inválidas |
 | Métrica de tempo médio | Ausente | Não definida | Apenas Performance Analytics genérico | Requisito oficial não identificado/implementado |
-| Vulnerability scan | Ausente | Não definido | Apenas citado em segurança | Entregável oficial ausente |
+| Vulnerability scan | Dependency-Check (SCA) + ZAP (DAST) via `security-scan.yml` | Projeto inteiro | Citado em segurança | Executado em 2026-08-28; ver `docs/security/vulnerability-report.md` |
 
 ## 6. Component interactions
 
@@ -689,7 +689,7 @@ situação de implementação.
 | Execução local simples/README | `README.md`, `DOCKER.md` e containers | Partially covered | README atual ainda não é completo |
 | Event Storming dos fluxos obrigatórios | **Ordenação**, **Hotspots**, **Pivotal Events, Actors, Commands and Policies** | Covered | Fluxos de SO e Stock estão representados com alternativas |
 | Diagramas DDD e Ubiquitous Language | **Aggregates and Bounded Contexts**, **Context Map**, **3. Ubiquitous Language** | Covered | Existem divergências de versão registradas abaixo |
-| Relatório de vulnerabilidades | Apenas menções em ADR de segurança | Not identified | Scan, ferramenta, resultado e relatório não foram encontrados |
+| Relatório de vulnerabilidades | `docs/security/vulnerability-report.md` | Covered | Dependency-Check + ZAP em 2026-08-28: 0 vulnerabilidade Crítica; achados aceitos em `TD-003` |
 | Vídeo e PDF de entrega | Requisito oficial | Not identified | São entregáveis, não decisões arquiteturais |
 | Regra de visibilidade/acesso ao repositório | Texto oficial | Not identified | O texto oficial alterna entre privado e público |
 
@@ -746,7 +746,8 @@ AD-001: mapear os conceitos do Miro para os módulos definidos ou atualizar form
 - Regra de preço total, descontos, impostos e eventual pagamento/faturamento.
 - Canal real ou simulado de Notification.
 - Contrato e resiliência da integração com fornecedor.
-- Escopo e ferramenta do vulnerability scan.
+- ~~Escopo e ferramenta do vulnerability scan.~~ Resolvido em 2026-08-28: projeto inteiro, com
+  OWASP Dependency-Check (SCA) e OWASP ZAP (DAST); ver `docs/security/vulnerability-report.md`.
 - Regra final de visibilidade do repositório para entrega.
 
 ### 12.4 Assunções usadas nesta consolidação (C)

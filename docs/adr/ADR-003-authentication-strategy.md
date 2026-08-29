@@ -324,8 +324,10 @@ Authorization Server) e seu racional.
       documentado em `technical-spec.md` (§"Camada de segurança HTTP" e §"Matriz de autorização por
       papel") e implementado em `identity.auth`/`identity.SecurityConfig`.
 - [ ] SonarLint vai validar segurança — **não configurado nesta feature.** Nenhuma ferramenta de scan
-      estático de segurança está integrada ao projeto ainda; isso é rastreado como lacuna aberta em
-      `GAPS-TECH-CHALLENGE.md` §6 (relatório de vulnerabilidades do desafio), não resolvido aqui.
+      estático de segurança está integrada ao projeto ainda; a lacuna permanece aberta e passou a ser
+      rastreada em `docs/security/vulnerability-report.md` §7 e em
+      `docs/tech-debt/TD-003-achados-de-seguranca-aceitos-sem-correcao.md` (Grupo 4). A referência
+      anterior era a `GAPS-TECH-CHALLENGE.md` §6, documento que nunca chegou a ser commitado.
 - [x] Testes de segurança planejados — implementados: `SecurityAuthorizationTest` (14 casos, matriz de
       autorização ponta a ponta), `AuthControllerTest`, `UserAccountTest`, `JwtTokenIssuerTest`,
       `BCryptPasswordHasherTest`.
