@@ -47,6 +47,10 @@ test:
 # Deliberately not bound to a Maven lifecycle phase, so `make verify` keeps its current cost.
 # skipTestScope=false includes test-scope dependencies, as required by the challenge baseline.
 sca:
+	@if [ -z "$(NVD_API_KEY)" ]; then \
+		echo "WARNING: NVD_API_KEY is not set. The NVD download will be heavily rate limited and may take"; \
+		echo "         over 30 minutes or fail. Request a free key at nvd.nist.gov/developers/request-an-api-key"; \
+	fi
 	$(MVNW) org.owasp:dependency-check-maven:check -DskipTestScope=false -Dnvd.api.key=$(NVD_API_KEY)
 
 # Requires the application to be reachable (e.g. after make docker-up); override with BASE_URL=...
@@ -62,17 +66,13 @@ dast:
 		-d '{"username":"admin","password":"changeme123"}' \
 		| sed -E 's/.*"token"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/'); \
 	if [ -z "$$TOKEN" ]; then echo "Could not obtain an ADMIN token; is the app running?" >&2; exit 1; fi; \
+	AUTH_CFG="-config replacer.full_list(0).description=auth -config replacer.full_list(0).enabled=true -config replacer.full_list(0).matchtype=REQ_HEADER -config replacer.full_list(0).matchstr=Authorization -config replacer.full_list(0).regex=false -config replacer.full_list(0).replacement=\"Bearer $$TOKEN\""; \
 	MSYS_NO_PATHCONV=1 docker run --rm --network host \
 		-v "$$(pwd)/target/zap:/zap/wrk:rw" \
 		ghcr.io/zaproxy/zaproxy:stable zap-api-scan.py \
 		-t "$(DAST_BASE_URL)/v3/api-docs" -f openapi -O "$(DAST_BASE_URL)" -I \
 		-r zap-report.html -J zap-report.json \
-		-z "-config replacer.full_list(0).description=auth \
-		    -config replacer.full_list(0).enabled=true \
-		    -config replacer.full_list(0).matchtype=REQ_HEADER \
-		    -config replacer.full_list(0).matchstr=Authorization \
-		    -config replacer.full_list(0).regex=false \
-		    -config replacer.full_list(0).replacement=\"Bearer $$TOKEN\""
+		-z "$$AUTH_CFG"
 
 coverage:
 	$(MVNW) clean verify
