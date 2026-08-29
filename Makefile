@@ -1,5 +1,9 @@
+# On Windows, GNU Make delegates recipes to cmd.exe, which does not resolve `mvnw.cmd` from the current
+# directory, so every $(MVNW) target failed with "is not recognized as an internal or external command".
+# Invoking the POSIX wrapper through sh works and needs no path juggling. The Linux/macOS branch is
+# unchanged.
 ifeq ($(OS),Windows_NT)
-MVNW := mvnw.cmd
+MVNW := sh mvnw
 else
 MVNW := ./mvnw
 endif
