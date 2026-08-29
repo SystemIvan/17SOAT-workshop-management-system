@@ -1,0 +1,141 @@
+# Deliberately separate from ci.yml: the "Quality gate" job there is the required status check for
+# branch protection, and must not become slower or more fragile because of security scans.
+# See docs/features/platform/owasp-vulnerability-assessment/technical-spec.md (decision U1).
+name: Security scan
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sca:
+    name: Dependency-Check (SCA)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        # actions/checkout v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 21
+        # actions/setup-java v5.6.0
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: pom.xml
+
+      # The NVD database changes daily, so it cannot share the Maven cache key
+      # (which is derived from pom.xml). The run_id key always misses and the
+      # restore-keys prefix picks up the most recent copy, so each run refreshes it.
+      - name: Cache the NVD database
+        # actions/cache v6.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: nvd-data-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            nvd-data-${{ runner.os }}-
+
+      # skipTestScope=false includes test-scope dependencies in the challenge baseline.
+      # failBuildOnCVSS is set to 11 in pom.xml, so findings never fail this step.
+      - name: Run OWASP Dependency-Check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: >-
+          ./mvnw --batch-mode org.owasp:dependency-check-maven:check
+          -DskipTestScope=false
+          -Dnvd.api.key="$NVD_API_KEY"
+
+      - name: Upload Dependency-Check report
+        if: ${{ always() }}
+        # actions/upload-artifact v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: dependency-check-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/dependency-check/**
+          if-no-files-found: warn
+          retention-days: 30
+
+  dast:
+    name: OWASP ZAP (DAST)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        # actions/checkout v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      # Compose defaults already select the dev profile with seeds enabled and publish port 8080,
+      # so no .env file is needed here.
+      - name: Start the application stack
+        run: docker compose up -d --build
+
+      # The project has no Spring Boot Actuator and the app service declares no healthcheck, so
+      # readiness cannot be awaited through depends_on. The public OpenAPI contract is polled instead.
+      - name: Wait for the application to become ready
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://localhost:8080/v3/api-docs; then
+              echo "Application ready after ${i} attempt(s)."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Application did not become ready in time." >&2
+          docker compose logs --tail 200 app >&2
+          exit 1
+
+      # Token retrieval and the scan share a single step so the JWT never leaves this shell.
+      # ADMIN passes every rule in SecurityConfig, so the scan reaches every documented endpoint.
+      - name: Run OWASP ZAP against the OpenAPI contract
+        run: |
+          mkdir -p target/zap
+          chmod 777 target/zap
+          TOKEN="$(curl -sf -X POST http://localhost:8080/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"changeme123"}' | jq -r '.token')"
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "Could not obtain an ADMIN token; the scan would only observe 401s." >&2
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          AUTH_CFG="-config replacer.full_list(0).description=auth -config replacer.full_list(0).enabled=true -config replacer.full_list(0).matchtype=REQ_HEADER -config replacer.full_list(0).matchstr=Authorization -config replacer.full_list(0).regex=false -config replacer.full_list(0).replacement=\"Bearer $TOKEN\""
+          # -I keeps warnings from failing the step; triage is a human judgement, not an exit code.
+          docker run --rm --network host \
+            -v "$PWD/target/zap:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy:stable zap-api-scan.py \
+            -t http://localhost:8080/v3/api-docs \
+            -f openapi \
+            -O http://localhost:8080 \
+            -I \
+            -r zap-report.html \
+            -J zap-report.json \
+            -z "$AUTH_CFG" || true
+
+      - name: Upload ZAP report
+        if: ${{ always() }}
+        # actions/upload-artifact v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: zap-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/zap/**
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Stop the application stack
+        if: ${{ always() }}
+        run: docker compose down --volumes

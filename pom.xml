@@ -33,6 +33,12 @@
 		<maven-enforcer.version>3.6.3</maven-enforcer.version>
 		<wiremock.version>3.13.1</wiremock.version>
 		<jjwt.version>0.12.6</jjwt.version>
+		<dependency-check.version>13.0.0</dependency-check.version>
+		<!-- Overrides the version managed by spring-boot-starter-parent 4.1.0 (11.0.22), which is
+		     affected by 8 critical and 6 high CVEs. 11.0.25 is the lowest release that clears all of
+		     them; Spring Boot 4.1.1 only reaches 11.0.24, so upgrading the parent is not enough.
+		     See docs/security/vulnerability-report.md. -->
+		<tomcat.version>11.0.25</tomcat.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -221,6 +227,29 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<configuration>
 					<argLine>@{argLine} -javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.owasp</groupId>
+				<artifactId>dependency-check-maven</artifactId>
+				<version>${dependency-check.version}</version>
+				<!-- No <executions>: the scan never runs as part of the build lifecycle, so
+				     `mvnw clean verify` keeps its current cost and behaviour. Invoke it
+				     explicitly instead: mvnw org.owasp:dependency-check-maven:check -->
+				<configuration>
+					<outputDirectory>${project.build.directory}/dependency-check</outputDirectory>
+					<formats>
+						<format>HTML</format>
+						<format>JSON</format>
+					</formats>
+					<suppressionFiles>
+						<suppressionFile>owasp-suppressions.xml</suppressionFile>
+					</suppressionFiles>
+					<!-- 11 is above any real CVSS score, so a finding never fails the build.
+					     Fixing critical/high findings is a process rule, not a build gate. -->
+					<failBuildOnCVSS>11</failBuildOnCVSS>
+					<!-- Declared explicitly rather than relying on the plugin default. -->
+					<skipTestScope>false</skipTestScope>
 				</configuration>
 			</plugin>
 			<plugin>

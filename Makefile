@@ -1,12 +1,17 @@
+# On Windows, GNU Make delegates recipes to cmd.exe, which does not resolve `mvnw.cmd` from the current
+# directory, so every $(MVNW) target failed with "is not recognized as an internal or external command".
+# Invoking the POSIX wrapper through sh works and needs no path juggling. The Linux/macOS branch is
+# unchanged.
 ifeq ($(OS),Windows_NT)
-MVNW := mvnw.cmd
+MVNW := sh mvnw
 else
 MVNW := ./mvnw
 endif
 COMPOSE := docker compose
 
 .PHONY: help test coverage verify compile build clean run run-dev \
-	docker-build docker-up docker-up-interactive docker-down docker-reset docker-logs docker-ps db-shell e2e
+	docker-build docker-up docker-up-interactive docker-down docker-reset docker-logs docker-ps db-shell e2e \
+	sca dast
 
 help:
 	@echo "Workshop Management System"
@@ -28,12 +33,50 @@ help:
 	@echo "  make docker-logs   Follow application logs"
 	@echo "  make db-shell      Open the MySQL client"
 	@echo ""
+	@echo "Security:"
+	@echo "  make sca           Run OWASP Dependency-Check over every declared dependency"
+	@echo "                     (export NVD_API_KEY first; the raw report lands in"
+	@echo "                     target/dependency-check/ and is never committed)"
+	@echo "  make dast          Run OWASP ZAP against the running app via its OpenAPI contract"
+	@echo "                     (requires the app reachable, e.g. after make docker-up;"
+	@echo "                     override with DAST_BASE_URL=...; report in target/zap/)"
+	@echo ""
 	@echo "E2E:"
 	@echo "  make e2e           Run the Postman collection as an E2E smoke suite via Newman"
 	@echo "                     (requires the app reachable, e.g. after make docker-up; override with BASE_URL=...)"
 
 test:
 	$(MVNW) test
+
+# Deliberately not bound to a Maven lifecycle phase, so `make verify` keeps its current cost.
+# skipTestScope=false includes test-scope dependencies, as required by the challenge baseline.
+sca:
+	@if [ -z "$(NVD_API_KEY)" ]; then \
+		echo "WARNING: NVD_API_KEY is not set. The NVD download will be heavily rate limited and may take"; \
+		echo "         over 30 minutes or fail. Request a free key at nvd.nist.gov/developers/request-an-api-key"; \
+	fi
+	$(MVNW) org.owasp:dependency-check-maven:check -DskipTestScope=false -Dnvd.api.key=$(NVD_API_KEY)
+
+# Requires the application to be reachable (e.g. after make docker-up); override with BASE_URL=...
+# The scan is driven by the published OpenAPI contract rather than a blind crawl, and authenticates as
+# ADMIN because every business endpoint requires a JWT.
+# MSYS_NO_PATHCONV=1 is mandatory on Git Bash for Windows: without it /zap/wrk is rewritten to a Windows
+# path, the volume is never mounted and ZAP aborts. It is harmless on Linux and macOS.
+DAST_BASE_URL ?= http://localhost:8080
+dast:
+	@mkdir -p target/zap
+	@TOKEN=$$(curl -sf -X POST "$(DAST_BASE_URL)/api/auth/login" \
+		-H 'Content-Type: application/json' \
+		-d '{"username":"admin","password":"changeme123"}' \
+		| sed -E 's/.*"token"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/'); \
+	if [ -z "$$TOKEN" ]; then echo "Could not obtain an ADMIN token; is the app running?" >&2; exit 1; fi; \
+	AUTH_CFG="-config replacer.full_list(0).description=auth -config replacer.full_list(0).enabled=true -config replacer.full_list(0).matchtype=REQ_HEADER -config replacer.full_list(0).matchstr=Authorization -config replacer.full_list(0).regex=false -config replacer.full_list(0).replacement=\"Bearer $$TOKEN\""; \
+	MSYS_NO_PATHCONV=1 docker run --rm --network host \
+		-v "$$(pwd)/target/zap:/zap/wrk:rw" \
+		ghcr.io/zaproxy/zaproxy:stable zap-api-scan.py \
+		-t "$(DAST_BASE_URL)/v3/api-docs" -f openapi -O "$(DAST_BASE_URL)" -I \
+		-r zap-report.html -J zap-report.json \
+		-z "$$AUTH_CFG"
 
 coverage:
 	$(MVNW) clean verify

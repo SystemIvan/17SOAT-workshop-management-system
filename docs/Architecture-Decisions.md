@@ -1136,7 +1136,10 @@ These items do not need a new architecture decision once their related decision,
 - Add Swagger/OpenAPI documentation to existing REST APIs.
 - Add use-case, controller, persistence and end-to-end integration tests.
 - Complete `README.md` with local execution and project objectives.
-- Run and document the required vulnerability scan.
+- ~~Run and document the required vulnerability scan.~~ Done on 28 August 2026: OWASP Dependency-Check
+  (SCA) and OWASP ZAP (DAST) over the whole project, reported in `docs/security/vulnerability-report.md`.
+  Findings accepted without a fix are tracked in
+  `docs/tech-debt/TD-003-achados-de-seguranca-aceitos-sem-correcao.md`.
 - Correct Docker documentation examples after comparing them with actual dependencies/endpoints.
 
 ## Documentation Gaps

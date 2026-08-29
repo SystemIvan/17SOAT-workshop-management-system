@@ -190,8 +190,8 @@ Revisar:
       negócio.
 - [x] `AGENTS.md` atualizado com `identity` como bounded context.
 - [x] `docs/adr/ADR-003-authentication-strategy.md` em `Accepted`, Approval Checklist marcado com
-      evidência (4 de 5 itens; "SonarLint vai validar segurança" permanece aberto, rastreado em
-      `GAPS-TECH-CHALLENGE.md` §6, não bloqueador).
+      evidência (4 de 5 itens; "SonarLint vai validar segurança" permanece aberto, hoje rastreado em
+      `docs/tech-debt/TD-003-achados-de-seguranca-aceitos-sem-correcao.md`, não bloqueador).
 - [x] Testes relevantes passando.
 - [x] `make verify` passando (`./mvnw verify`, JaCoCo incluso).
 - [x] Revisão de segurança concluída, com achados e mitigações registrados.
@@ -216,7 +216,8 @@ Revisar:
 - **Achado aceito com mitigação**: conta `ADMIN` de bootstrap tem senha inicial documentada e conhecida
   — mitigação é a instrução explícita de rotação imediata fora de ambiente de demonstração (README +
   este plano). Não bloqueia `Implemented`, mas deve constar no relatório de vulnerabilidades do
-  desafio (`GAPS-TECH-CHALLENGE.md` §6) como item tratado.
+  desafio como item tratado — **cumprido** em `docs/security/vulnerability-report.md` §5 e registrado em
+  `docs/tech-debt/TD-003-achados-de-seguranca-aceitos-sem-correcao.md` (Grupo 4).
 
 ## Evidências de verificação
 
@@ -254,7 +255,8 @@ Revisar:
   Approval Checklist, 4 confirmados (2 de consenso humano confirmados por Santiago Silvestre em
   2026-08-24 via pergunta explícita — o agente não inferiu essa aprovação; os outros 2 confirmados por
   evidência técnica direta) e 1 deixado explicitamente aberto ("SonarLint vai validar segurança" — não
-  configurado, rastreado em `GAPS-TECH-CHALLENGE.md` §6). Do Security Checklist da mesma ADR, 6 de 10
+  configurado, hoje rastreado em `docs/tech-debt/TD-003-achados-de-seguranca-aceitos-sem-correcao.md`).
+  Do Security Checklist da mesma ADR, 6 de 10
   itens marcados com evidência de teste/config; 4 deixados abertos com justificativa (`N/A` ou
   explicitamente fora de escopo), não escondidos.
   `./mvnw verify` — 2026-08-24, **396 testes, 0 falhas, 0 erros**, `BUILD SUCCESS`, JaCoCo gerado.

@@ -1,41 +1,74 @@
 # Workshop Management System
 
-Backend REST API for an automotive workshop, implemented as a Java 21/Spring Boot 4 modular monolith.
+API REST para uma oficina mecânica, implementada como monólito modular com Java 21 e Spring Boot 4.
 
-## Architecture
+## Arquitetura
 
-The Spring Modulith modules follow the project context map:
+Os módulos do Spring Modulith seguem as fronteiras do domínio:
 
-- Registrations
-- Service Lifecycle
-- Stock & Procurement
+- `registration`: clientes, veículos e catálogo de serviços;
+- `servicelifecycle`: ordens de serviço, diagnósticos, Estimates, execuções e técnicos;
+- `stockprocurement`: estoque, reservas, demandas, compras, recebimentos e baixo estoque;
+- `identity`: contas, credenciais, autenticação JWT e papéis de acesso.
 
-See [Project Structure](docs/PROJECT-STRUCTURE.md) and [AGENTS.md](AGENTS.md) before changing the application.
+O sistema é um único processo e deploy, mas cada módulo preserva suas camadas de domínio, aplicação e infraestrutura.
+Integrações síncronas usam APIs Java públicas, ports e adapters in-process; reações assíncronas usam eventos Spring.
 
-## Run locally
+O MySQL 8.0 foi escolhido pela natureza relacional e transacional do domínio, garantindo integridade referencial e
+operações atômicas para os fluxos de Ordem de Serviço e estoque. A decisão completa está na
+[ADR-001](docs/adr/ADR-001-escolha-do-banco-de-dados.md).
 
-Requirements: Java 21 and Docker Compose.
+Consulte [AGENTS.md](AGENTS.md) antes de alterar a aplicação.
+
+## Execução local
+
+Para executar com Docker, são necessários Docker Compose e GNU Make. Java 21 é necessário apenas para executar a
+aplicação fora dos containers com `make run-dev`.
 
 ```bash
 make docker-up
 ```
 
-The local Docker environment uses the `dev` profile and loads idempotent demonstration Customer and Stock Item records.
-Copy `.env.example` to `.env` to override this behavior. Seeds are disabled in the default application profile.
+Caso o GNU Make não esteja disponível, execute diretamente:
 
-All administrative endpoints require a JWT (see `docs/adr/ADR-003-authentication-strategy.md`). Set
-`APP_SECURITY_JWT_SECRET` in `.env` for any real deployment; the default in `.env.example` is for local development
-only. A bootstrap `admin`/`ADMIN` account is mandatory reference data (Flyway-seeded) and is the entry point to
-obtain a token and create further accounts — see the Postman walkthrough below.
+```bash
+docker compose up -d --build
+```
 
-Useful URLs:
+O ambiente Docker local utiliza o perfil `dev` e carrega dados de demonstração idempotentes de Customer e Stock Item.
+Copie `.env.example` para `.env` para alterar esse comportamento. Os seeds ficam desativados no perfil padrão da
+aplicação.
+
+Todos os endpoints administrativos exigem JWT (consulte `docs/adr/ADR-003-authentication-strategy.md`). Defina
+`APP_SECURITY_JWT_SECRET` no `.env` para qualquer ambiente real; o valor padrão de `.env.example` é exclusivo para
+desenvolvimento local. A conta obrigatória `admin`/`ADMIN`, criada por migration Flyway, permite obter um token e criar
+outras contas, conforme o roteiro Postman abaixo.
+
+URLs úteis:
 
 - API base: `http://localhost:8080/api`
 - Swagger UI: `http://localhost:8080/swagger-ui.html`
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
 - External Supplier System simulator (WireMock): `http://localhost:8089`
 
-## Development commands
+## Recursos da API
+
+| Recurso | Prefixo | Capacidades principais |
+| --- | --- | --- |
+| Autenticação | `/api/auth` | Login JWT e criação administrativa de contas. |
+| Clientes | `/api/customers` | Cadastro, identificação, consulta, atualização e arquivamento. |
+| Veículos | `/api/vehicles` | Cadastro, consulta, atualização, quilometragem e arquivamento. |
+| Catálogo | `/api/catalog-services` | Cadastro, consulta, atualização de preço e arquivamento. |
+| Técnicos | `/api/technicians` | Cadastro, consulta, especialidades e status. |
+| Ordens de Serviço | `/api/service-orders` | Criação, diagnóstico, orçamento, execução, tracking e entrega. |
+| Estoque | `/api/stock-items` | Estoque, saldo e política de baixo estoque. |
+| Reservas | `/api/stock-reservations` | Consulta e consumo de reservas de materiais. |
+| Compras | `/api/purchase-demands`, `/api/purchase-orders` | Demandas, compras e recebimentos. |
+
+O contrato OpenAPI é a fonte de verdade para todos os endpoints. A coleção Postman versionada em
+`docs/api/postman/workshop-management-system.postman_collection.json` contém exemplos e asserções dos fluxos.
+
+## Comandos de desenvolvimento
 
 ```bash
 make test
@@ -49,7 +82,7 @@ quando a suíte, o `ModuleStructureTest`, a geração do relatório JaCoCo ou a 
 mínimo é 80%, definido no `pom.xml`; o workflow não mantém um cálculo separado. Depois de uma execução local, abra
 `target/site/jacoco/index.html` para consultar o relatório de cobertura.
 
-## Continuous integration
+## Integração contínua
 
 O workflow `CI` executa o check único `Quality gate` em Pull Requests e pushes para `dev` e `main`, usando Temurin 21 e
 o Maven Wrapper. No resumo de cada execução, a seção **Artifacts** disponibiliza por 30 dias:
@@ -60,27 +93,46 @@ o Maven Wrapper. No resumo de cada execução, a seção **Artifacts** disponibi
 Um novo commit cancela a execução obsoleta da mesma proposta. A proteção das branches deve exigir o contexto exato
 `Quality gate`; renomear o job requer coordenar antes a regra correspondente no GitHub.
 
-## E2E smoke suite (Postman/Newman)
+### Scan de segurança
 
-Every request in the Postman collection asserts its HTTP status and key response fields via `pm.test`, so it
-doubles as an E2E smoke suite. Run it against a running instance (`make docker-up`) with:
+O workflow `Security scan` é separado do `CI` de propósito: ele não participa do check obrigatório `Quality gate`, para
+que os scans não deixem toda Pull Request mais lenta nem a bloqueiem por uma CVE publicada em biblioteca de terceiros.
+Ele é disparado manualmente (**Actions → Security scan → Run workflow**) e tem dois jobs:
+
+- `Dependency-Check (SCA)`, que analisa as dependências do `pom.xml`. Requer o secret `NVD_API_KEY`;
+- `OWASP ZAP (DAST)`, que sobe a aplicação via Docker Compose e a escaneia a partir do contrato OpenAPI, autenticado
+  como `ADMIN`.
+
+Os artifacts ficam disponíveis por 30 dias:
+
+- `dependency-check-report-*`, com o relatório HTML/JSON do OWASP Dependency-Check;
+- `zap-report-*`, com o relatório HTML/JSON do OWASP ZAP.
+
+**O output bruto dessas ferramentas nunca é commitado**. Isso evita registrar no histórico do Git um mapa detalhado de
+vulnerabilidades por versão, inclusive depois de uma correção. A análise narrativa fica em
+`docs/security/vulnerability-report.md` e referencia qual execução de CI gerou cada evidência.
+
+Para rodar localmente:
 
 ```bash
-make e2e
+export NVD_API_KEY=<chave da NVD>
+make sca            # analise de dependencias
+
+make docker-up      # sobe a aplicacao
+make dast           # escaneia a API em execucao; use DAST_BASE_URL=... para outro host
 ```
 
-This drives exactly the happy-path sequence described below via Newman's `--folder` flag (which also matches
-individual request names), so it can be re-run repeatedly: the Customer, Vehicle, Service Catalog and Stock Item
-"Create" requests generate a fresh CPF/plate/chassis/SKU/name on every run to avoid `409 Conflict`. Override the
-target with `BASE_URL=... make e2e`. Requires Node.js (`npx`); no global Newman install needed.
+Se a porta 3306 já estiver ocupada, use `DB_PORT=3307 make docker-up`. No Git Bash do Windows o alvo `dast` já define
+`MSYS_NO_PATHCONV=1`, sem o qual o volume do ZAP não é montado.
 
-Run `make help` for Docker and database commands. `make docker-reset` explicitly deletes the local database volume and is
-needed once when adopting the initial Flyway baseline over a database previously created by Hibernate.
+Execute `make help` para consultar comandos de Docker e banco de dados. `make docker-reset` remove explicitamente o
+volume local do banco e é necessário uma vez ao adotar o baseline inicial do Flyway sobre uma base criada antes pelo
+Hibernate.
 
-## Feature workflow
+## Fluxo de features
 
-Feature specifications live under `docs/features/`. HTTP contract changes must update the generated OpenAPI expectations
-and the collection at `docs/api/postman/workshop-management-system.postman_collection.json`.
+As especificações de features ficam em `docs/features/`. Alterações de contratos HTTP devem atualizar as expectativas
+do OpenAPI gerado e a coleção em `docs/api/postman/workshop-management-system.postman_collection.json`.
 
 ## Teste manual do fluxo principal pelo Postman
 
@@ -91,10 +143,16 @@ ordem de execução é a desta seção.
 
 ### Pré-requisitos e variáveis
 
-É necessário ter Java 21 e Docker Compose. Inicie a API e o MySQL com:
+Para seguir este roteiro, tenha Docker Compose e GNU Make instalados. Inicie a API e o MySQL com:
 
 ```bash
 make docker-up
+```
+
+Sem GNU Make, use:
+
+```bash
+docker compose up -d --build
 ```
 
 Espere a aplicação estar disponível em `http://localhost:8080/swagger-ui.html`, importe a coleção e mantenha as
@@ -382,13 +440,13 @@ retornados em respostas `201 Created` são os que devem ser usados no restante d
 
 ### Fluxo executável de Purchase Order
 
-Execute este roteiro logo depois do **passo 7 — Perform diagnosis** do fluxo principal. Ele é uma compra de reposição:
+Execute este roteiro logo depois do **passo 8 — Perform diagnosis** do fluxo principal. Ele é uma compra de reposição:
 não substitui a geração e decisão da Estimate. Ao final, volte ao passo do fluxo principal em que a Service Order estiver.
 
 1. Para criar uma demanda de compra, faça o diagnóstico com `availableQuantity: 1` no Stock Item e requirement de `3`
-   ou mais. A resposta cria a Purchase Demand `PENDING_REPAIR`. Continue depois com o **passo 8** do fluxo principal
+   ou mais. A resposta cria a Purchase Demand `PENDING_REPAIR`. Continue depois com o **passo 9** do fluxo principal
    para gerar a Estimate; se ela já foi aprovada e a reserva falhou, a execução estará em `AWAITING_ITEMS` no **passo
-   10**.
+   11**.
 2. Execute `Stock & Procurement / List open purchase demands`. Espere `200 OK`, confira `suggestedQuantity` e deixe a
    coleção guardar `purchaseDemandId`.
 3. Gere um novo `purchaseOrderIdempotencyKey` e execute `Create Purchase Order from demand`. A quantidade deve cobrir
@@ -405,7 +463,7 @@ não substitui a geração e decisão da Estimate. Ao final, volte ao passo do f
    reativá-lo e, após o commit, reavalia reservas elegíveis em `AWAITING_ITEMS` por prioridade.
 9. Execute `Retry Purchase Order Receipt` e `Get Purchase Order Receipt`. Espere `200 OK`, o mesmo ID de Receipt e
    nenhum novo incremento de saldo.
-10. Retome o fluxo principal: se a Estimate ainda não foi decidida, continue no passo 8; se a execução já estava em
+10. Retome o fluxo principal: se a Estimate ainda não foi decidida, continue no passo 9; se a execução já estava em
     `AWAITING_ITEMS`, confirme o novo estado com `Get service order status` antes de prosseguir com a execução.
 
 11. Opcionalmente, para uma compra sem demanda, execute `Create ad hoc Purchase Order` com qualquer Stock Item ativo
