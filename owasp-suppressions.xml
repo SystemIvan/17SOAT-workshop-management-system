@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    OWASP Dependency-Check suppression file.
+
+    Every suppression MUST carry a <notes> entry explaining why the finding does not apply to this
+    project. This file is the auditable evidence behind the "false positive" verdicts recorded in
+    docs/security/vulnerability-report.md, so an undocumented suppression is not acceptable.
+
+    Suppress only what was actually analysed and understood. Do not suppress a finding to make a
+    report look clean.
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+</suppressions>

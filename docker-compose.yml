@@ -1,0 +1,80 @@
+services:
+  supplier-simulator:
+    image: wiremock/wiremock:3.13.1
+    container_name: workshop-supplier-simulator
+    command: ["--global-response-templating"]
+    ports:
+      - "${SUPPLIER_SIMULATOR_PORT:-8089}:8080"
+    volumes:
+      - ./docker/wiremock:/home/wiremock:ro
+    networks:
+      - workshop-network
+    restart: unless-stopped
+
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: workshop-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${DB_NAME:-workshop}
+      MYSQL_USER: ${DB_USERNAME:-workshop_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-workshop_pass}
+      TZ: 'America/Sao_Paulo'
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      # Persistência de dados
+      - mysql_data:/var/lib/mysql
+      # Script de inicialização (opcional)
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - workshop-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${DB_USERNAME:-workshop_user}", "-p${DB_PASSWORD:-workshop_pass}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  # Spring Boot Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: workshop-app
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${DB_NAME:-workshop}?useSSL=false&serverTimezone=America/Sao_Paulo&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-workshop_user}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-workshop_pass}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${DDL_AUTO:-validate}
+      SPRING_JPA_SHOW_SQL: ${SHOW_SQL:-false}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      APP_SEED_ENABLED: ${APP_SEED_ENABLED:-true}
+      SUPPLIER_BASE_URL: http://supplier-simulator:8080
+      SUPPLIER_CONNECT_TIMEOUT: ${SUPPLIER_CONNECT_TIMEOUT:-2s}
+      SUPPLIER_READ_TIMEOUT: ${SUPPLIER_READ_TIMEOUT:-5s}
+      APP_SECURITY_JWT_SECRET: ${APP_SECURITY_JWT_SECRET:-change-me-to-a-random-secret-with-at-least-32-bytes}
+      SERVER_PORT: 8080
+      TZ: 'America/Sao_Paulo'
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      supplier-simulator:
+        condition: service_started
+    networks:
+      - workshop-network
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  workshop-network:
+    driver: bridge

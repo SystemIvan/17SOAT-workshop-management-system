@@ -1,2 +1,493 @@
-# 17SOAT-workshop-management-system
-A backend system for automotive workshop management, providing service order lifecycle, customer and vehicle management, inventory control, authentication, and RESTful APIs following Domain-Driven Design (DDD) principles.
+# Workshop Management System
+
+API REST para uma oficina mecânica, implementada como monólito modular com Java 21 e Spring Boot 4.
+
+## Arquitetura
+
+Os módulos do Spring Modulith seguem as fronteiras do domínio:
+
+- `registration`: clientes, veículos e catálogo de serviços;
+- `servicelifecycle`: ordens de serviço, diagnósticos, Estimates, execuções e técnicos;
+- `stockprocurement`: estoque, reservas, demandas, compras, recebimentos e baixo estoque;
+- `identity`: contas, credenciais, autenticação JWT e papéis de acesso.
+
+O sistema é um único processo e deploy, mas cada módulo preserva suas camadas de domínio, aplicação e infraestrutura.
+Integrações síncronas usam APIs Java públicas, ports e adapters in-process; reações assíncronas usam eventos Spring.
+
+O MySQL 8.0 foi escolhido pela natureza relacional e transacional do domínio, garantindo integridade referencial e
+operações atômicas para os fluxos de Ordem de Serviço e estoque. A decisão completa está na
+[ADR-001](docs/adr/ADR-001-escolha-do-banco-de-dados.md).
+
+Consulte [AGENTS.md](AGENTS.md) antes de alterar a aplicação.
+
+## Execução local
+
+Para executar com Docker, são necessários Docker Compose e GNU Make. Java 21 é necessário apenas para executar a
+aplicação fora dos containers com `make run-dev`.
+
+```bash
+make docker-up
+```
+
+Caso o GNU Make não esteja disponível, execute diretamente:
+
+```bash
+docker compose up -d --build
+```
+
+O ambiente Docker local utiliza o perfil `dev` e carrega dados de demonstração idempotentes de Customer e Stock Item.
+Copie `.env.example` para `.env` para alterar esse comportamento. Os seeds ficam desativados no perfil padrão da
+aplicação.
+
+Todos os endpoints administrativos exigem JWT (consulte `docs/adr/ADR-003-authentication-strategy.md`). Defina
+`APP_SECURITY_JWT_SECRET` no `.env` para qualquer ambiente real; o valor padrão de `.env.example` é exclusivo para
+desenvolvimento local. A conta obrigatória `admin`/`ADMIN`, criada por migration Flyway, permite obter um token e criar
+outras contas, conforme o roteiro Postman abaixo.
+
+URLs úteis:
+
+- API base: `http://localhost:8080/api`
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+- External Supplier System simulator (WireMock): `http://localhost:8089`
+
+## Recursos da API
+
+| Recurso | Prefixo | Capacidades principais |
+| --- | --- | --- |
+| Autenticação | `/api/auth` | Login JWT e criação administrativa de contas. |
+| Clientes | `/api/customers` | Cadastro, identificação, consulta, atualização e arquivamento. |
+| Veículos | `/api/vehicles` | Cadastro, consulta, atualização, quilometragem e arquivamento. |
+| Catálogo | `/api/catalog-services` | Cadastro, consulta, atualização de preço e arquivamento. |
+| Técnicos | `/api/technicians` | Cadastro, consulta, especialidades e status. |
+| Ordens de Serviço | `/api/service-orders` | Criação, diagnóstico, orçamento, execução, tracking e entrega. |
+| Estoque | `/api/stock-items` | Estoque, saldo e política de baixo estoque. |
+| Reservas | `/api/stock-reservations` | Consulta e consumo de reservas de materiais. |
+| Compras | `/api/purchase-demands`, `/api/purchase-orders` | Demandas, compras e recebimentos. |
+
+O contrato OpenAPI é a fonte de verdade para todos os endpoints. A coleção Postman versionada em
+`docs/api/postman/workshop-management-system.postman_collection.json` contém exemplos e asserções dos fluxos.
+
+## Comandos de desenvolvimento
+
+```bash
+make test
+make coverage
+make verify
+make run-dev
+```
+
+`make verify` e `make coverage` executam o quality gate completo por meio de `./mvnw clean verify`. O build reprova
+quando a suíte, o `ModuleStructureTest`, a geração do relatório JaCoCo ou a cobertura global de linhas falha. O limite
+mínimo é 80%, definido no `pom.xml`; o workflow não mantém um cálculo separado. Depois de uma execução local, abra
+`target/site/jacoco/index.html` para consultar o relatório de cobertura.
+
+## Integração contínua
+
+O workflow `CI` executa o check único `Quality gate` em Pull Requests e pushes para `dev` e `main`, usando Temurin 21 e
+o Maven Wrapper. No resumo de cada execução, a seção **Artifacts** disponibiliza por 30 dias:
+
+- `test-reports-*`, com os relatórios Surefire/Failsafe produzidos;
+- `jacoco-report-*`, com os relatórios HTML, XML e CSV do JaCoCo.
+
+Um novo commit cancela a execução obsoleta da mesma proposta. A proteção das branches deve exigir o contexto exato
+`Quality gate`; renomear o job requer coordenar antes a regra correspondente no GitHub.
+
+### Scan de segurança
+
+O workflow `Security scan` é separado do `CI` de propósito: ele não participa do check obrigatório `Quality gate`, para
+que os scans não deixem toda Pull Request mais lenta nem a bloqueiem por uma CVE publicada em biblioteca de terceiros.
+Ele é disparado manualmente (**Actions → Security scan → Run workflow**) e tem dois jobs:
+
+- `Dependency-Check (SCA)`, que analisa as dependências do `pom.xml`. Requer o secret `NVD_API_KEY`;
+- `OWASP ZAP (DAST)`, que sobe a aplicação via Docker Compose e a escaneia a partir do contrato OpenAPI, autenticado
+  como `ADMIN`.
+
+Os artifacts ficam disponíveis por 30 dias:
+
+- `dependency-check-report-*`, com o relatório HTML/JSON do OWASP Dependency-Check;
+- `zap-report-*`, com o relatório HTML/JSON do OWASP ZAP.
+
+**O output bruto dessas ferramentas nunca é commitado**. Isso evita registrar no histórico do Git um mapa detalhado de
+vulnerabilidades por versão, inclusive depois de uma correção. A análise narrativa fica em
+`docs/security/vulnerability-report.md` e referencia qual execução de CI gerou cada evidência.
+
+Para rodar localmente:
+
+```bash
+export NVD_API_KEY=<chave da NVD>
+make sca            # analise de dependencias
+
+make docker-up      # sobe a aplicacao
+make dast           # escaneia a API em execucao; use DAST_BASE_URL=... para outro host
+```
+
+Se a porta 3306 já estiver ocupada, use `DB_PORT=3307 make docker-up`. No Git Bash do Windows o alvo `dast` já define
+`MSYS_NO_PATHCONV=1`, sem o qual o volume do ZAP não é montado.
+
+Execute `make help` para consultar comandos de Docker e banco de dados. `make docker-reset` remove explicitamente o
+volume local do banco e é necessário uma vez ao adotar o baseline inicial do Flyway sobre uma base criada antes pelo
+Hibernate.
+
+## Fluxo de features
+
+As especificações de features ficam em `docs/features/`. Alterações de contratos HTTP devem atualizar as expectativas
+do OpenAPI gerado e a coleção em `docs/api/postman/workshop-management-system.postman_collection.json`.
+
+## Teste manual do fluxo principal pelo Postman
+
+Esta seção descreve o fluxo completo da oficina, do cadastro até a entrega do veículo. Ela usa como referência a
+coleção [Workshop Management System](docs/api/postman/workshop-management-system.postman_collection.json): importe
+esse arquivo no Postman e execute as requisições indicadas abaixo. A ordem das pastas na coleção é organizacional; a
+ordem de execução é a desta seção.
+
+### Pré-requisitos e variáveis
+
+Para seguir este roteiro, tenha Docker Compose e GNU Make instalados. Inicie a API e o MySQL com:
+
+```bash
+make docker-up
+```
+
+Sem GNU Make, use:
+
+```bash
+docker compose up -d --build
+```
+
+Espere a aplicação estar disponível em `http://localhost:8080/swagger-ui.html`, importe a coleção e mantenha as
+variáveis no escopo da coleção. Todos os endpoints administrativos exigem um JWT (`AD-016`,
+`docs/adr/ADR-003-authentication-strategy.md`); a coleção já está configurada com autenticação `Bearer {{authToken}}`
+no nível de collection, então basta executar o login do passo 0 antes do restante do roteiro. `baseUrl` deve conter
+apenas a origem, sem `/api`: para a execução local, use `http://localhost:8080`.
+
+| Variável | Como preencher |
+| --- | --- |
+| `baseUrl` | `http://localhost:8080` localmente. |
+| `authToken` | Preenchida automaticamente pelo passo 0 (`Login (bootstrap admin)`); as demais requisições a usam via `Authorization: Bearer {{authToken}}`. |
+| `customerId`, `vehicleId`, `technicianId`, `stockItemId`, `serviceOrderId`, `executionId`, `serviceExecutionId`, `diagnosisId` e `estimateId` | A coleção as atualiza automaticamente quando a respectiva requisição de criação/diagnóstico obtém sucesso. |
+| `stockReservationId` | É preenchida pelo script de `Retry stock reservation` quando houver `reservationId`; se a reserva já ocorreu na decisão, copie `executions[0].stockReservationId` da resposta da decisão para consultar ou consumir a reserva. |
+| `purchaseDemandId` | Variável para testes manuais isolados de Purchase Order. |
+| `purchaseOrderFlowDemandId` | É preenchida por `List open purchase demands` com a primeira demanda retornada e é usada pelo fluxo principal de Purchase Order. |
+| `lowStockPurchaseDemandId` e `lowStockSuggestedQuantity` | São preenchidas por `List open low-stock purchase demands` e usadas pela Purchase Order de reposição preventiva. |
+| `purchaseOrderId` | É preenchida pelas criações de Purchase Order confirmadas pelo simulador. |
+| `purchaseOrderIdempotencyKey` | Identifica o comando de criação ad hoc. Preserve o mesmo UUID e body em retries; gere outro UUID para uma compra diferente. |
+| `purchaseOrderFlowIdempotencyKey` | É gerada pela collection ao executar `Create Purchase Order from demand`; o `Retry same Purchase Order` reutiliza-a automaticamente. |
+| `customerTaxId` | Informe o CPF/CNPJ sem formatação usado para o Customer; é utilizado somente por `Identify customer by CPF/CNPJ`. |
+| `catalogServiceId` | Preenchida automaticamente por `Registrations / Service Catalog / Create catalog service` (passo 3); identifica o serviço informado no diagnóstico (passo 8). |
+| `metricFrom` e `metricTo` | Preenchidas automaticamente por `Get average execution time` com uma janela de 24 horas antes e depois da execução da request. Podem ser substituídas por instantes ISO-8601 para uma consulta manual. |
+
+As requisições `Create customer`, `Create vehicle`, `Create catalog service` e `Create stock item` têm um script de
+pré-requisição que gera CPF (com dígitos verificadores válidos), placa, chassi, nome de serviço e SKU únicos a cada
+execução — não é necessário editar esses valores manualmente entre execuções, mesmo em uma base já usada. Os IDs
+retornados em respostas `201 Created` são os que devem ser usados no restante do teste.
+
+### Sequência executável
+
+0. Em `Auth`, envie `Login (bootstrap admin)`:
+
+   ```http
+   POST {{baseUrl}}/api/auth/login
+   ```
+
+   com `{"username":"admin","password":"changeme123"}` — a conta `admin`/`ADMIN` é dado de referência
+   obrigatório, criado por migração Flyway (`V20260824120001__seed_bootstrap_admin_account.sql`), disponível em
+   qualquer ambiente, não só `dev`. Espere `200 OK`; o script grava o `token` retornado em `authToken`, usado pelo
+   restante da coleção. Se quiser testar outros papéis (`CUSTOMER`, `TECHNICIAN`, `MANAGER`), use `Create user
+   account (ADMIN only)` (`POST {{baseUrl}}/api/auth/users`) autenticado como `admin` e depois faça login com a
+   nova conta.
+
+1. Em `Registrations / Customer`, envie `Create customer`:
+
+   ```http
+   POST {{baseUrl}}/api/customers
+   ```
+
+   Use o body da coleção, com `name`, `document` e `contactInfo`. Espere `201 Created`; o script grava o `id` retornado
+   em `customerId`.
+
+2. Em `Registrations / Vehicle`, envie `Create vehicle`. O body deve manter `"customerId": "{{customerId}}"`; os
+   demais campos são `licensePlate`, `chassis` (opcional), `brand`, `model`, `year`, `color` e `mileage` (opcional).
+
+   ```http
+   POST {{baseUrl}}/api/vehicles
+   ```
+
+   Espere `201 Created` e confirme que `vehicleId` recebeu o `id` retornado.
+
+3. Logo após criar o veículo, em `Registrations / Service Catalog`, envie `Create catalog service`:
+
+   ```json
+   {
+     "name": "{{catalogServiceName}}",
+     "basePrice": { "value": 150.00, "currency": "BRL" }
+   }
+   ```
+
+   Espere `201 Created`; o script grava o `id` retornado em `catalogServiceId`, referenciado pelo diagnóstico no
+   passo 8. Cada `catalogServiceId` usado num diagnóstico deve identificar um serviço ativo — pular este passo faz
+   `Perform diagnosis` falhar com `404`.
+
+4. Em `Service Lifecycle / Technicians`, envie `Create technician` com o exemplo da coleção:
+
+   ```json
+   {
+     "name": "Joao Technician",
+     "specialties": ["MECHANICAL", "DIAGNOSTICS"]
+   }
+   ```
+
+   A resposta esperada é `201 Created` e preenche `technicianId`.
+
+5. Se o diagnóstico usar peça ou insumo, crie-o agora em `Stock & Procurement / Create stock item`. O exemplo da
+   coleção cria a peça que será referenciada no diagnóstico:
+
+   ```json
+   {
+     "name": "Oil filter",
+     "sku": "{{stockItemSku}}",
+     "type": "PART",
+     "availableQuantity": 20,
+     "price": { "value": 45.90, "currency": "BRL" }
+   }
+   ```
+
+   Envie `POST {{baseUrl}}/api/stock-items`, espere `201 Created` e use o `stockItemId` gravado pelo script. A
+   quantidade disponível deve ser pelo menos a quantidade exigida no diagnóstico para exercitar a reserva bem-sucedida.
+
+   Para a reposição preventiva, envie em seguida `PUT {{baseUrl}}/api/stock-items/{{stockItemId}}/low-stock-policy`
+   com um `minimumQuantity` maior que o saldo atual e um `targetQuantity` ainda maior — por exemplo,
+   `{ "minimumQuantity": 21, "targetQuantity": 30 }` para o item acima. A consulta
+   `GET {{baseUrl}}/api/stock-items?lowStock=true&active=true` mostra apenas itens configurados cujo saldo está
+   estritamente abaixo do mínimo. Em seguida, execute `Stock & Procurement / List open low-stock purchase demands`;
+   ela consulta `GET {{baseUrl}}/api/purchase-demands?origin=LOW_STOCK&stockItemId={{stockItemId}}` e retorna a
+   demanda aberta para a reposição preventiva. Depois, execute `Create Purchase Order from low-stock demand`: a
+   coleção usa o ID e o `suggestedQuantity` retornados para montar a linha da ordem. Para desabilitar a policy de
+   forma idempotente, envie `DELETE` no mesmo caminho; nenhuma dessas operações cria uma Purchase Order automaticamente.
+
+6. Em `Service Lifecycle / Service Orders`, envie `Create service order` em
+   `POST {{baseUrl}}/api/service-orders`. Mantenha `customerId` e `vehicleId` nas variáveis da coleção e informe o
+   retrato do veículo e a avaliação inicial, como no exemplo:
+
+   ```json
+   {
+     "customerId": "{{customerId}}",
+     "vehicleId": "{{vehicleId}}",
+     "vehicleSnapshot": {
+       "licensePlate": "ABC1D23",
+       "brand": "Fiat",
+       "model": "Argo",
+       "year": 2024
+     },
+     "priority": "NORMAL",
+     "initialAssessment": "Ruído ao frear relatado pelo cliente"
+   }
+   ```
+
+   Espere `201 Created`. A resposta registra `serviceOrderId`; consulte já neste ponto `Get service order status`
+   (`GET {{baseUrl}}/api/service-orders/{{serviceOrderId}}/status`) e espere `RECEIVED`.
+
+7. Envie `Assign diagnosis assignee`:
+
+   ```http
+   PUT {{baseUrl}}/api/service-orders/{{serviceOrderId}}/diagnosis-assignee
+   ```
+
+   com `{"technicianId":"{{technicianId}}"}`. A resposta é `200 OK` e apresenta `diagnosisAssigneeId`. Esta é a
+   atribuição planejada; ela não substitui o autor efetivo registrado no próximo passo.
+
+8. Envie `Perform diagnosis`:
+
+   ```http
+   POST {{baseUrl}}/api/service-orders/{{serviceOrderId}}/diagnosis
+   ```
+
+   Para o caminho com peça, use o body da coleção, que inclui `diagnosedByTechnicianId`, um item de serviço com preço e
+   `stockRequirements` com `stockItemId`, `type`, `quantity`, `nameSnapshot` e `priceSnapshot`:
+
+   ```json
+   {
+     "diagnosedByTechnicianId": "{{technicianId}}",
+     "items": [{
+       "catalogServiceId": "{{catalogServiceId}}",
+       "name": "Oil and filter change",
+       "price": { "value": 150.00, "currency": "BRL" },
+       "stockRequirements": [{
+         "stockItemId": "{{stockItemId}}",
+         "type": "PART",
+         "quantity": 1,
+         "nameSnapshot": "Oil filter",
+         "priceSnapshot": { "value": 45.90, "currency": "BRL" }
+       }]
+     }]
+   }
+   ```
+
+   Espere `200 OK`. O script define `executionId`, `serviceExecutionId` e `diagnosisId` a partir da primeira execução.
+   Confirme que a execução mostra `diagnosedByTechnicianId` (autor efetivo), `stockAvailability` e consulte `/status`:
+   o status esperado é `IN_DIAGNOSIS`. Se a quantidade observada for insuficiente, a Purchase Demand `PENDING_REPAIR`
+   já é criada neste passo; isso não reserva saldo nem antecipa `AWAITING_ITEMS`.
+
+9. Em `Estimates`, envie `Generate estimate`:
+
+   ```http
+   POST {{baseUrl}}/api/service-orders/{{serviceOrderId}}/estimates
+   ```
+
+   com `{"diagnosisId":"{{diagnosisId}}"}`. O script de pré-requisição usa o `diagnosisId` salvo pela coleção, mesmo
+   que exista uma variável de ambiente com o mesmo nome. Espere `201 Created`, guarde o `estimateId` definido pelo
+   script e use `Get estimate` (`GET {{baseUrl}}/api/estimates/{{estimateId}}`) para conferir `lines`, seus
+   `serviceExecutionId`, preço do serviço, itens comerciais, `stockAvailability`, o `lineTotal` calculado em cada linha
+   e o `total` consolidado da Estimate.
+
+   Os totais são calculados pelo servidor exclusivamente a partir dos snapshots comerciais congelados na Estimate:
+
+   - `lineTotal = servicePrice + soma(priceSnapshot × quantity)` dos Stock Items da linha;
+   - `total = soma dos lineTotal` de todas as linhas da Estimate.
+
+   Dessa forma, o consumidor da API não precisa recalcular o valor comercial do orçamento nem consultar novamente
+   Service Catalog ou Stock Items para obter os preços. Os requisitos permanecem congelados e a disponibilidade é
+   revalidada ao gerar o orçamento, atualizando a mesma demanda quando ainda houver insuficiência.
+
+   Para o exemplo deste roteiro, com serviço de `150.00 BRL` e uma unidade do item de estoque de `45.90 BRL`, a linha
+   deve apresentar um `lineTotal` de `195.90 BRL`. Como há apenas uma linha, o `total` da Estimate também deve ser
+   `195.90 BRL`.
+
+10. Decida todas as linhas consultadas em `Decide estimate lines`:
+
+    ```http
+    POST {{baseUrl}}/api/estimates/{{estimateId}}/decisions
+    ```
+
+    Para aprovar a única linha do exemplo, use:
+
+    ```json
+    {
+      "decisions": [
+        { "serviceExecutionId": "{{executionId}}", "decision": "APPROVED" }
+      ]
+    }
+    ```
+
+    A resposta é `200 OK` com a Service Order. Para múltiplas linhas, inclua uma decisão para cada
+    `lines[].serviceExecutionId` retornado por `Get estimate`; uma linha já decidida não pode ser decidida novamente.
+
+11. Verifique se a execução aprovada está `READY`.
+
+    - Se o diagnóstico não tiver peça (`"stockRequirements": []`), ela já estará pronta; siga para o passo 12.
+    - Se tiver peça, a decisão do orçamento já tenta reservá-la. Com quantidade suficiente, a execução fica `READY` e
+      recebe `stockReservationId`; siga para o passo 12. A reserva pode ser consultada nas requisições de Stock.
+    - Se ela ficar `AWAITING_ITEMS`, falta material. Execute `Retry stock reservation`, sem body. `RESERVED` a deixa
+      `READY`; `NOT_RESERVED` mostra o motivo em `issues` e o fluxo não pode prosseguir até haver quantidade
+      disponível. RF27 agora permite criar a Purchase Order para a demanda, mas o recebimento e a reposição do saldo
+      continuam fora desta feature (RF29).
+
+12. Para cada execução aprovada que será realizada, envie `Assign technician`:
+
+    ```http
+    POST {{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/assign-technician
+    ```
+
+    com `{"technicianId":"{{technicianId}}"}`. Espere `200 OK` e confira `assignedTechnicianId`. Não atribua uma
+    execução `REJECTED`.
+
+13. Depois de atribuir o Technician no passo 12, e somente com a execução `READY`, envie, nesta ordem,
+    `Start execution`, `Update execution progress` e `Complete execution`. `Start execution` sem
+    `assignedTechnicianId` retorna `409 INVALID_STATE_TRANSITION`:
+
+    ```http
+    POST  {{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/start
+    PATCH {{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/progress
+    POST  {{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/complete
+    ```
+
+    O `PATCH` usa o body `{"note":"Oil drained and filter replaced"}`. Atualmente essa `note` só valida que a
+    execução está `IN_PROGRESS`: ela não é persistida nem é devolvida pela API. Portanto, execute-o para testar o
+    endpoint, mas não o use como histórico de trabalho. Espere `200 OK` em todas: os estados da execução devem ser,
+    respectivamente, `IN_PROGRESS`, `IN_PROGRESS` e `COMPLETED`. Repita o ciclo para cada linha aprovada antes de
+    finalizar a ordem.
+
+14. Depois de `Complete execution`, envie `Get average execution time`:
+
+    ```http
+    GET {{baseUrl}}/api/service-orders/metrics/average-execution-time?from={{metricFrom}}&to={{metricTo}}
+    ```
+
+    O endpoint aceita somente JWT de `MANAGER` ou `ADMIN`; o login bootstrap do passo 0 usa `ADMIN`. O script da
+    coleção define uma janela que inclui a conclusão recém-registrada. Espere `200 OK`, `unit: "HOURS"`,
+    `global.sampleCount >= 1` e um item de `byCatalogService` cujo `catalogServiceId` seja o criado no passo 3.
+    `averageHours` possui duas casas decimais e pode ser `0.00` para uma execução instantânea; sem amostras, a
+    contagem é zero, a média é `null` e os grupos ficam vazios. Não há campos em segundos ou milissegundos.
+
+    O filtro considera `completedAt >= from` e `completedAt < to`. Somente transições realizadas após a adoção da
+    feature possuem `startedAt` e `completedAt`; registros legados não recebem backfill e, portanto, não entram na
+    métrica. Pausas e retomadas não são modeladas neste MVP: a duração é o tempo transcorrido entre a mudança para
+    `IN_PROGRESS` e a mudança para `COMPLETED`.
+
+15. Quando todas as execuções estiverem `COMPLETED` ou `REJECTED`, envie `Finalize service order`:
+
+    ```http
+    POST {{baseUrl}}/api/service-orders/{{serviceOrderId}}/finalize
+    ```
+
+    com `{"vehicleDelivered":true}`. Espere `200 OK` e `statusSnapshot: "DELIVERED"`. O valor `false`, ou tentar
+    finalizar antes de a ordem estar concluída, retorna conflito (`409`).
+
+16. Durante o roteiro, use tanto `Get service order` quanto `Get service order status`. O primeiro retorna o retrato
+    completo, inclusive `executions` e `statusSnapshot`; o segundo retorna somente `{ "id", "status" }`. No contrato
+    atual, `ServiceOrderResponse.status` está marcado como obsoleto; para a leitura completa, use
+    `statusSnapshot` como o campo de acompanhamento.
+
+### Fluxo executável de Purchase Order
+
+Execute este roteiro logo depois do **passo 8 — Perform diagnosis** do fluxo principal. Ele é uma compra de reposição:
+não substitui a geração e decisão da Estimate. Ao final, volte ao passo do fluxo principal em que a Service Order estiver.
+
+1. Para criar uma demanda de compra, faça o diagnóstico com `availableQuantity: 1` no Stock Item e requirement de `3`
+   ou mais. A resposta cria a Purchase Demand `PENDING_REPAIR`. Continue depois com o **passo 9** do fluxo principal
+   para gerar a Estimate; se ela já foi aprovada e a reserva falhou, a execução estará em `AWAITING_ITEMS` no **passo
+   11**.
+2. Execute `Stock & Procurement / List open purchase demands`. Espere `200 OK`, confira `suggestedQuantity` e deixe a
+   coleção guardar `purchaseDemandId`.
+3. Gere um novo `purchaseOrderIdempotencyKey` e execute `Create Purchase Order from demand`. A quantidade deve cobrir
+   ao menos a sugerida. Espere `201 Created`, `status: "OPEN"` e o ID da ordem em `Location`.
+4. Execute `Retry same Purchase Order` sem mudar header ou body. Espere `200 OK` e a mesma referência externa.
+   Alterar o body usando a mesma chave retorna `409 PURCHASE_ORDER_IDEMPOTENCY_CONFLICT`.
+5. Execute `Get Purchase Order`; a demanda não aparecerá mais na listagem aberta porque está `ORDERED`. Em seguida,
+   execute `List Purchase Orders pending delivery` e localize a ordem `OPEN`.
+6. Execute `Close Purchase Order` sem body. Espere `200 OK`, `status: "CLOSED"`, `closedAt` e
+   `closedByUserAccountId`. Este é o encerramento de RF28: ele não altera `availableQuantity`.
+7. Execute `Retry close Purchase Order`. Espere `200 OK` e o mesmo `closedAt`; o fechamento é terminal e idempotente.
+8. Execute `Receive Purchase Order` sem body. Espere `201 Created`, `Location`, uma linha de Receipt por linha da
+   ordem e o aumento de `availableQuantity`. Esta é a etapa RF29: ela aceita recebimento histórico de item inativo sem
+   reativá-lo e, após o commit, reavalia reservas elegíveis em `AWAITING_ITEMS` por prioridade.
+9. Execute `Retry Purchase Order Receipt` e `Get Purchase Order Receipt`. Espere `200 OK`, o mesmo ID de Receipt e
+   nenhum novo incremento de saldo.
+10. Retome o fluxo principal: se a Estimate ainda não foi decidida, continue no passo 9; se a execução já estava em
+    `AWAITING_ITEMS`, confirme o novo estado com `Get service order status` antes de prosseguir com a execução.
+
+11. Opcionalmente, para uma compra sem demanda, execute `Create ad hoc Purchase Order` com qualquer Stock Item ativo
+    e `demandIds: []`. Use uma nova chave de idempotência e espere `201 Created`. Para uma ordem mista, mantenha os
+    `demandIds` e inclua as linhas ad hoc; itens repetidos são consolidados.
+12. Opcionalmente, para testar falhas do simulador, use `SUPPLIER-REJECT-001` (retorna
+    `422 SUPPLIER_ORDER_REJECTED` e reabre as demandas) ou `SUPPLIER-TIMEOUT-001` (retorna
+    `503 EXTERNAL_SUPPLIER_UNAVAILABLE`). No timeout, a ordem fica `PENDING_SUBMISSION`; restaure o simulador e
+    repita exatamente o mesmo POST e `Idempotency-Key` para reconciliar sem duplicar a compra. O `make docker-up`
+    sobe o WireMock na porta `8089`; a aplicação o acessa internamente por `http://supplier-simulator:8080`. Não
+    configure um fornecedor real no MVP.
+
+### Bifurcações e acompanhamento de status
+
+`statusSnapshot` é recalculado a partir das execuções e da entrega. Em uma ordem recém-criada ele é `RECEIVED`; após
+o diagnóstico aberto, `IN_DIAGNOSIS`; uma execução aprovada sem requisito de estoque, ou com reserva confirmada, deixa
+a ordem `IN_PROGRESS`; falta de peça deixa-a `AWAITING_ITEMS`; e todas as execuções terminais (`COMPLETED` ou
+`REJECTED`) deixam-na `COMPLETED`. A entrega confirmada no passo final muda-a para `DELIVERED`.
+
+Uma linha rejeitada recebe `REJECTED` e não deve ser atribuída, iniciada nem concluída. Se houver linhas aprovadas e
+rejeitadas, execute apenas as aprovadas e complete todas elas; a rejeitada já conta como terminal. Se todas forem
+rejeitadas, a ordem alcança `COMPLETED` e ainda pode ser finalizada com `vehicleDelivered: true`.
+
+Embora `AWAITING_APPROVAL` exista entre os valores possíveis de status, a geração do orçamento preserva o diagnóstico
+aberto no contrato atual; valide o status sempre pela resposta real de `Get service order status`, especialmente entre
+geração e decisão do orçamento. Para erros de validação, referências inexistentes ou transições inválidas, espere os
+status HTTP documentados no Swagger, em geral `400`, `404` ou `409`, e corrija a condição antes de continuar.

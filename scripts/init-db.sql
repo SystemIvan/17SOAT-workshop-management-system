@@ -1,0 +1,8 @@
+-- Script de inicialização do banco de dados
+-- Executado automaticamente pelo container MySQL no primeiro start
+-- (montado em /docker-entrypoint-initdb.d/init.sql pelo docker-compose.yml)
+--
+-- O database e o usuário já são criados pelas variáveis de ambiente
+-- MYSQL_DATABASE / MYSQL_USER / MYSQL_PASSWORD (ver docker-compose.yml).
+-- As tabelas são gerenciadas pelo Flyway a partir de src/main/resources/db/migration.
+-- Adicione aqui apenas seeds ou ajustes complementares, se necessário.

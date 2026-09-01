@@ -1,0 +1,42 @@
+HELP.md
+target/
+.e2e-newman-env.json
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+.env
+rascunho/
+
+### Claude Code local context (Santiago / Épico 3) ###
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
