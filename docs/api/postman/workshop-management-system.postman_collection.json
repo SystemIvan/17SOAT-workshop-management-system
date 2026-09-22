@@ -930,7 +930,11 @@
                   "script": {
                     "exec": [
                       "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
-                      "pm.test('Response is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+                      "pm.test('Response is an array', function () { pm.expect(pm.response.json()).to.be.an('array'); });",
+                      "const validStatusLabels = ['RECEBIDA', 'DIAGNOSTICO', 'AGUARDANDO_APROVACAO', 'EXECUCAO', 'FINALIZADA', 'ENTREGUE'];",
+                      "pm.test('Every returned order has a known statusLabel', function () {",
+                      "    pm.response.json().forEach((order) => pm.expect(validStatusLabels).to.include(order.statusLabel));",
+                      "});"
                     ]
                   }
                 }
@@ -951,6 +955,9 @@
                       "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
                       "pm.test('Every returned order matches the filtered status', function () {",
                       "    pm.response.json().forEach((order) => pm.expect(order.statusSnapshot).to.eql('IN_DIAGNOSIS'));",
+                      "});",
+                      "pm.test('Every returned order has statusLabel DIAGNOSTICO', function () {",
+                      "    pm.response.json().forEach((order) => pm.expect(order.statusLabel).to.eql('DIAGNOSTICO'));",
                       "});"
                     ]
                   }
@@ -1030,6 +1037,10 @@
                       "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
                       "pm.test('Returned order matches serviceOrderId', function () {",
                       "    pm.expect(pm.response.json().id).to.eql(pm.variables.get('serviceOrderId'));",
+                      "});",
+                      "const validStatusLabels = ['RECEBIDA', 'DIAGNOSTICO', 'AGUARDANDO_APROVACAO', 'EXECUCAO', 'FINALIZADA', 'ENTREGUE'];",
+                      "pm.test('statusLabel is a known nominal value', function () {",
+                      "    pm.expect(validStatusLabels).to.include(pm.response.json().statusLabel);",
                       "});"
                     ]
                   }
@@ -1051,6 +1062,10 @@
                       "const validStatuses = ['RECEIVED', 'IN_DIAGNOSIS', 'AWAITING_APPROVAL', 'AWAITING_ITEMS', 'IN_PROGRESS', 'COMPLETED', 'DELIVERED'];",
                       "pm.test('Status is a known ServiceOrderStatus value', function () {",
                       "    pm.expect(validStatuses).to.include(pm.response.json().status);",
+                      "});",
+                      "const validStatusLabels = ['RECEBIDA', 'DIAGNOSTICO', 'AGUARDANDO_APROVACAO', 'EXECUCAO', 'FINALIZADA', 'ENTREGUE'];",
+                      "pm.test('statusLabel is a known nominal value', function () {",
+                      "    pm.expect(validStatusLabels).to.include(pm.response.json().statusLabel);",
                       "});"
                     ]
                   }

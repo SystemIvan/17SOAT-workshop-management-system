@@ -30,12 +30,14 @@ public final class ServiceOrderMapper {
                 serviceOrder.diagnosisAssigneeId(),
                 status,
                 status,
+                ServiceOrderStatusLabel.from(status),
                 serviceOrder.approvedEstimateIds(),
                 serviceOrder.serviceExecutions().stream().map(ServiceOrderMapper::toExecutionResponse).toList());
     }
 
     public static ServiceOrderStatusResponse toStatusResponse(ServiceOrder serviceOrder) {
-        return new ServiceOrderStatusResponse(serviceOrder.id(), serviceOrder.status());
+        var status = serviceOrder.status();
+        return new ServiceOrderStatusResponse(serviceOrder.id(), status, ServiceOrderStatusLabel.from(status));
     }
 
     public static ServiceExecutionResponse toExecutionResponse(ServiceExecution execution) {
