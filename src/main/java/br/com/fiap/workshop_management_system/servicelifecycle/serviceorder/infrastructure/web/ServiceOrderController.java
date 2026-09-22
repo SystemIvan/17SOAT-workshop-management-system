@@ -124,7 +124,13 @@ public class ServiceOrderController {
     }
 
     @GetMapping
-    @Operation(summary = "List service orders, optionally filtered by status, customer, technician or priority")
+    @Operation(
+            summary = "List service orders, optionally filtered by status, customer, technician or priority",
+            description = "Results are always ordered by operational status rank (IN_PROGRESS, "
+                    + "AWAITING_APPROVAL, IN_DIAGNOSIS, RECEIVED, AWAITING_ITEMS, COMPLETED, DELIVERED) and "
+                    + "then by createdAt ascending within the same status. When no status filter is given, "
+                    + "COMPLETED and DELIVERED orders are excluded from the default listing; an explicit "
+                    + "status filter (including COMPLETED/DELIVERED) always overrides this exclusion.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Service orders listed"),
             @ApiResponse(responseCode = "400", description = "Invalid filter value")

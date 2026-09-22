@@ -15,6 +15,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import org.springframework.data.domain.Persistable;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -67,6 +68,8 @@ public class ServiceOrderJpaEntity implements Persistable<UUID> {
 
     private boolean hasSentEstimateWithPendingLines;
 
+    private Instant createdAt;
+
     @ElementCollection
     @CollectionTable(name = "service_order_approved_estimates", joinColumns = @JoinColumn(name = "service_order_id"))
     @Column(name = "estimate_id")
@@ -92,7 +95,8 @@ public class ServiceOrderJpaEntity implements Persistable<UUID> {
             ServiceOrderStatus statusSnapshot,
             UUID openDiagnosisId,
             boolean hasSentEstimateWithPendingLines,
-            Set<UUID> approvedEstimateIds) {
+            Set<UUID> approvedEstimateIds,
+            Instant createdAt) {
         this.id = id;
         this.customerId = customerId;
         this.vehicleId = vehicleId;
@@ -107,6 +111,7 @@ public class ServiceOrderJpaEntity implements Persistable<UUID> {
         this.openDiagnosisId = openDiagnosisId;
         this.hasSentEstimateWithPendingLines = hasSentEstimateWithPendingLines;
         this.approvedEstimateIds = approvedEstimateIds;
+        this.createdAt = createdAt;
     }
 
     public void addExecution(ServiceExecutionJpaEntity execution) {
@@ -173,6 +178,10 @@ public class ServiceOrderJpaEntity implements Persistable<UUID> {
 
     public Set<UUID> getApprovedEstimateIds() {
         return approvedEstimateIds;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
     }
 
     public List<ServiceExecutionJpaEntity> getExecutions() {

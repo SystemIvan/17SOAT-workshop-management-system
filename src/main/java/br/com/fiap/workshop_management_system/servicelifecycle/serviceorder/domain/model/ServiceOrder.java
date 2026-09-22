@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -19,6 +20,7 @@ public class ServiceOrder {
     private final UUID vehicleId;
     private final VehicleSnapshot vehicleSnapshot;
     private final String initialAssessment;
+    private final Instant createdAt;
     private UUID diagnosisAssigneeId;
     private final Set<UUID> approvedEstimateIds = new LinkedHashSet<>();
     private final List<ServiceExecution> serviceExecutions = new ArrayList<>();
@@ -37,7 +39,7 @@ public class ServiceOrder {
 
     public static ServiceOrder create(
             UUID customerId, UUID vehicleId, VehicleSnapshot vehicleSnapshot, String initialAssessment) {
-        return create(customerId, vehicleId, vehicleSnapshot, Priority.NORMAL, initialAssessment);
+        return create(customerId, vehicleId, vehicleSnapshot, Priority.NORMAL, initialAssessment, Instant.now());
     }
 
     public static ServiceOrder create(
@@ -46,13 +48,30 @@ public class ServiceOrder {
             VehicleSnapshot vehicleSnapshot,
             Priority priority,
             String initialAssessment) {
+        return create(customerId, vehicleId, vehicleSnapshot, priority, initialAssessment, Instant.now());
+    }
+
+    /**
+     * RF38 - permite ao chamador controlar explicitamente o instante de criação (usado por
+     * {@code CreateServiceOrderUseCase}, que injeta um {@code Clock} para testabilidade). As duas
+     * sobrecargas acima continuam usando {@code Instant.now()} para não quebrar call sites existentes
+     * que não precisam desse controle.
+     */
+    public static ServiceOrder create(
+            UUID customerId,
+            UUID vehicleId,
+            VehicleSnapshot vehicleSnapshot,
+            Priority priority,
+            String initialAssessment,
+            Instant createdAt) {
         ServiceOrder serviceOrder = new ServiceOrder(
                 UUID.randomUUID(),
                 customerId,
                 vehicleId,
                 vehicleSnapshot,
                 priority,
-                requireInitialAssessment(initialAssessment));
+                requireInitialAssessment(initialAssessment),
+                Objects.requireNonNull(createdAt, "createdAt must not be null"));
         serviceOrder.statusSnapshot = ServiceOrderStatus.RECEIVED;
         return serviceOrder;
     }
@@ -63,13 +82,15 @@ public class ServiceOrder {
             UUID vehicleId,
             VehicleSnapshot vehicleSnapshot,
             Priority priority,
-            String initialAssessment) {
+            String initialAssessment,
+            Instant createdAt) {
         this.id = id;
         this.customerId = customerId;
         this.vehicleId = vehicleId;
         this.vehicleSnapshot = vehicleSnapshot;
         this.priority = priority;
         this.initialAssessment = initialAssessment;
+        this.createdAt = createdAt;
     }
 
     /**
@@ -89,9 +110,11 @@ public class ServiceOrder {
             UUID openDiagnosisId,
             boolean hasSentEstimateWithPendingLines,
             Set<UUID> approvedEstimateIds,
-            List<ServiceExecution> serviceExecutions) {
+            List<ServiceExecution> serviceExecutions,
+            Instant createdAt) {
         ServiceOrder serviceOrder = new ServiceOrder(
-                id, customerId, vehicleId, vehicleSnapshot, priority, initialAssessment);
+                id, customerId, vehicleId, vehicleSnapshot, priority, initialAssessment,
+                Objects.requireNonNull(createdAt, "createdAt must not be null"));
         serviceOrder.diagnosisAssigneeId = diagnosisAssigneeId;
         serviceOrder.statusSnapshot = statusSnapshot;
         serviceOrder.openDiagnosisId = openDiagnosisId;
@@ -352,6 +375,10 @@ public class ServiceOrder {
 
     public UUID vehicleId() {
         return vehicleId;
+    }
+
+    public Instant createdAt() {
+        return createdAt;
     }
 
     public VehicleSnapshot vehicleSnapshot() {

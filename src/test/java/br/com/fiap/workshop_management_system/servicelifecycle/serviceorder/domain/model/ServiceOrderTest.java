@@ -10,6 +10,7 @@ import java.util.UUID;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -43,6 +44,24 @@ class ServiceOrderTest {
 
         assertEquals(ServiceOrderStatus.RECEIVED, serviceOrder.status());
         assertEquals("Initial assessment", serviceOrder.initialAssessment());
+    }
+
+    @Test
+    void createWithoutExplicitCreatedAtFillsItWithTheCurrentInstant() {
+        ServiceOrder serviceOrder = newServiceOrder();
+
+        assertNotNull(serviceOrder.createdAt());
+    }
+
+    @Test
+    void createWithExplicitCreatedAtPreservesTheGivenInstant() {
+        Instant createdAt = Instant.parse("2026-09-19T12:00:00Z");
+
+        ServiceOrder serviceOrder = ServiceOrder.create(
+                UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, Priority.NORMAL, "Initial assessment",
+                createdAt);
+
+        assertEquals(createdAt, serviceOrder.createdAt());
     }
 
     @Test

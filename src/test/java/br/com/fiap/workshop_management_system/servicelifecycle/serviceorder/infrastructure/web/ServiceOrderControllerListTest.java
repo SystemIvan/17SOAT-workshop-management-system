@@ -1,10 +1,16 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.infrastructure.web;
 
 import br.com.fiap.workshop_management_system.identity.auth.application.port.TokenIssuer;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Money;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockItemType;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockRequirement;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.infrastructure.persistence
         .ServiceOrderJpaRepository;
 import br.com.fiap.workshop_management_system.testsupport.TestAuth;
 import com.jayway.jsonpath.JsonPath;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,12 +19,16 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
 import static br.com.fiap.workshop_management_system.testsupport.CatalogServiceHttpFixture.createActiveCatalogService;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -44,7 +54,17 @@ class ServiceOrderControllerListTest {
     @Autowired
     private ServiceOrderJpaRepository serviceOrderJpaRepository;
 
+    @Autowired
+    private ServiceOrderRepository serviceOrderRepository;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    @Autowired
+    private EntityManager entityManager;
+
     private MockMvc mockMvc;
+    private TransactionTemplate transactionTemplate;
 
     @BeforeEach
     void setUp() {
@@ -54,6 +74,7 @@ class ServiceOrderControllerListTest {
                         .springSecurity())
                 .defaultRequest(get("/").header("Authorization", "Bearer " + TestAuth.adminToken(tokenIssuer)))
                 .build();
+        transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     @Test
@@ -189,6 +210,62 @@ class ServiceOrderControllerListTest {
     }
 
     @Test
+    void defaultListingExcludesCompletedAndDeliveredAndOrdersByOperationalPriority() throws Exception {
+        String received = createServiceOrder(UUID.randomUUID(), "NORMAL");
+        String inDiagnosis = createServiceOrder(UUID.randomUUID(), "NORMAL");
+        diagnoseWithOneExecution(inDiagnosis);
+        String awaitingApproval = createServiceOrder(UUID.randomUUID(), "NORMAL");
+        markEstimateSentWithPendingLines(awaitingApproval);
+        String inProgress = createServiceOrder(UUID.randomUUID(), "NORMAL");
+        moveToInProgress(inProgress);
+        String awaitingItems = createServiceOrder(UUID.randomUUID(), "NORMAL");
+        moveToAwaitingItems(awaitingItems);
+        String completed = createServiceOrder(UUID.randomUUID(), "NORMAL");
+        moveToCompleted(completed);
+        String delivered = createServiceOrder(UUID.randomUUID(), "NORMAL");
+        moveToCompleted(delivered);
+        finalizeServiceOrder(delivered);
+
+        mockMvc.perform(get("/api/service-orders"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(5)))
+                .andExpect(jsonPath("$[*].id", contains(
+                        inProgress, awaitingApproval, inDiagnosis, received, awaitingItems)));
+    }
+
+    @Test
+    void explicitStatusFilterDisablesTheDefaultExclusion() throws Exception {
+        String completed = createServiceOrder(UUID.randomUUID(), "NORMAL");
+        moveToCompleted(completed);
+        String delivered = createServiceOrder(UUID.randomUUID(), "NORMAL");
+        moveToCompleted(delivered);
+        finalizeServiceOrder(delivered);
+
+        mockMvc.perform(get("/api/service-orders").param("status", "COMPLETED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(completed));
+
+        mockMvc.perform(get("/api/service-orders").param("status", "DELIVERED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(delivered));
+    }
+
+    @Test
+    void ordersServiceOrdersWithTheSameStatusFromOldestToNewest() throws Exception {
+        String older = createServiceOrder(UUID.randomUUID(), "NORMAL");
+        setCreatedAt(older, java.time.Instant.parse("2026-09-01T00:00:00Z"));
+        String newer = createServiceOrder(UUID.randomUUID(), "NORMAL");
+        setCreatedAt(newer, java.time.Instant.parse("2026-09-10T00:00:00Z"));
+
+        mockMvc.perform(get("/api/service-orders"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[*].id", contains(older, newer)));
+    }
+
+    @Test
     void detailByIdIsUnaffectedByTheNewListingEndpoint() throws Exception {
         String serviceOrderId = createServiceOrder(UUID.randomUUID(), "NORMAL");
 
@@ -251,5 +328,90 @@ class ServiceOrderControllerListTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"technicianId\":\"" + technicianId + "\"}"))
                 .andExpect(status().isOk());
+    }
+
+    /**
+     * RF38 helpers below drive a ServiceOrder to each of the 7 statuses so the default listing can be
+     * tested end to end. {@code markEstimateSentWithPendingLines}/{@code authorizeExecutionFromEstimate}
+     * are Epic 2 domain integration points with no HTTP endpoint yet (same gap already documented in
+     * {@code ServiceOrderControllerStartExecutionTest}), so they are driven directly through the
+     * repository, like the rest of this test suite already does for the same reason.
+     */
+    private void markEstimateSentWithPendingLines(String serviceOrderId) {
+        transactionTemplate.executeWithoutResult(status -> {
+            ServiceOrder serviceOrder = serviceOrderRepository.findById(UUID.fromString(serviceOrderId)).orElseThrow();
+            serviceOrder.markEstimateSentWithPendingLines();
+            serviceOrderRepository.save(serviceOrder);
+        });
+    }
+
+    private void moveToInProgress(String serviceOrderId) throws Exception {
+        String executionId = diagnoseWithOneExecution(serviceOrderId);
+        authorizeExecution(serviceOrderId, executionId);
+        String technicianId = createTechnician();
+        mockMvc.perform(post("/api/service-orders/{id}/executions/{executionId}/assign-technician",
+                        serviceOrderId, executionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"technicianId\":\"" + technicianId + "\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/service-orders/{id}/executions/{executionId}/start", serviceOrderId, executionId))
+                .andExpect(status().isOk());
+    }
+
+    private void moveToAwaitingItems(String serviceOrderId) throws Exception {
+        String executionId = diagnoseWithOneExecution(serviceOrderId);
+        transactionTemplate.executeWithoutResult(status -> {
+            ServiceOrder serviceOrder = serviceOrderRepository.findById(UUID.fromString(serviceOrderId)).orElseThrow();
+            serviceOrder.attachStockRequirement(UUID.fromString(executionId), new StockRequirement(
+                    UUID.randomUUID(), StockItemType.PART, 1, "Filtro de óleo",
+                    new Money(BigDecimal.TEN, "BRL"), false));
+            serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), UUID.fromString(executionId));
+            serviceOrderRepository.save(serviceOrder);
+        });
+    }
+
+    private void moveToCompleted(String serviceOrderId) throws Exception {
+        String executionId = diagnoseWithOneExecution(serviceOrderId);
+        authorizeExecution(serviceOrderId, executionId);
+        String technicianId = createTechnician();
+        mockMvc.perform(post("/api/service-orders/{id}/executions/{executionId}/assign-technician",
+                        serviceOrderId, executionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"technicianId\":\"" + technicianId + "\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/service-orders/{id}/executions/{executionId}/start", serviceOrderId, executionId))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/service-orders/{id}/executions/{executionId}/complete", serviceOrderId, executionId))
+                .andExpect(status().isOk());
+    }
+
+    private void finalizeServiceOrder(String serviceOrderId) throws Exception {
+        mockMvc.perform(post("/api/service-orders/{id}/finalize", serviceOrderId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"vehicleDelivered\": true}"))
+                .andExpect(status().isOk());
+    }
+
+    private void authorizeExecution(String serviceOrderId, String executionId) {
+        transactionTemplate.executeWithoutResult(status -> {
+            ServiceOrder serviceOrder = serviceOrderRepository.findById(UUID.fromString(serviceOrderId)).orElseThrow();
+            serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), UUID.fromString(executionId));
+            serviceOrderRepository.save(serviceOrder);
+        });
+    }
+
+    /**
+     * Overwrites {@code created_at} directly at the persistence layer (no domain method exposes this -
+     * the field is immutable once a ServiceOrder is created, by design). Used only to make the
+     * "oldest first" ordering test deterministic instead of relying on wall-clock timing between two
+     * sequential HTTP calls.
+     */
+    private void setCreatedAt(String serviceOrderId, java.time.Instant createdAt) {
+        transactionTemplate.executeWithoutResult(status -> {
+            entityManager.createQuery("UPDATE ServiceOrderJpaEntity e SET e.createdAt = :createdAt WHERE e.id = :id")
+                    .setParameter("createdAt", createdAt)
+                    .setParameter("id", UUID.fromString(serviceOrderId))
+                    .executeUpdate();
+        });
     }
 }

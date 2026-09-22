@@ -242,7 +242,8 @@ class ServiceOrderRepositoryImplTest {
                     ServiceOrderStatus.RECEIVED,
                     null,
                     false,
-                    Set.of()));
+                    Set.of(),
+                    Instant.EPOCH));
             entityManager.flush();
             entityManager.clear();
         });

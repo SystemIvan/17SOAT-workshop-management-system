@@ -1,6 +1,7 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.infrastructure.persistence;
 
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrderStatus;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository
         .ServiceOrderSearchCriteria;
@@ -13,6 +14,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -48,6 +50,9 @@ public class ServiceOrderRepositoryImpl implements ServiceOrderRepository {
             List<Predicate> predicates = new ArrayList<>();
             if (criteria.status() != null) {
                 predicates.add(builder.equal(root.get("statusSnapshot"), criteria.status()));
+            } else {
+                predicates.add(root.get("statusSnapshot")
+                        .in(ServiceOrderStatus.COMPLETED, ServiceOrderStatus.DELIVERED).not());
             }
             if (criteria.customerId() != null) {
                 predicates.add(builder.equal(root.get("customerId"), criteria.customerId()));
@@ -65,7 +70,11 @@ public class ServiceOrderRepositoryImpl implements ServiceOrderRepository {
             }
             return builder.and(predicates.toArray(Predicate[]::new));
         };
-        return jpaRepository.findAll(specification).stream().map(mapper::toDomain).toList();
+        return jpaRepository.findAll(specification).stream()
+                .map(mapper::toDomain)
+                .sorted(Comparator.<ServiceOrder>comparingInt(serviceOrder -> serviceOrder.status().listingRank())
+                        .thenComparing(ServiceOrder::createdAt))
+                .toList();
     }
 
     @Override
