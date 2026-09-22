@@ -938,7 +938,7 @@
               "request": {
                 "method": "GET",
                 "url": "{{baseUrl}}/api/service-orders",
-                "description": "Sem parâmetros retorna todas as ordens de serviço. status, customerId, technicianId e priority são filtros opcionais e combináveis com AND; technicianId casa com o diagnosisAssigneeId da SO ou com o assignedTechnicianId de qualquer execução."
+                "description": "Sem parâmetros, exclui ordens COMPLETED/DELIVERED (o filtro explícito de status sempre sobrepõe essa exclusão) e ordena o resultado por prioridade operacional de status (IN_PROGRESS, AWAITING_APPROVAL, IN_DIAGNOSIS, RECEIVED, AWAITING_ITEMS, COMPLETED, DELIVERED) e, dentro do mesmo status, por createdAt crescente. status, customerId, technicianId e priority são filtros opcionais e combináveis com AND; technicianId casa com o diagnosisAssigneeId da SO ou com o assignedTechnicianId de qualquer execução."
               }
             },
             {
