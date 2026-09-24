@@ -18,6 +18,7 @@ public record ServiceOrderResponse(
         @Schema(nullable = true) UUID diagnosisAssigneeId,
         @Schema(deprecated = true) ServiceOrderStatus status,
         ServiceOrderStatus statusSnapshot,
+        ServiceOrderStatusLabel statusLabel,
         Set<UUID> approvedEstimateIds,
         List<ServiceExecutionResponse> executions) {
 }

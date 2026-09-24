@@ -230,7 +230,9 @@ class ServiceOrderControllerListTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(5)))
                 .andExpect(jsonPath("$[*].id", contains(
-                        inProgress, awaitingApproval, inDiagnosis, received, awaitingItems)));
+                        inProgress, awaitingApproval, inDiagnosis, received, awaitingItems)))
+                .andExpect(jsonPath("$[*].statusLabel", contains(
+                        "EXECUCAO", "AGUARDANDO_APROVACAO", "DIAGNOSTICO", "RECEBIDA", "EXECUCAO")));
     }
 
     @Test
@@ -271,7 +273,8 @@ class ServiceOrderControllerListTest {
 
         mockMvc.perform(get("/api/service-orders/{id}", serviceOrderId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(serviceOrderId));
+                .andExpect(jsonPath("$.id").value(serviceOrderId))
+                .andExpect(jsonPath("$.statusLabel").value("RECEBIDA"));
 
         mockMvc.perform(get("/api/service-orders/{id}", UUID.randomUUID()))
                 .andExpect(status().isNotFound());

@@ -285,7 +285,8 @@ retornados em respostas `201 Created` são os que devem ser usados no restante d
    ```
 
    Espere `201 Created`. A resposta registra `serviceOrderId`; consulte já neste ponto `Get service order status`
-   (`GET {{baseUrl}}/api/service-orders/{{serviceOrderId}}/status`) e espere `RECEIVED`.
+   (`GET {{baseUrl}}/api/service-orders/{{serviceOrderId}}/status`) e espere `status` `RECEIVED` e `statusLabel`
+   `RECEBIDA` (os 6 estados nominais do enunciado da Fase 2 — RF39).
 
 7. Envie `Assign diagnosis assignee`:
 
@@ -430,13 +431,15 @@ retornados em respostas `201 Created` são os que devem ser usados no restante d
     POST {{baseUrl}}/api/service-orders/{{serviceOrderId}}/finalize
     ```
 
-    com `{"vehicleDelivered":true}`. Espere `200 OK` e `statusSnapshot: "DELIVERED"`. O valor `false`, ou tentar
-    finalizar antes de a ordem estar concluída, retorna conflito (`409`).
+    com `{"vehicleDelivered":true}`. Espere `200 OK`, `statusSnapshot: "DELIVERED"` e `statusLabel: "ENTREGUE"`. O
+    valor `false`, ou tentar finalizar antes de a ordem estar concluída, retorna conflito (`409`).
 
 16. Durante o roteiro, use tanto `Get service order` quanto `Get service order status`. O primeiro retorna o retrato
-    completo, inclusive `executions` e `statusSnapshot`; o segundo retorna somente `{ "id", "status" }`. No contrato
-    atual, `ServiceOrderResponse.status` está marcado como obsoleto; para a leitura completa, use
-    `statusSnapshot` como o campo de acompanhamento.
+    completo, inclusive `executions`, `statusSnapshot` e `statusLabel`; o segundo retorna
+    `{ "id", "status", "statusLabel" }`. No contrato atual, `ServiceOrderResponse.status` está marcado como
+    obsoleto; para a leitura completa, use `statusSnapshot` como o campo de acompanhamento interno (7 valores) e
+    `statusLabel` como a representação nominal externa de 6 estados do enunciado da Fase 2 (RF39) —
+    `AWAITING_ITEMS` e `IN_PROGRESS` mapeiam ambos para `EXECUCAO`.
 
 ### Fluxo executável de Purchase Order
 
