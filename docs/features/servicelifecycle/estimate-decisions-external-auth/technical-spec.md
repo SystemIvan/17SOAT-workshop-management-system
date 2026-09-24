@@ -3,11 +3,11 @@
 | Campo | Valor |
 |---|---|
 | Feature | `estimate-decisions-external-auth` |
-| Status | Draft |
+| Status | Approved |
 | Responsável | Santiago Silvestre |
 | Atualizado em | 2026-09-23 |
-| Aprovado por | — |
-| Aprovado em | — |
+| Aprovado por | Santiago Silvestre |
+| Aprovado em | 2026-09-23 |
 | Especificação funcional | `./functional-spec.md` (Approved, 2026-09-23 — decisão (b) HMAC de webhook) |
 
 ## Contexto e desenho
