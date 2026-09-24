@@ -3,11 +3,11 @@
 | Campo | Valor |
 |---|---|
 | Feature | `estimate-decisions-external-auth` |
-| Status | Draft |
+| Status | Approved |
 | Responsável | Santiago Silvestre |
 | Atualizado em | 2026-09-23 |
-| Aprovado por | — |
-| Aprovado em | — |
+| Aprovado por | Santiago Silvestre |
+| Aprovado em | 2026-09-23 |
 | Referências | RF41; RF37 (decisão de desenho candidata a ser compartilhada — conteúdo ainda não detalhado, ver "Relação com RF37"); RF40 (`docs/features/servicelifecycle/external-status-update/functional-spec.md`, Draft, bloqueada por esta decisão); `docs/features/servicelifecycle/decide-estimate-lines/functional-spec.md` (endpoint e caso de uso protegidos por esta feature, comportamento de negócio inalterado); `docs/Architecture-Decisions.md` AD-016 (Identity/Auth module, mapeamento role→domain-ID); README.md (afirma hoje que todos os endpoints administrativos exigem JWT — texto impactado por esta feature) |
 
 ## Nota sobre a origem do requisito
@@ -58,16 +58,15 @@ A US exige decidir explicitamente entre as duas opções abaixo antes de qualque
   do controller. Não usa nem estende a infraestrutura JWT/Identity existente; trata o gateway externo como
   uma integração de webhook, não como um "usuário" do sistema.
 
-**Recomendação (a confirmar por Santiago):** opção **(b)**. Justificativa: um gateway de aprovação externo
-não é um ator de domínio (não é Customer nem Technician) e não deveria ganhar uma conta/JWT — isso força o
-Identity/Auth module (cujo desenho em AD-016 é explicitamente role→domain-ID) a acomodar um conceito que
-não se encaixa nele. HMAC de webhook é o padrão mais comum para "receber notificação de um sistema
-externo" (é literalmente o texto do enunciado da Fase 2) e mantém o JWT/Identity module sem mudança,
-isolando toda a mudança em um filtro de segurança dedicado a este endpoint. O custo é não reaproveitar a
-infraestrutura JWT já pronta, e precisar de gestão de segredo compartilhado (rotação, armazenamento) — que
-já seria necessária de qualquer forma na opção (a) para o segredo/credencial do client credentials.
-
-Esta spec não marca a decisão como resolvida até confirmação explícita.
+**Decisão: opção (b), HMAC de webhook.** Confirmada por Santiago Silvestre em 2026-09-23. Justificativa: um
+gateway de aprovação externo não é um ator de domínio (não é Customer nem Technician) e não deveria ganhar
+uma conta/JWT — isso força o Identity/Auth module (cujo desenho em AD-016 é explicitamente role→domain-ID)
+a acomodar um conceito que não se encaixa nele. HMAC de webhook é o padrão mais comum para "receber
+notificação de um sistema externo" (é literalmente o texto do enunciado da Fase 2) e mantém o JWT/Identity
+module sem mudança, isolando toda a mudança em um filtro de segurança dedicado a este endpoint. O custo é
+não reaproveitar a infraestrutura JWT já pronta, e precisar de gestão de segredo compartilhado (rotação,
+armazenamento) — que já seria necessária de qualquer forma na opção (a) para o segredo/credencial do
+client credentials.
 
 ## Relação com RF37
 
@@ -129,8 +128,8 @@ descrita, revisar esta seção e, se aplicável, apontar para esta mesma decisã
 
 - qualquer mudança em `DecideEstimateLinesUseCase` ou nas regras de negócio de aprovação/rejeição de
   Estimate já especificadas em `decide-estimate-lines`;
-- estender o modelo role→domain-ID do Identity/Auth module (AD-016) para outros fins além desta decisão,
-  caso a opção (a) seja escolhida;
+- estender o modelo role→domain-ID do Identity/Auth module (AD-016) — a opção (a), que exigiria isso, foi
+  descartada nesta decisão;
 - o formato exato do payload/canal de RF40 (`external-status-update`) — RF40 continua sua própria spec,
   isolada em outra branch, e só avança depois que esta decisão estiver aprovada e implementada;
 - detalhar ou resolver RF37 — apenas sinalizar a relação quando ela for descrita;
@@ -138,13 +137,11 @@ descrita, revisar esta seção e, se aplicável, apontar para esta mesma decisã
 
 ## Critérios de aceite
 
-- [ ] A decisão entre (a) token de serviço JWT e (b) assinatura HMAC de webhook está confirmada por
-      Santiago e registrada nesta spec antes da aprovação.
-- [ ] Dado uma chamada ao endpoint com a credencial/assinatura correta do mecanismo escolhido, quando o
-      endpoint é chamado, então `DecideEstimateLinesUseCase` é executado e o comportamento de negócio é
+- [ ] Dado uma chamada ao endpoint com a assinatura HMAC correta (payload + segredo compartilhado), quando
+      o endpoint é chamado, então `DecideEstimateLinesUseCase` é executado e o comportamento de negócio é
       idêntico ao já especificado em `decide-estimate-lines`.
-- [ ] Dado uma chamada sem credencial/assinatura, ou com um valor inválido, quando o endpoint é chamado,
-      então a API responde `401`/`403` e nenhuma decisão de orçamento é aplicada.
+- [ ] Dado uma chamada sem assinatura HMAC, ou com uma assinatura inválida/adulterada, quando o endpoint é
+      chamado, então a API responde `401`/`403` e nenhuma decisão de orçamento é aplicada.
 - [ ] Dado uma chamada de um usuário interno autenticado por JWT (fluxo já existente), quando o endpoint é
       chamado, então o comportamento é idêntico ao especificado em `decide-estimate-lines`, sem nenhuma
       regressão.
