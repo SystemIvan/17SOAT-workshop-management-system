@@ -10,6 +10,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -34,6 +35,7 @@ import java.util.Locale;
  * unauthenticated instead of failing here, so the JWT filter that follows can still authenticate internal users
  * and the authorization stage answers 401 through {@link ApiAuthenticationEntryPoint} otherwise.
  */
+@Component
 public class EstimateGatewayHmacAuthenticationFilter extends OncePerRequestFilter {
 
     static final String TIMESTAMP_HEADER = "X-Estimate-Gateway-Timestamp";

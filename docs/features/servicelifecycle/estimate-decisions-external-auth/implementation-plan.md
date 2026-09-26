@@ -110,9 +110,9 @@ Revisar:
 
 - [x] `CachedBodyHttpServletRequest` implementado e testado.
 - [x] `EstimateGatewayHmacAuthenticationFilter` implementado e testado.
-- [ ] `SecurityConfig` atualizado (filtro registrado, authority `ESTIMATE_APPROVAL_GATEWAY` na regra da
+- [x] `SecurityConfig` atualizado (filtro registrado, authority `ESTIMATE_APPROVAL_GATEWAY` na regra da
       rota).
-- [ ] Testes de integração HTTP cobrindo sucesso HMAC, falha HMAC (ausente/inválido/expirado) e regressão
+- [x] Testes de integração HTTP cobrindo sucesso HMAC, falha HMAC (ausente/inválido/expirado) e regressão
       JWT.
 - [ ] `README.md`, OpenAPI e Postman atualizados.
 - [ ] Testes relevantes passando.
@@ -199,6 +199,31 @@ A preencher durante a implementação (comandos executados, resultados de teste,
   `|now - timestamp| <= tolerância`, estoura `long` para timestamps próximos de `Long.MIN_VALUE`
   (`Math.abs` devolve negativo) e aceitaria a requisição. Substituída por comparação de limites
   (`now - tol <= timestamp <= now + tol`) e coberta por teste dedicado.
+
+### Checkpoint 3 — Wiring em `SecurityConfig` (2026-09-26)
+
+- `EstimateGatewayHmacAuthenticationFilter` anotado com `@Component` e registrado com
+  `.addFilterBefore(estimateGatewayHmacAuthenticationFilter, JwtAuthenticationFilter.class)`. Assim como o
+  `JwtAuthenticationFilter`, o registro automático como filtro de servlet roda depois da cadeia de
+  segurança e é ignorado por `OncePerRequestFilter` (a requisição já foi marcada como filtrada).
+- Regra da rota: `.requestMatchers(HttpMethod.POST, "/api/estimates/*/decisions")
+  .hasAnyAuthority("CUSTOMER", "ADMIN", "ESTIMATE_APPROVAL_GATEWAY")`. Nenhuma outra regra recebeu a
+  authority do gateway.
+- Precedência: como o filtro HMAC roda antes do JWT, um `Authorization: Bearer` válido enviado junto com
+  headers HMAC prevalece (o filtro JWT sobrescreve o contexto). Coberto por teste.
+- Nova classe `EstimateControllerGatewayAuthenticationTest` (`@SpringBootTest` + `springSecurity()`), 8
+  testes, 0 falhas:
+  - HMAC válido sem JWT → `200`, linha `READY` (aprovação) e `REJECTED` (rejeição);
+  - sem HMAC e sem JWT → `401`; HMAC com segredo errado → `401`; timestamp 301s no passado → `401`. Nos
+    três casos, uma decisão posterior com JWT ADMIN ainda retorna `200`/`READY`, o que prova que
+    `DecideEstimateLinesUseCase` não alterou a linha (ela continuava `PENDING`);
+  - JWT `CUSTOMER` sem HMAC → `200` (regressão pontual);
+  - HMAC inválido + JWT `CUSTOMER` válido → `200`;
+  - headers HMAC válidos em `GET /api/estimates/{id}` → `401` (a assinatura não autentica outras rotas).
+- Execuções:
+  - `./mvnw test -Dtest=EstimateControllerGatewayAuthenticationTest,EstimateControllerDecideLinesTest,SecurityAuthorizationTest,EstimateGatewayHmacAuthenticationFilterTest,ModuleStructureTest`:
+    8 + 8 + 15 + 16 + 2 testes, 0 falhas;
+  - `./mvnw test` (suíte completa): 729 testes, 0 falhas, 0 erros, 0 skipped.
 
 ## Rollback ou recuperação
 
