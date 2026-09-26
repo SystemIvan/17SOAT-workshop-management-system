@@ -41,8 +41,8 @@ aplicação.
 
 Todos os endpoints administrativos exigem JWT (consulte `docs/adr/ADR-003-authentication-strategy.md`). A única
 exceção é `POST /api/estimates/{estimateId}/decisions`, que também aceita, sem JWT, uma chamada assinada por HMAC
-do gateway externo de aprovação do Customer (RF41, ver
-[Decisão de orçamento pelo gateway externo](#decisão-de-orçamento-pelo-gateway-externo-hmac)). Defina
+do gateway externo de aprovação do Customer (RF41, `docs/adr/ADR-007-external-gateway-hmac-authentication.md`;
+ver [Decisão de orçamento pelo gateway externo](#decisão-de-orçamento-pelo-gateway-externo-hmac)). Defina
 `APP_SECURITY_JWT_SECRET` e `APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET` no `.env` para qualquer ambiente real; os
 valores padrão de `.env.example` são exclusivos para desenvolvimento local. A conta obrigatória `admin`/`ADMIN`, criada por migration Flyway, permite obter um token e criar
 outras contas, conforme o roteiro Postman abaixo.
@@ -161,8 +161,8 @@ docker compose up -d --build
 Espere a aplicação estar disponível em `http://localhost:8080/swagger-ui.html`, importe a coleção e mantenha as
 variáveis no escopo da coleção. Todos os endpoints administrativos exigem um JWT (`AD-016`,
 `docs/adr/ADR-003-authentication-strategy.md`), exceto o caminho alternativo por HMAC da decisão de orçamento
-(RF41); a coleção já está configurada com autenticação `Bearer {{authToken}}` no nível de collection, então basta
-executar o login do passo 0 antes do restante do roteiro. `baseUrl` deve conter
+(RF41, `docs/adr/ADR-007-external-gateway-hmac-authentication.md`); a coleção já está configurada com
+autenticação `Bearer {{authToken}}` no nível de collection, então basta executar o login do passo 0 antes do restante do roteiro. `baseUrl` deve conter
 apenas a origem, sem `/api`: para a execução local, use `http://localhost:8080`.
 
 | Variável | Como preencher |
