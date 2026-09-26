@@ -109,7 +109,7 @@ Revisar:
 ## Definition of Done
 
 - [x] `CachedBodyHttpServletRequest` implementado e testado.
-- [ ] `EstimateGatewayHmacAuthenticationFilter` implementado e testado.
+- [x] `EstimateGatewayHmacAuthenticationFilter` implementado e testado.
 - [ ] `SecurityConfig` atualizado (filtro registrado, authority `ESTIMATE_APPROVAL_GATEWAY` na regra da
       rota).
 - [ ] Testes de integração HTTP cobrindo sucesso HMAC, falha HMAC (ausente/inválido/expirado) e regressão
@@ -145,6 +145,12 @@ Revisar:
 Nenhum achado crítico/alto pendente identificado nesta etapa de planejamento; qualquer achado durante a
 implementação deve ser registrado aqui antes de marcar a feature como implementada.
 
+Achados durante a implementação:
+
+- **Checkpoint 2 — overflow na janela de timestamp (alto, resolvido)**: `Math.abs(now - timestamp)` estoura
+  para timestamps extremos e aceitaria uma assinatura válida fora de qualquer janela (replay indefinido).
+  Mitigado com comparação de limites e teste `extremeTimestampDoesNotOverflowIntoTheWindow`.
+
 ## Evidências de verificação
 
 A preencher durante a implementação (comandos executados, resultados de teste, contagens, saída de
@@ -160,6 +166,39 @@ A preencher durante a implementação (comandos executados, resultados de teste,
   - `CachedBodyHttpServletRequestTest`: 5 testes, 0 falhas (duas leituras de `getInputStream()`,
     `getReader()` após `getInputStream()`, charset da requisição respeitado, corpo vazio, cópia defensiva);
   - `ModuleStructureTest`: 2 testes, 0 falhas.
+
+### Checkpoint 2 — `EstimateGatewayHmacAuthenticationFilter` (2026-09-26)
+
+- `identity.EstimateGatewayHmacAuthenticationFilter` criado com construtor `@Value` (segredo + tolerância)
+  e construtor package-private com `Clock`, mesmo padrão de `JwtTokenIssuer`. **Ainda sem `@Component`**:
+  como qualquer `Filter` anotado vira também filtro de servlet no Spring Boot, registrá-lo antes do wiring
+  em `SecurityConfig` o faria rodar fora da cadeia de segurança. `@Component` e o
+  `.addFilterBefore(...)` entram juntos no Checkpoint 3.
+- Decisões de implementação:
+  - segredo em branco rejeitado na construção (`IllegalArgumentException`) — falha no startup em vez de
+    aceitar HMAC com chave vazia;
+  - assinatura comparada em hex minúsculo com `MessageDigest.isEqual`; hex maiúsculo enviado pelo gateway é
+    normalizado antes da comparação;
+  - timestamp não numérico → não autenticado, sem exceção;
+  - a assinatura é sempre calculada antes de checar a janela, para as duas falhas custarem o mesmo trabalho.
+- Properties adicionadas: `app.security.estimate-gateway.hmac-secret`
+  (`APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET`, default só de desenvolvimento) e
+  `app.security.estimate-gateway.timestamp-tolerance-seconds`
+  (`APP_SECURITY_ESTIMATE_GATEWAY_TIMESTAMP_TOLERANCE_SECONDS`, default `300`) em `application.properties`;
+  segredo de teste em `src/test/resources/application.properties`. `application-dev.properties` não
+  sobrescreve segredos hoje, então não foi alterado.
+- `./mvnw test -Dtest=EstimateGatewayHmacAuthenticationFilterTest,CachedBodyHttpServletRequestTest,ModuleStructureTest`:
+  - `EstimateGatewayHmacAuthenticationFilterTest`: 16 testes, 0 falhas — assinatura válida, hex maiúsculo,
+    borda da janela, headers ausentes, só um header, segredo errado, corpo adulterado, timestamp expirado,
+    timestamp futuro fora da janela, timestamp `Long.MIN_VALUE`, timestamp malformado, limpeza de contexto
+    pré-existente, outro path não envolvido, outro método não envolvido, corpo legível downstream, segredo
+    em branco;
+  - `CachedBodyHttpServletRequestTest`: 5 testes, 0 falhas;
+  - `ModuleStructureTest`: 2 testes, 0 falhas.
+- Achado de segurança durante a implementação (resolvido): a checagem de janela sugerida,
+  `|now - timestamp| <= tolerância`, estoura `long` para timestamps próximos de `Long.MIN_VALUE`
+  (`Math.abs` devolve negativo) e aceitaria a requisição. Substituída por comparação de limites
+  (`now - tol <= timestamp <= now + tol`) e coberta por teste dedicado.
 
 ## Rollback ou recuperação
 
