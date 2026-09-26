@@ -35,7 +35,8 @@ class EstimateGatewayHmacAuthenticationFilterTest {
     private static final Instant NOW = Instant.parse("2026-09-26T12:00:00Z");
     private static final String DECISIONS_PATH = "/api/estimates/3f1c2d4e-0000-0000-0000-000000000001/decisions";
     private static final String BODY =
-            "{\"decisions\":[{\"serviceExecutionId\":\"3f1c2d4e-0000-0000-0000-000000000002\",\"decision\":\"APPROVED\"}]}";
+            "{\"decisions\":[{\"serviceExecutionId\":\"3f1c2d4e-0000-0000-0000-000000000002\","
+            + "\"decision\":\"APPROVED\"}]}";
 
     private final EstimateGatewayHmacAuthenticationFilter filter = new EstimateGatewayHmacAuthenticationFilter(
             SECRET, TOLERANCE_SECONDS, Clock.fixed(NOW, ZoneOffset.UTC));
@@ -160,7 +161,9 @@ class EstimateGatewayHmacAuthenticationFilterTest {
     void malformedTimestampLeavesTheRequestUnauthenticatedWithoutThrowing() throws Exception {
         CapturingChain chain = new CapturingChain();
 
-        filter.doFilter(signedRequest("not-a-number", sign("not-a-number", BODY)), new MockHttpServletResponse(), chain);
+        MockHttpServletRequest request = signedRequest("not-a-number", sign("not-a-number", BODY));
+
+        filter.doFilter(request, new MockHttpServletResponse(), chain);
 
         assertNull(chain.authentication);
     }
