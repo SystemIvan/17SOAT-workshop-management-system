@@ -488,8 +488,10 @@ curl -i -X POST "http://localhost:8080/api/estimates/<estimateId>/decisions" \
   --data-raw "$BODY"
 ```
 
-Assinatura errada, segredo diferente, timestamp fora da janela ou corpo alterado após a assinatura resultam em
-`401`, sem alterar a Estimate. Se a chamada também trouxer um `Authorization: Bearer` válido, o JWT prevalece.
+Assinatura errada, segredo diferente, timestamp fora da janela, corpo alterado após a assinatura ou corpo assinado
+maior que 64 KiB (`APP_SECURITY_ESTIMATE_GATEWAY_MAX_BODY_BYTES`, padrão `65536`) resultam em
+`401`, sem alterar a Estimate. Se a chamada também trouxer um `Authorization: Bearer` válido, o JWT prevalece, exceto
+quando o corpo assinado passa do limite: nesse caso a chamada é rejeitada antes de o JWT ser avaliado.
 
 ### Fluxo executável de Purchase Order
 

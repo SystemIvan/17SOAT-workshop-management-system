@@ -117,8 +117,7 @@ Revisar:
 - [x] `README.md`, OpenAPI e Postman atualizados.
 - [x] Testes relevantes passando.
 - [x] `make verify` passando.
-- [ ] Revisão de segurança concluída (ver abaixo) — revisão feita; 1 achado médio aguardando decisão do
-      responsável (buffer do corpo sem limite antes da autenticação).
+- [x] Revisão de segurança concluída (ver abaixo) — achado médio de buffer do corpo resolvido com (a) + (b).
 - [ ] Chamada real via Postman contra a aplicação em Docker — pendente, adiada pelo responsável
       (2026-09-26).
 - [ ] PR pronto para review — pendente, adiado pelo responsável (2026-09-26).
@@ -153,7 +152,8 @@ Achados durante a implementação:
 - **Checkpoint 2 — overflow na janela de timestamp (alto, resolvido)**: `Math.abs(now - timestamp)` estoura
   para timestamps extremos e aceitaria uma assinatura válida fora de qualquer janela (replay indefinido).
   Mitigado com comparação de limites e teste `extremeTimestampDoesNotOverflowIntoTheWindow`.
-- **Checkpoint 5 — corpo lido para a memória sem limite antes da autenticação (médio, EM ABERTO)**:
+- **Checkpoint 5 — corpo lido para a memória sem limite antes da autenticação (médio, RESOLVIDO em
+  2026-09-26 com (a) + (b), decisão de Santiago Silvestre)**:
   `CachedBodyHttpServletRequest` usa `readAllBytes()` sem teto, e o filtro envolve toda
   `POST /api/estimates/*/decisions` antes de saber se o chamador é válido. Antes desta feature, uma chamada
   sem credencial era rejeitada na autorização sem o corpo ser lido; agora um chamador anônimo pode forçar o
@@ -163,6 +163,20 @@ Achados durante a implementação:
   (ex.: 64 KiB) com rejeição `401` via `ApiAuthenticationEntryPoint` quando excedido; (c) aceitar como risco
   de MVP e registrar em `docs/tech-debt/`. (b) altera o comportamento descrito no `technical-spec.md`
   aprovado (o filtro passaria a responder diretamente), por isso não foi aplicado sem decisão.
+  Resolução aplicada:
+  - (a) sem os dois headers HMAC o filtro não lê nem envolve o corpo: limpa o contexto e segue a cadeia com a
+    requisição original (chamadas anônimas e JWT voltam a custar o mesmo que antes do RF41);
+  - (b) com os headers, `Content-Length` declarado acima do limite é rejeitado sem ler nenhum byte; sem
+    `Content-Length` (chunked), a leitura usa `readNBytes(limite + 1)` e rejeita ao passar do teto. A
+    rejeição é o `401` genérico de `ApiAuthenticationEntryPoint` (mesmo corpo `UNAUTHORIZED`), sem chamar o
+    restante da cadeia. Limite configurável em `app.security.estimate-gateway.max-body-bytes`
+    (`APP_SECURITY_ESTIMATE_GATEWAY_MAX_BODY_BYTES`, padrão `65536`); valor não positivo falha no startup.
+  - Efeito colateral documentado no README: com corpo assinado acima do limite, um `Authorization: Bearer`
+    válido na mesma chamada não é avaliado (a chamada já foi rejeitada).
+  - Divergência do `technical-spec.md` aprovado: o spec descreve o filtro como nunca respondendo
+    diretamente ("ausente/inválido → clearContext, sem lançar exceção") e envolvendo sempre o corpo. O
+    contrato externo (toda falha do caminho HMAC → `401`) não muda, mas o spec não foi editado — cabe ao
+    responsável decidir se registra um adendo e se isso exige reaprovação.
 - **Checkpoint 5 — segredo padrão conhecido (baixo, aceito)**: se
   `APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET` não for definida, a aplicação sobe com o segredo de
   desenvolvimento publicado no repositório. É o mesmo padrão já aceito para `APP_SECURITY_JWT_SECRET`;
@@ -171,7 +185,7 @@ Achados durante a implementação:
 Revisão dos itens do checkpoint 5 (2026-09-26):
 
 - **Validação de entrada**: confirmada — timestamp não numérico, header ausente ou assinatura inválida
-  resultam em não autenticado, sem exceção (testes do checkpoint 2). Corpo sem limite: ver achado acima.
+  resultam em não autenticado, sem exceção (testes do checkpoint 2). Corpo limitado a 64 KiB (achado acima).
 - **Autenticação/autorização**: `ESTIMATE_APPROVAL_GATEWAY` só é concedida pelo filtro HMAC e só aparece na
   regra de `POST /api/estimates/*/decisions`; headers válidos em outra rota → `401` (teste de integração).
   Nenhuma mudança no enum `Role` nem no mapeamento role→domain-ID (`git diff 61646cc HEAD -- .../identity/auth`
@@ -183,7 +197,7 @@ Revisão dos itens do checkpoint 5 (2026-09-26):
   permissão (comportamento anterior, agora documentado no OpenAPI), conforme `technical-spec.md`.
 - **Dependências novas**: nenhuma.
 - **Abuso**: replay fora da janela bloqueado (incluindo overflow, corrigido); replay dentro da janela de
-  300s é risco de MVP já aceito no `technical-spec.md`; buffer do corpo, ver achado em aberto.
+  300s é risco de MVP já aceito no `technical-spec.md`; buffer do corpo limitado (achado resolvido).
 
 ## Evidências de verificação
 
@@ -306,7 +320,29 @@ A preencher durante a implementação (comandos executados, resultados de teste,
 - OpenAPI e Postman conferidos contra `technical-spec.md`: mesmos nomes de header, formato
   `HMAC-SHA256(timestamp + "." + rawBody)` em hex, janela de 300s, `401` para falha do caminho HMAC.
 - Pendente por decisão do responsável: execução real via Postman contra a aplicação em Docker e abertura do
-  PR. Pendente de decisão: achado médio de buffer do corpo sem limite (ver "Revisão de segurança").
+  PR. O achado médio de buffer do corpo foi resolvido em seguida (ver abaixo).
+
+### Checkpoint 5 — Correção do buffer do corpo, opção (a) + (b) (2026-09-26)
+
+- Código: `CachedBodyHttpServletRequest(request, maxBodyBytes)` com `readNBytes(limite + 1)` e
+  `BodyTooLargeException`; `EstimateGatewayHmacAuthenticationFilter` só lê o corpo com os dois headers
+  presentes, checa `Content-Length` antes de ler e responde `401` via `ApiAuthenticationEntryPoint` quando o
+  limite é excedido. Nova property `app.security.estimate-gateway.max-body-bytes` (padrão `65536`).
+- Testes novos:
+  - `CachedBodyHttpServletRequestTest` (7 testes): corpo exatamente no limite aceito; corpo acima do limite
+    lança `BodyTooLargeException`;
+  - `EstimateGatewayHmacAuthenticationFilterTest` (21 testes): chamada sem headers segue com a requisição
+    original (corpo não lido), inclusive com corpo 4× acima do limite; corpo assinado acima do limite →
+    `401` `UNAUTHORIZED` sem chamar a cadeia; `Content-Length` declarado acima do limite → `401` sem ler o
+    corpo (o teste falha se `getInputStream()` for chamado); corpo assinado exatamente no limite →
+    autenticado; limite não positivo rejeitado no startup;
+  - `EstimateControllerGatewayAuthenticationTest` (9 testes): corpo JSON válido e corretamente assinado,
+    acima de 64 KiB → `401` pela cadeia real, e a linha continua `PENDING`.
+- OpenAPI (descrição do endpoint) e README mencionam o limite e a exceção à precedência do JWT.
+- `./mvnw clean verify`: `BUILD SUCCESS`; 738 testes, 0 falhas, 0 erros, 0 skipped; "All coverage checks
+  have been met". Cobertura do projeto: linhas 93,94%, instruções 93,07%, branches 75,56%.
+  `EstimateGatewayHmacAuthenticationFilter` 56/58 linhas (não coberto: `catch` de
+  `GeneralSecurityException`); `CachedBodyHttpServletRequest` 11/11.
 
 ## Rollback ou recuperação
 

@@ -129,6 +129,20 @@ class EstimateControllerGatewayAuthenticationTest {
     }
 
     @Test
+    void validlySignedBodyOverTheSizeLimitReturns401AndLeavesTheLinePending() throws Exception {
+        PendingLine line = pendingLine();
+        String body = approve(line.executionId());
+        // Valid JSON padded past the default 64 KiB limit; the signature itself is correct.
+        String oversized = body.strip() + " ".repeat(65_536);
+
+        mockMvc.perform(signed(line.estimateId(), oversized, Instant.now(), gatewaySecret))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+
+        assertStillPending(line, body);
+    }
+
+    @Test
     void customerJwtWithoutSignatureStillWorks() throws Exception {
         PendingLine line = pendingLine();
 

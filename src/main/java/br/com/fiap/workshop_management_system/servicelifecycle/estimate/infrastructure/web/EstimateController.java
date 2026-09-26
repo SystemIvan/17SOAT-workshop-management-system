@@ -93,7 +93,8 @@ public class EstimateController {
             description = "Accepts either a Bearer JWT (CUSTOMER or ADMIN) or, for the external customer approval "
                     + "gateway, an HMAC signature without JWT: X-Estimate-Gateway-Signature is the lowercase hex "
                     + "HMAC-SHA256 of timestamp + \".\" + raw request body, keyed with the shared gateway secret. "
-                    + "Signatures older or newer than 300 seconds are rejected.")
+                    + "Signatures older or newer than 300 seconds, and signed bodies over 64 KiB, are rejected "
+                    + "with 401.")
     @Parameter(in = ParameterIn.HEADER, name = "X-Estimate-Gateway-Timestamp", required = false,
             description = "External gateway only: signing instant in UTC epoch seconds",
             schema = @Schema(type = "string", example = "1790434800"))

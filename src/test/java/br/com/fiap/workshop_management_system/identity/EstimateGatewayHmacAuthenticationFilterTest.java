@@ -1,5 +1,7 @@
 package br.com.fiap.workshop_management_system.identity;
 
+import com.jayway.jsonpath.JsonPath;
+import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.ServletRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -38,8 +40,11 @@ class EstimateGatewayHmacAuthenticationFilterTest {
             "{\"decisions\":[{\"serviceExecutionId\":\"3f1c2d4e-0000-0000-0000-000000000002\","
             + "\"decision\":\"APPROVED\"}]}";
 
+    private static final int MAX_BODY_BYTES = 1024;
+
     private final EstimateGatewayHmacAuthenticationFilter filter = new EstimateGatewayHmacAuthenticationFilter(
-            SECRET, TOLERANCE_SECONDS, Clock.fixed(NOW, ZoneOffset.UTC));
+            SECRET, TOLERANCE_SECONDS, MAX_BODY_BYTES, new ApiAuthenticationEntryPoint(),
+            Clock.fixed(NOW, ZoneOffset.UTC));
 
     @AfterEach
     void clearSecurityContext() {
@@ -85,12 +90,85 @@ class EstimateGatewayHmacAuthenticationFilterTest {
 
     @Test
     void missingHeadersLeaveTheRequestUnauthenticatedAndContinueTheChain() throws Exception {
+        MockHttpServletRequest request = decisionsRequest();
         CapturingChain chain = new CapturingChain();
 
-        filter.doFilter(decisionsRequest(), new MockHttpServletResponse(), chain);
+        filter.doFilter(request, new MockHttpServletResponse(), chain);
 
-        assertNotNull(chain.request, "chain must continue so the JWT filter can still authenticate");
+        assertSame(request, chain.request, "unsigned calls must reach the JWT filter with the body unread");
         assertNull(chain.authentication);
+    }
+
+    @Test
+    void unsignedCallWithAHugeBodyIsNotReadNorRejectedHere() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", DECISIONS_PATH);
+        request.setContent(new byte[MAX_BODY_BYTES * 4]);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        CapturingChain chain = new CapturingChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertSame(request, chain.request);
+        assertEquals(200, response.getStatus());
+    }
+
+    @Test
+    void signedBodyOverTheLimitIsRejectedWith401WithoutCallingTheChain() throws Exception {
+        String body = "x".repeat(MAX_BODY_BYTES + 1);
+        String timestamp = epochSeconds(NOW);
+        MockHttpServletRequest request = decisionsRequest();
+        request.setContent(body.getBytes(StandardCharsets.UTF_8));
+        request.addHeader(EstimateGatewayHmacAuthenticationFilter.TIMESTAMP_HEADER, timestamp);
+        request.addHeader(EstimateGatewayHmacAuthenticationFilter.SIGNATURE_HEADER, sign(timestamp, body));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        CapturingChain chain = new CapturingChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(401, response.getStatus());
+        assertEquals("UNAUTHORIZED", JsonPath.read(response.getContentAsString(), "$.code"));
+        assertNull(chain.request);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void declaredContentLengthOverTheLimitIsRejectedBeforeReading() throws Exception {
+        String timestamp = epochSeconds(NOW);
+        MockHttpServletRequest declaringRequest = new MockHttpServletRequest("POST", DECISIONS_PATH) {
+            @Override
+            public long getContentLengthLong() {
+                return MAX_BODY_BYTES + 1L;
+            }
+
+            @Override
+            public ServletInputStream getInputStream() {
+                throw new AssertionError("body must not be read when Content-Length is over the limit");
+            }
+        };
+        declaringRequest.addHeader(EstimateGatewayHmacAuthenticationFilter.TIMESTAMP_HEADER, timestamp);
+        declaringRequest.addHeader(EstimateGatewayHmacAuthenticationFilter.SIGNATURE_HEADER, sign(timestamp, BODY));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        CapturingChain chain = new CapturingChain();
+
+        filter.doFilter(declaringRequest, response, chain);
+
+        assertEquals(401, response.getStatus());
+        assertNull(chain.request);
+    }
+
+    @Test
+    void signedBodyExactlyAtTheLimitIsAuthenticated() throws Exception {
+        String body = "x".repeat(MAX_BODY_BYTES);
+        String timestamp = epochSeconds(NOW);
+        MockHttpServletRequest request = decisionsRequest();
+        request.setContent(body.getBytes(StandardCharsets.UTF_8));
+        request.addHeader(EstimateGatewayHmacAuthenticationFilter.TIMESTAMP_HEADER, timestamp);
+        request.addHeader(EstimateGatewayHmacAuthenticationFilter.SIGNATURE_HEADER, sign(timestamp, body));
+        CapturingChain chain = new CapturingChain();
+
+        filter.doFilter(request, new MockHttpServletResponse(), chain);
+
+        assertNotNull(chain.authentication);
     }
 
     @Test
@@ -220,8 +298,19 @@ class EstimateGatewayHmacAuthenticationFilterTest {
     void blankSecretIsRejectedAtStartup() {
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 
-        assertThrows(IllegalArgumentException.class,
-                () -> new EstimateGatewayHmacAuthenticationFilter(" ", TOLERANCE_SECONDS, clock));
+        ApiAuthenticationEntryPoint entryPoint = new ApiAuthenticationEntryPoint();
+
+        assertThrows(IllegalArgumentException.class, () -> new EstimateGatewayHmacAuthenticationFilter(
+                " ", TOLERANCE_SECONDS, MAX_BODY_BYTES, entryPoint, clock));
+    }
+
+    @Test
+    void nonPositiveBodyLimitIsRejectedAtStartup() {
+        Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+        ApiAuthenticationEntryPoint entryPoint = new ApiAuthenticationEntryPoint();
+
+        assertThrows(IllegalArgumentException.class, () -> new EstimateGatewayHmacAuthenticationFilter(
+                SECRET, TOLERANCE_SECONDS, 0, entryPoint, clock));
     }
 
     private static MockHttpServletRequest decisionsRequest() {

@@ -7,9 +7,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -34,6 +36,9 @@ import java.util.Locale;
  * {@code Role} to domain-ID mapping of AD-016. A missing or invalid signature leaves the request
  * unauthenticated instead of failing here, so the JWT filter that follows can still authenticate internal users
  * and the authorization stage answers 401 through {@link ApiAuthenticationEntryPoint} otherwise.
+ *
+ * <p>The only case answered here is a signed call whose body exceeds {@code max-body-bytes}: the body is read
+ * before authentication, so it is capped, and once partially consumed it cannot continue down the chain.
  */
 @Component
 public class EstimateGatewayHmacAuthenticationFilter extends OncePerRequestFilter {
@@ -49,21 +54,32 @@ public class EstimateGatewayHmacAuthenticationFilter extends OncePerRequestFilte
 
     private final SecretKeySpec key;
     private final long toleranceSeconds;
+    private final int maxBodyBytes;
+    private final AuthenticationEntryPoint authenticationEntryPoint;
     private final Clock clock;
 
     @Autowired
     public EstimateGatewayHmacAuthenticationFilter(
             @Value("${app.security.estimate-gateway.hmac-secret}") String secret,
-            @Value("${app.security.estimate-gateway.timestamp-tolerance-seconds:300}") long toleranceSeconds) {
-        this(secret, toleranceSeconds, Clock.systemUTC());
+            @Value("${app.security.estimate-gateway.timestamp-tolerance-seconds:300}") long toleranceSeconds,
+            @Value("${app.security.estimate-gateway.max-body-bytes:65536}") int maxBodyBytes,
+            ApiAuthenticationEntryPoint authenticationEntryPoint) {
+        this(secret, toleranceSeconds, maxBodyBytes, authenticationEntryPoint, Clock.systemUTC());
     }
 
-    EstimateGatewayHmacAuthenticationFilter(String secret, long toleranceSeconds, Clock clock) {
+    EstimateGatewayHmacAuthenticationFilter(
+            String secret, long toleranceSeconds, int maxBodyBytes,
+            AuthenticationEntryPoint authenticationEntryPoint, Clock clock) {
         if (secret == null || secret.isBlank()) {
             throw new IllegalArgumentException("app.security.estimate-gateway.hmac-secret must be configured");
         }
+        if (maxBodyBytes <= 0) {
+            throw new IllegalArgumentException("app.security.estimate-gateway.max-body-bytes must be positive");
+        }
         this.key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM);
         this.toleranceSeconds = toleranceSeconds;
+        this.maxBodyBytes = maxBodyBytes;
+        this.authenticationEntryPoint = authenticationEntryPoint;
         this.clock = clock;
     }
 
@@ -75,10 +91,27 @@ public class EstimateGatewayHmacAuthenticationFilter extends OncePerRequestFilte
             filterChain.doFilter(request, response);
             return;
         }
-        CachedBodyHttpServletRequest cachedRequest = new CachedBodyHttpServletRequest(request);
         String timestamp = request.getHeader(TIMESTAMP_HEADER);
         String signature = request.getHeader(SIGNATURE_HEADER);
-        if (timestamp != null && signature != null && isValid(timestamp, signature, cachedRequest.body())) {
+        if (timestamp == null || signature == null) {
+            // Not a gateway call: leave the body unread so anonymous requests cost nothing here and JWT callers
+            // go through exactly as before RF41.
+            SecurityContextHolder.clearContext();
+            filterChain.doFilter(request, response);
+            return;
+        }
+        CachedBodyHttpServletRequest cachedRequest;
+        try {
+            cachedRequest = readBounded(request);
+        } catch (CachedBodyHttpServletRequest.BodyTooLargeException tooLarge) {
+            // The body is already partially consumed and cannot be handed downstream, so reject here with the
+            // same generic 401 the authorization stage would produce for any other gateway failure.
+            SecurityContextHolder.clearContext();
+            authenticationEntryPoint.commence(request, response,
+                    new BadCredentialsException("Gateway request body too large"));
+            return;
+        }
+        if (isValid(timestamp, signature, cachedRequest.body())) {
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                     GATEWAY_PRINCIPAL, null, List.of(new SimpleGrantedAuthority(GATEWAY_AUTHORITY)));
             SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -86,6 +119,14 @@ public class EstimateGatewayHmacAuthenticationFilter extends OncePerRequestFilte
             SecurityContextHolder.clearContext();
         }
         filterChain.doFilter(cachedRequest, response);
+    }
+
+    private CachedBodyHttpServletRequest readBounded(HttpServletRequest request) throws IOException {
+        // A declared Content-Length over the limit is rejected before reading a single byte.
+        if (request.getContentLengthLong() > maxBodyBytes) {
+            throw new CachedBodyHttpServletRequest.BodyTooLargeException(maxBodyBytes);
+        }
+        return new CachedBodyHttpServletRequest(request, maxBodyBytes);
     }
 
     private boolean isProtectedRequest(HttpServletRequest request) {

@@ -18,14 +18,21 @@ import java.nio.charset.StandardCharsets;
  * <p>Needed because the HMAC filter must hash the raw body while the JSON message converter still has to
  * deserialize it later in the chain. {@code ContentCachingRequestWrapper} does not fit: it only exposes the
  * bytes already consumed through it and never replays them to a second reader.
+ *
+ * <p>The read is capped because it happens before the caller is authenticated: without a limit an anonymous
+ * caller could make the server hold an arbitrarily large body in memory.
  */
 class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
 
     private final byte[] body;
 
-    CachedBodyHttpServletRequest(HttpServletRequest request) throws IOException {
+    CachedBodyHttpServletRequest(HttpServletRequest request, int maxBodyBytes) throws IOException {
         super(request);
-        this.body = request.getInputStream().readAllBytes();
+        byte[] read = request.getInputStream().readNBytes(maxBodyBytes + 1);
+        if (read.length > maxBodyBytes) {
+            throw new BodyTooLargeException(maxBodyBytes);
+        }
+        this.body = read;
     }
 
     byte[] body() {
@@ -46,6 +53,13 @@ class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
         String encoding = getCharacterEncoding();
         // JSON bodies default to UTF-8 when the client sends no charset.
         return encoding == null ? StandardCharsets.UTF_8 : Charset.forName(encoding);
+    }
+
+    static final class BodyTooLargeException extends IOException {
+
+        BodyTooLargeException(int maxBodyBytes) {
+            super("Request body exceeds " + maxBodyBytes + " bytes");
+        }
     }
 
     private static final class CachedBodyServletInputStream extends ServletInputStream {
