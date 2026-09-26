@@ -120,7 +120,7 @@ Revisar:
 
 ## Definition of Done
 
-- [ ] Adendo 2 da technical-spec de RF41 escrito e aprovado pelo responsável.
+- [x] Adendo 2 da technical-spec de RF41 escrito e aprovado pelo responsável (Santiago Silvestre, 2026-09-26).
 - [ ] Migração do índice e consulta `findByServiceOrderIdAndStatus` implementadas e testadas.
 - [ ] `ApplyExternalStatusUpdateUseCase` e DTOs implementados e testados.
 - [ ] Controller, filtro HMAC e `SecurityConfig` atualizados, com testes HTTP pela cadeia real.

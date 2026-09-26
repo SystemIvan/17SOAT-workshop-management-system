@@ -230,7 +230,7 @@ Substituem os passos 2, 3 e 5 de "Fluxo de verificação" onde conflitarem:
 | Campo | Valor |
 |---|---|
 | Origem | RF40 — `docs/features/servicelifecycle/external-status-update/technical-spec.md` (Approved, 2026-09-26) |
-| Aprovação do adendo | Pendente |
+| Aprovação do adendo | Approved — Santiago Silvestre, 2026-09-26 |
 
 ### Mudança
 
