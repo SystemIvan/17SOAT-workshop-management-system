@@ -3,11 +3,11 @@
 | Campo | Valor |
 |---|---|
 | Feature | `external-status-update` |
-| Status | Draft |
+| Status | Approved |
 | Responsável | Santiago Silvestre |
 | Atualizado em | 2026-09-26 |
-| Aprovado por | — |
-| Aprovado em | — |
+| Aprovado por | Santiago Silvestre |
+| Aprovado em | 2026-09-26 |
 | Referências | RF40 ("Endpoint de atualização de status da OS via canal externo (e-mail)"); RF41 (`docs/features/servicelifecycle/estimate-decisions-external-auth/` — autenticação HMAC do gateway externo, implementada); `docs/features/servicelifecycle/decide-estimate-lines/functional-spec.md` (RF15/RF16, regra de decisão reaproveitada); `docs/features/servicelifecycle/status-nominal-mapping/functional-spec.md` (RF39, nomes nominais de status); `docs/Architecture-Decisions.md` AD-010 (`statusSnapshot` recalculado por comando); `.claude/rules/epic-3-service-lifecycle.md` |
 
 ## Nota sobre a origem do requisito
