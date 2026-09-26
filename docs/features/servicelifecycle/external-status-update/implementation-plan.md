@@ -122,7 +122,7 @@ Revisar:
 
 - [x] Adendo 2 da technical-spec de RF41 escrito e aprovado pelo responsável (Santiago Silvestre, 2026-09-26).
 - [x] Migração do índice e consulta `findByServiceOrderIdAndStatus` implementadas e testadas.
-- [ ] `ApplyExternalStatusUpdateUseCase` e DTOs implementados e testados.
+- [x] `ApplyExternalStatusUpdateUseCase` e DTOs implementados e testados.
 - [ ] Controller, filtro HMAC e `SecurityConfig` atualizados, com testes HTTP pela cadeia real.
 - [ ] OpenAPI, Postman e `README.md` atualizados.
 - [ ] Testes relevantes passando.
@@ -174,6 +174,23 @@ A preencher checkpoint a checkpoint (comandos, resultados, contagens de testes, 
   `ApplyExternalStatusUpdateUseCase` do Checkpoint 3 é `@Transactional`, como o spec prevê.
 - Regressão: `EstimateStatusMigrationTest` (1), `DecideEstimateLinesUseCaseTest` (12),
   `ExpireEstimatesUseCaseTest` (2), `GenerateEstimateUseCaseTest` (6) e `ModuleStructureTest` (2), 0 falhas.
+
+### Checkpoint 3 — DTOs e caso de uso (2026-09-26)
+
+- `ExternalIntendedStatus` (enum `APPROVED`/`REJECTED`) e `ExternalStatusUpdateRequest(@NotNull intendedStatus)`
+  em `estimate.application.dto`.
+- `ApplyExternalStatusUpdateUseCase` (`@Transactional`): OS inexistente → `NoSuchElementException`; zero ou
+  duas+ Estimates `SENT` → `IllegalStateException`; seleciona as linhas da Estimate cujas execuções estão
+  `PENDING` (nenhuma → `IllegalStateException`); mapeia a intenção com `switch` exaustivo e delega a
+  `DecideEstimateLinesUseCase.execute(estimateId, request)`. Mensagens só com IDs.
+- `ApplyExternalStatusUpdateUseCaseTest` (mocks dos dois repositórios e do caso de uso delegado; OS e Estimate
+  reais): 7 testes, 0 falhas — `APPROVED` com duas linhas pendentes; `REJECTED`; linha já decidida fora do
+  request; OS inexistente (sem tocar repositório de Estimate nem o caso de uso delegado); nenhuma `SENT`; duas
+  `SENT`; `SENT` sem linha pendente (nos três últimos, o caso de uso delegado nunca é chamado).
+- `ModuleStructureTest`: 2 testes, 0 falhas.
+- Estilo: a única linha acima de 120 caracteres é o import do record aninhado
+  `DecideEstimateLinesRequest.LineDecisionRequest`, idêntico ao de `DecideEstimateLinesUseCase` (imports não
+  podem ser quebrados).
 
 ## Rollback ou recuperação
 
