@@ -28,7 +28,8 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Authenticates the external estimate-approval gateway on {@code POST /api/estimates/{id}/decisions} through an
+ * Authenticates the external estimate-approval gateway on {@code POST /api/estimates/{id}/decisions} (RF41) and
+ * {@code POST /api/service-orders/{id}/external-status-updates} (RF40) through an
  * HMAC-SHA256 signature over {@code timestamp + "." + rawBody} (RF41, technical-spec.md —
  * estimate-decisions-external-auth).
  *
@@ -49,7 +50,9 @@ public class EstimateGatewayHmacAuthenticationFilter extends OncePerRequestFilte
     static final String GATEWAY_PRINCIPAL = "estimate-approval-gateway";
 
     private static final String HMAC_ALGORITHM = "HmacSHA256";
-    private static final String PROTECTED_PATH = "/api/estimates/*/decisions";
+    // RF41 decisions endpoint and RF40 external status update (technical-spec.md, Adendo 2).
+    private static final List<String> PROTECTED_PATHS = List.of(
+            "/api/estimates/*/decisions", "/api/service-orders/*/external-status-updates");
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
     private final SecretKeySpec key;
@@ -131,7 +134,8 @@ public class EstimateGatewayHmacAuthenticationFilter extends OncePerRequestFilte
 
     private boolean isProtectedRequest(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
-        return HttpMethod.POST.matches(request.getMethod()) && PATH_MATCHER.match(PROTECTED_PATH, path);
+        return HttpMethod.POST.matches(request.getMethod())
+                && PROTECTED_PATHS.stream().anyMatch(pattern -> PATH_MATCHER.match(pattern, path));
     }
 
     private boolean isValid(String timestamp, String signature, byte[] body) {

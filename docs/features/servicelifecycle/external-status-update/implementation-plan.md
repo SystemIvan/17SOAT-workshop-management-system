@@ -123,7 +123,7 @@ Revisar:
 - [x] Adendo 2 da technical-spec de RF41 escrito e aprovado pelo responsável (Santiago Silvestre, 2026-09-26).
 - [x] Migração do índice e consulta `findByServiceOrderIdAndStatus` implementadas e testadas.
 - [x] `ApplyExternalStatusUpdateUseCase` e DTOs implementados e testados.
-- [ ] Controller, filtro HMAC e `SecurityConfig` atualizados, com testes HTTP pela cadeia real.
+- [x] Controller, filtro HMAC e `SecurityConfig` atualizados, com testes HTTP pela cadeia real.
 - [ ] OpenAPI, Postman e `README.md` atualizados.
 - [ ] Testes relevantes passando.
 - [ ] `make verify` passando.
@@ -191,6 +191,32 @@ A preencher checkpoint a checkpoint (comandos, resultados, contagens de testes, 
 - Estilo: a única linha acima de 120 caracteres é o import do record aninhado
   `DecideEstimateLinesRequest.LineDecisionRequest`, idêntico ao de `DecideEstimateLinesUseCase` (imports não
   podem ser quebrados).
+
+### Checkpoint 4 — Controller e segurança (2026-09-26)
+
+- `ExternalStatusUpdateController`: `POST /api/service-orders/{serviceOrderId}/external-status-updates`,
+  `@Valid @RequestBody`, `200` com `ServiceOrderResponse`. (Anotações OpenAPI ficam para o Checkpoint 5.)
+- `EstimateGatewayHmacAuthenticationFilter`: `PROTECTED_PATH` virou `PROTECTED_PATHS` com os dois padrões;
+  nenhuma outra mudança de comportamento. Javadoc atualizado.
+- `SecurityConfig`: regra `POST /api/service-orders/*/external-status-updates` →
+  `hasAuthority("ESTIMATE_APPROVAL_GATEWAY")`, antes de `/api/service-orders/**`. O comentário da regra de RF41
+  ("reaches this single route and nothing else") foi corrigido, pois o gateway agora alcança as duas rotas.
+- `ExternalStatusUpdateControllerTest` (`@SpringBootTest` + `springSecurity()`, fluxo real até a Estimate
+  `SENT`): 11 testes, 0 falhas —
+  - HMAC + `APPROVED` → `200`, execução `READY`; HMAC + `REJECTED` → `200`, execução `REJECTED`;
+  - reenvio após aplicar → `409 INVALID_STATE_TRANSITION`; OS em diagnóstico → `409`; orçamento já decidido
+    pelo canal interno → `409`;
+  - OS inexistente → `404 NOT_FOUND`; `intendedStatus` `EXECUCAO` → `400 VALIDATION_ERROR` (linha continua
+    `PENDING`); corpo `{}` → `400`;
+  - sem assinatura → `401`; segredo errado → `401`; JWT `ADMIN` sem HMAC → `403`; nos três, uma decisão
+    posterior pelo canal interno retorna `200`/`READY`, provando que a linha continuava `PENDING`.
+- `EstimateGatewayHmacAuthenticationFilterTest`: 24 testes, 0 falhas (3 novos — novo path autenticado com
+  assinatura válida; novo path com assinatura inválida fica não autenticado; `POST
+  /api/service-orders/{id}/estimates` com headers HMAC não é envolvido nem autenticado).
+- Regressão: `EstimateControllerDecideLinesTest` (8), `EstimateControllerGatewayAuthenticationTest` (9),
+  `SecurityAuthorizationTest` (15), `ModuleStructureTest` (2), 0 falhas.
+- Estilo: a linha acima de 120 caracteres no controller é o import de `ApplyExternalStatusUpdateUseCase`
+  (imports não podem ser quebrados).
 
 ## Rollback ou recuperação
 

@@ -36,6 +36,8 @@ class EstimateGatewayHmacAuthenticationFilterTest {
     private static final long TOLERANCE_SECONDS = 300;
     private static final Instant NOW = Instant.parse("2026-09-26T12:00:00Z");
     private static final String DECISIONS_PATH = "/api/estimates/3f1c2d4e-0000-0000-0000-000000000001/decisions";
+    private static final String EXTERNAL_STATUS_PATH =
+            "/api/service-orders/3f1c2d4e-0000-0000-0000-000000000003/external-status-updates";
     private static final String BODY =
             "{\"decisions\":[{\"serviceExecutionId\":\"3f1c2d4e-0000-0000-0000-000000000002\","
             + "\"decision\":\"APPROVED\"}]}";
@@ -274,6 +276,42 @@ class EstimateGatewayHmacAuthenticationFilterTest {
     }
 
     @Test
+    void externalStatusUpdatePathIsAuthenticatedWithAValidSignature() throws Exception {
+        String timestamp = epochSeconds(NOW);
+        MockHttpServletRequest request = signedRequestTo(EXTERNAL_STATUS_PATH, timestamp, sign(timestamp, BODY));
+        CapturingChain chain = new CapturingChain();
+
+        filter.doFilter(request, new MockHttpServletResponse(), chain);
+
+        assertNotNull(chain.authentication);
+        assertEquals(EstimateGatewayHmacAuthenticationFilter.GATEWAY_PRINCIPAL, chain.authentication.getPrincipal());
+        assertInstanceOf(CachedBodyHttpServletRequest.class, chain.request);
+    }
+
+    @Test
+    void externalStatusUpdatePathRejectsAnInvalidSignature() throws Exception {
+        CapturingChain chain = new CapturingChain();
+
+        filter.doFilter(signedRequestTo(EXTERNAL_STATUS_PATH, epochSeconds(NOW), "deadbeef"),
+                new MockHttpServletResponse(), chain);
+
+        assertNull(chain.authentication);
+    }
+
+    @Test
+    void otherServiceOrderPathsAreNotWrappedNorAuthenticated() throws Exception {
+        String timestamp = epochSeconds(NOW);
+        MockHttpServletRequest request = signedRequestTo(
+                "/api/service-orders/3f1c2d4e-0000-0000-0000-000000000003/estimates", timestamp, sign(timestamp, BODY));
+        CapturingChain chain = new CapturingChain();
+
+        filter.doFilter(request, new MockHttpServletResponse(), chain);
+
+        assertSame(request, chain.request);
+        assertNull(chain.authentication);
+    }
+
+    @Test
     void otherMethodsOnTheDecisionsPathAreNotWrapped() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", DECISIONS_PATH);
         CapturingChain chain = new CapturingChain();
@@ -321,6 +359,14 @@ class EstimateGatewayHmacAuthenticationFilterTest {
 
     private static MockHttpServletRequest signedRequest(String timestamp, String signature) {
         MockHttpServletRequest request = decisionsRequest();
+        request.addHeader(EstimateGatewayHmacAuthenticationFilter.TIMESTAMP_HEADER, timestamp);
+        request.addHeader(EstimateGatewayHmacAuthenticationFilter.SIGNATURE_HEADER, signature);
+        return request;
+    }
+
+    private static MockHttpServletRequest signedRequestTo(String path, String timestamp, String signature) {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", path);
+        request.setContent(BODY.getBytes(StandardCharsets.UTF_8));
         request.addHeader(EstimateGatewayHmacAuthenticationFilter.TIMESTAMP_HEADER, timestamp);
         request.addHeader(EstimateGatewayHmacAuthenticationFilter.SIGNATURE_HEADER, signature);
         return request;

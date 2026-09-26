@@ -69,11 +69,16 @@ public class SecurityConfig {
                         .hasAnyAuthority("MANAGER", "ADMIN")
 
                         // ESTIMATE_APPROVAL_GATEWAY is granted only by the HMAC filter (RF41), never by a JWT
-                        // role, so the external gateway reaches this single route and nothing else.
+                        // role, so the external gateway reaches only this route and the RF40 one below.
                         .requestMatchers(HttpMethod.POST, "/api/estimates/*/decisions")
                         .hasAnyAuthority("CUSTOMER", "ADMIN", "ESTIMATE_APPROVAL_GATEWAY")
                         .requestMatchers(HttpMethod.GET, "/api/estimates/**")
                         .hasAnyAuthority("CUSTOMER", "MANAGER", "ADMIN")
+
+                        // RF40: gateway-only. Declared before the general service-orders rule, otherwise a JWT
+                        // ADMIN/MANAGER would reach it; internal users decide through /api/estimates/*/decisions.
+                        .requestMatchers(HttpMethod.POST, "/api/service-orders/*/external-status-updates")
+                        .hasAuthority("ESTIMATE_APPROVAL_GATEWAY")
 
                         .requestMatchers("/api/service-orders/**").hasAnyAuthority("MANAGER", "TECHNICIAN", "ADMIN")
 
