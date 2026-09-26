@@ -125,27 +125,35 @@ Revisar:
 - [x] `ApplyExternalStatusUpdateUseCase` e DTOs implementados e testados.
 - [x] Controller, filtro HMAC e `SecurityConfig` atualizados, com testes HTTP pela cadeia real.
 - [x] OpenAPI, Postman e `README.md` atualizados.
-- [ ] Testes relevantes passando.
-- [ ] `make verify` passando.
-- [ ] Revisão de segurança concluída (ver abaixo).
-- [ ] Chamada real via Postman contra a aplicação em Docker.
+- [x] Testes relevantes passando.
+- [x] `make verify` passando.
+- [x] Revisão de segurança concluída (ver abaixo) — nenhum achado crítico, alto ou médio.
+- [ ] Chamada real via Postman contra a aplicação em Docker — pendente, a cargo do responsável.
 
 ## Revisão de segurança
 
-A preencher no Checkpoint 6. Itens previstos, conforme `technical-spec.md`:
+Concluída no Checkpoint 6 (2026-09-26). Nenhum achado crítico, alto ou médio.
 
-- **Validação de entrada**: DTO com um único enum `@NotNull`; valores fora de `APPROVED`/`REJECTED` → `400`.
-- **Mass assignment**: o chamador não escolhe Estimate, linhas nem nenhum outro campo.
-- **Autenticação/autorização**: só `ESTIMATE_APPROVAL_GATEWAY`; ordem da regra antes de `/api/service-orders/**`
-  verificada por teste (JWT `ADMIN` → `403`).
-- **Exposição de dados**: resposta igual à de `/decisions` para o mesmo chamador; falha de autenticação não
-  revela a existência da OS.
-- **Segredos/logs**: nenhum log novo com payload, assinatura ou dados pessoais.
-- **SQL/persistência/migration**: migração só cria índice; consulta derivada pelo Spring Data, sem SQL manual.
-- **Erros e disclosure**: só códigos estáveis existentes; mensagens só com IDs.
+- **Validação de entrada**: confirmada — DTO com um único enum `@NotNull`; `EXECUCAO` e `{}` → `400
+  VALIDATION_ERROR` (testes HTTP), sem alterar estado.
+- **Mass assignment**: confirmado — o chamador não escolhe Estimate, linhas nem nenhum outro campo; o caso de uso
+  deriva tudo da OS.
+- **Autenticação/autorização**: confirmada — só `ESTIMATE_APPROVAL_GATEWAY`; a regra vem antes de
+  `/api/service-orders/**` e JWT `ADMIN` sem HMAC → `403` (teste); sem assinatura ou com segredo errado → `401`
+  (testes); `POST /api/service-orders/{id}/estimates` com headers HMAC não é autenticado pelo filtro (teste).
+  Nenhum import de `servicelifecycle` em `identity` (os paths são strings).
+- **Exposição de dados**: resposta igual à de `/decisions` para o mesmo chamador; falha de autenticação é `401`
+  antes de qualquer acesso a dados, sem revelar a existência da OS.
+- **Segredos/logs**: nenhum logger nem chamada de log adicionados na feature (conferido no diff).
+- **SQL/persistência/migration**: a migração só cria um índice; consulta derivada pelo Spring Data, sem SQL
+  manual nem concatenação.
+- **Erros e disclosure**: só códigos estáveis existentes (`NOT_FOUND`, `INVALID_STATE_TRANSITION`,
+  `VALIDATION_ERROR`, `UNAUTHORIZED`); mensagens de exceção só com IDs.
 - **Dependências novas**: nenhuma.
-- **Abuso**: replay dentro da janela resulta em `409` sem efeito duplicado; limite de corpo de RF41 vale para o
-  novo path.
+- **Abuso**: reenvio dentro da janela → `409` sem efeito duplicado (teste); o limite de 64 KiB e a leitura
+  condicional do corpo (RF41, Adendo 1) valem para o novo path, pois o filtro trata os dois paths igual.
+  Concorrência entre este canal e o interno termina em `409` sem aplicação parcial, porque
+  `DecideEstimateLinesUseCase` revalida as linhas sob lock.
 
 ## Evidências de verificação
 
@@ -239,6 +247,30 @@ A preencher checkpoint a checkpoint (comandos, resultados, contagens de testes, 
   valores aceitos, tabela de respostas, roteiro Postman e exemplo `bash`/`openssl`/`curl` autocontido. Também
   reflui uma linha pré-existente de 170 caracteres no parágrafo editado.
 - `./mvnw test -Dtest=OpenApiContractTest,ExternalStatusUpdateControllerTest`: 19 + 11 testes, 0 falhas.
+
+### Checkpoint 6 — Validação final (2026-09-26)
+
+- Primeira execução de `./mvnw clean verify`: `BUILD FAILURE` com 763 testes e 1 erro em
+  `ExternalSupplierHttpAdapterTest.translatesAcceptanceAndSendsOnlyTheSupplierContract` (`stockprocurement`,
+  não tocado por esta feature): `SocketTimeoutException: Read timed out` contra o WireMock local, com read timeout
+  configurado no teste em 200 ms. Isolado, o teste passou (3/3). É instabilidade de tempo pré-existente sob carga
+  da suíte completa, não regressão desta feature; não foi alterado (fora de escopo) e fica registrado aqui.
+- Segunda execução de `./mvnw clean verify`: `BUILD SUCCESS`; 763 testes, 0 falhas, 0 erros, 0 skipped;
+  "All coverage checks have been met".
+- Cobertura (JaCoCo, linhas): projeto 93,98% (instruções 93,12%, branches 75,71%);
+  `ApplyExternalStatusUpdateUseCase` 31/31 (branches 10/10); `ExternalStatusUpdateController` 4/4;
+  `EstimateRepositoryImpl` 18/18; `SecurityConfig` 39/39; `EstimateGatewayHmacAuthenticationFilter` 58/60 (não
+  coberto: `catch` de `GeneralSecurityException`, inalcançável).
+- Revisão de escopo (diff de `src/main` desde `720986c`): 10 arquivos de produção, todos previstos no spec.
+  - nenhuma regra de decisão fora de `DecideEstimateLinesUseCase` (`ApplyExternalStatusUpdateUseCase` não chama
+    `authorizeExecutionFromEstimate`/`rejectExecutionFromEstimate`/`close`/reserva de estoque);
+  - nenhum import de `servicelifecycle` em `identity`; `ModuleStructureTest` verde;
+  - `EstimateController`, `DecideEstimateLinesUseCase` e `DecideEstimateLinesRequest` sem nenhuma alteração;
+    `/decisions` com JWT e HMAC coberto pelos testes de regressão;
+  - OpenAPI e Postman conferidos contra o contrato do `technical-spec.md` (path, `intendedStatus`, headers,
+    códigos).
+- Pendente: chamada real via Postman contra a aplicação em Docker (a cargo do responsável). Por isso o plano
+  continua `In Progress`.
 
 ## Rollback ou recuperação
 
