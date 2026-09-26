@@ -3,9 +3,9 @@
 | Campo | Valor |
 |---|---|
 | Feature | `estimate-decisions-external-auth` |
-| Status | Draft |
+| Status | In Progress |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-09-23 |
+| Atualizado em | 2026-09-26 |
 | Especificação técnica | `./technical-spec.md` (Approved, 2026-09-23) |
 
 ## Objetivo
@@ -108,7 +108,7 @@ Revisar:
 
 ## Definition of Done
 
-- [ ] `CachedBodyHttpServletRequest` implementado e testado.
+- [x] `CachedBodyHttpServletRequest` implementado e testado.
 - [ ] `EstimateGatewayHmacAuthenticationFilter` implementado e testado.
 - [ ] `SecurityConfig` atualizado (filtro registrado, authority `ESTIMATE_APPROVAL_GATEWAY` na regra da
       rota).
@@ -149,6 +149,17 @@ implementação deve ser registrado aqui antes de marcar a feature como implemen
 
 A preencher durante a implementação (comandos executados, resultados de teste, contagens, saída de
 `make verify`), seguindo o mesmo padrão de `decide-estimate-lines/implementation-plan.md`.
+
+### Checkpoint 1 — `CachedBodyHttpServletRequest` (2026-09-26)
+
+- `identity.CachedBodyHttpServletRequest` criado como classe package-private (só o filtro HMAC do mesmo
+  pacote a usa; não entra na API pública do módulo). Além do previsto, expõe `body()` (cópia defensiva)
+  para o filtro calcular o HMAC sem reabrir o stream, e `setReadListener` lança
+  `UnsupportedOperationException` (leitura assíncrona não é usada por nenhum endpoint).
+- `./mvnw test -Dtest=CachedBodyHttpServletRequestTest,ModuleStructureTest`:
+  - `CachedBodyHttpServletRequestTest`: 5 testes, 0 falhas (duas leituras de `getInputStream()`,
+    `getReader()` após `getInputStream()`, charset da requisição respeitado, corpo vazio, cópia defensiva);
+  - `ModuleStructureTest`: 2 testes, 0 falhas.
 
 ## Rollback ou recuperação
 
