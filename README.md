@@ -39,9 +39,12 @@ O ambiente Docker local utiliza o perfil `dev` e carrega dados de demonstração
 Copie `.env.example` para `.env` para alterar esse comportamento. Os seeds ficam desativados no perfil padrão da
 aplicação.
 
-Todos os endpoints administrativos exigem JWT (consulte `docs/adr/ADR-003-authentication-strategy.md`). Defina
-`APP_SECURITY_JWT_SECRET` no `.env` para qualquer ambiente real; o valor padrão de `.env.example` é exclusivo para
-desenvolvimento local. A conta obrigatória `admin`/`ADMIN`, criada por migration Flyway, permite obter um token e criar
+Todos os endpoints administrativos exigem JWT (consulte `docs/adr/ADR-003-authentication-strategy.md`). A única
+exceção é `POST /api/estimates/{estimateId}/decisions`, que também aceita, sem JWT, uma chamada assinada por HMAC
+do gateway externo de aprovação do Customer (RF41, `docs/adr/ADR-007-external-gateway-hmac-authentication.md`;
+ver [Decisão de orçamento pelo gateway externo](#decisão-de-orçamento-pelo-gateway-externo-hmac)). Defina
+`APP_SECURITY_JWT_SECRET` e `APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET` no `.env` para qualquer ambiente real; os
+valores padrão de `.env.example` são exclusivos para desenvolvimento local. A conta obrigatória `admin`/`ADMIN`, criada por migration Flyway, permite obter um token e criar
 outras contas, conforme o roteiro Postman abaixo.
 
 URLs úteis:
@@ -157,8 +160,9 @@ docker compose up -d --build
 
 Espere a aplicação estar disponível em `http://localhost:8080/swagger-ui.html`, importe a coleção e mantenha as
 variáveis no escopo da coleção. Todos os endpoints administrativos exigem um JWT (`AD-016`,
-`docs/adr/ADR-003-authentication-strategy.md`); a coleção já está configurada com autenticação `Bearer {{authToken}}`
-no nível de collection, então basta executar o login do passo 0 antes do restante do roteiro. `baseUrl` deve conter
+`docs/adr/ADR-003-authentication-strategy.md`), exceto o caminho alternativo por HMAC da decisão de orçamento
+(RF41, `docs/adr/ADR-007-external-gateway-hmac-authentication.md`); a coleção já está configurada com
+autenticação `Bearer {{authToken}}` no nível de collection, então basta executar o login do passo 0 antes do restante do roteiro. `baseUrl` deve conter
 apenas a origem, sem `/api`: para a execução local, use `http://localhost:8080`.
 
 | Variável | Como preencher |
@@ -175,6 +179,7 @@ apenas a origem, sem `/api`: para a execução local, use `http://localhost:8080
 | `purchaseOrderFlowIdempotencyKey` | É gerada pela collection ao executar `Create Purchase Order from demand`; o `Retry same Purchase Order` reutiliza-a automaticamente. |
 | `customerTaxId` | Informe o CPF/CNPJ sem formatação usado para o Customer; é utilizado somente por `Identify customer by CPF/CNPJ`. |
 | `catalogServiceId` | Preenchida automaticamente por `Registrations / Service Catalog / Create catalog service` (passo 3); identifica o serviço informado no diagnóstico (passo 8). |
+| `estimateGatewaySecret` | Segredo HMAC usado por `Decide estimate lines via external gateway (HMAC)`. O valor padrão coincide com o padrão de `APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET` em `.env.example`/`docker-compose.yml`; se você alterar o segredo da aplicação, altere esta variável também. |
 | `metricFrom` e `metricTo` | Preenchidas automaticamente por `Get average execution time` com uma janela de 24 horas antes e depois da execução da request. Podem ser substituídas por instantes ISO-8601 para uma consulta manual. |
 
 As requisições `Create customer`, `Create vehicle`, `Create catalog service` e `Create stock item` têm um script de
@@ -373,6 +378,11 @@ retornados em respostas `201 Created` são os que devem ser usados no restante d
     A resposta é `200 OK` com a Service Order. Para múltiplas linhas, inclua uma decisão para cada
     `lines[].serviceExecutionId` retornado por `Get estimate`; uma linha já decidida não pode ser decidida novamente.
 
+    Para simular a decisão chegando pelo gateway externo do Customer (RF41), envie, **no lugar** de
+    `Decide estimate lines`, a requisição `Isolated / Decide estimate lines via external gateway (HMAC)` — mesmo
+    corpo, sem JWT, assinada pelo pre-request script. O resultado esperado é o mesmo `200 OK`. Os detalhes estão em
+    [Decisão de orçamento pelo gateway externo](#decisão-de-orçamento-pelo-gateway-externo-hmac).
+
 11. Verifique se a execução aprovada está `READY`.
 
     - Se o diagnóstico não tiver peça (`"stockRequirements": []`), ela já estará pronta; siga para o passo 12.
@@ -440,6 +450,48 @@ retornados em respostas `201 Created` são os que devem ser usados no restante d
     obsoleto; para a leitura completa, use `statusSnapshot` como o campo de acompanhamento interno (7 valores) e
     `statusLabel` como a representação nominal externa de 6 estados do enunciado da Fase 2 (RF39) —
     `AWAITING_ITEMS` e `IN_PROGRESS` mapeiam ambos para `EXECUCAO`.
+
+### Decisão de orçamento pelo gateway externo (HMAC)
+
+`POST /api/estimates/{estimateId}/decisions` aceita, além do JWT `CUSTOMER`/`ADMIN`, uma chamada do gateway externo
+de aprovação do Customer autenticada por assinatura HMAC, sem conta de usuário (RF41,
+`docs/features/servicelifecycle/estimate-decisions-external-auth/`). O corpo e a resposta são os mesmos do passo 10.
+
+| Header | Valor |
+| --- | --- |
+| `X-Estimate-Gateway-Timestamp` | Instante da assinatura em epoch seconds (UTC). |
+| `X-Estimate-Gateway-Signature` | Hex minúsculo de `HMAC-SHA256(timestamp + "." + corpoCru, segredo)`. |
+
+O segredo é `APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET`. O corpo assinado precisa ser byte a byte o corpo enviado:
+qualquer reformatação depois da assinatura invalida a chamada. Timestamps com mais de 300 segundos de diferença do
+relógio do servidor são rejeitados.
+
+Pelo Postman, com a Service Order no ponto do passo 10 (linha ainda `PENDING`):
+
+1. Confirme que `estimateGatewaySecret` é igual ao segredo da aplicação (o padrão local já coincide).
+2. Envie `Isolated / Decide estimate lines via external gateway (HMAC)`. Espere `200 OK` com a Service Order e a
+   execução `READY` (ou `AWAITING_ITEMS`, se faltar material, como no passo 11).
+3. Opcionalmente, envie `Estimates / Decide estimate lines without credentials (expect 401)`: sem JWT e sem
+   assinatura, a API responde `401` antes de qualquer regra de negócio, em qualquer estado da Estimate.
+
+Para reproduzir fora do Postman, com `bash` e `openssl`:
+
+```bash
+SECRET=local-development-only-estimate-gateway-secret-please-rotate
+BODY='{"decisions":[{"serviceExecutionId":"<executionId>","decision":"APPROVED"}]}'
+TS=$(date +%s)
+SIG=$(printf '%s' "$TS.$BODY" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
+curl -i -X POST "http://localhost:8080/api/estimates/<estimateId>/decisions" \
+  -H 'Content-Type: application/json' \
+  -H "X-Estimate-Gateway-Timestamp: $TS" \
+  -H "X-Estimate-Gateway-Signature: $SIG" \
+  --data-raw "$BODY"
+```
+
+Assinatura errada, segredo diferente, timestamp fora da janela, corpo alterado após a assinatura ou corpo assinado
+maior que 64 KiB (`APP_SECURITY_ESTIMATE_GATEWAY_MAX_BODY_BYTES`, padrão `65536`) resultam em
+`401`, sem alterar a Estimate. Se a chamada também trouxer um `Authorization: Bearer` válido, o JWT prevalece, exceto
+quando o corpo assinado passa do limite: nesse caso a chamada é rejeitada antes de o JWT ser avaliado.
 
 ### Fluxo executável de Purchase Order
 

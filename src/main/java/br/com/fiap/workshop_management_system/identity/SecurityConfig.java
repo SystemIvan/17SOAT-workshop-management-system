@@ -19,14 +19,17 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final EstimateGatewayHmacAuthenticationFilter estimateGatewayHmacAuthenticationFilter;
     private final ApiAuthenticationEntryPoint authenticationEntryPoint;
     private final ApiAccessDeniedHandler accessDeniedHandler;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
+            EstimateGatewayHmacAuthenticationFilter estimateGatewayHmacAuthenticationFilter,
             ApiAuthenticationEntryPoint authenticationEntryPoint,
             ApiAccessDeniedHandler accessDeniedHandler) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.estimateGatewayHmacAuthenticationFilter = estimateGatewayHmacAuthenticationFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
     }
@@ -65,15 +68,19 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/service-orders/metrics/average-execution-time")
                         .hasAnyAuthority("MANAGER", "ADMIN")
 
+                        // ESTIMATE_APPROVAL_GATEWAY is granted only by the HMAC filter (RF41), never by a JWT
+                        // role, so the external gateway reaches this single route and nothing else.
                         .requestMatchers(HttpMethod.POST, "/api/estimates/*/decisions")
-                        .hasAnyAuthority("CUSTOMER", "ADMIN")
+                        .hasAnyAuthority("CUSTOMER", "ADMIN", "ESTIMATE_APPROVAL_GATEWAY")
                         .requestMatchers(HttpMethod.GET, "/api/estimates/**")
                         .hasAnyAuthority("CUSTOMER", "MANAGER", "ADMIN")
 
                         .requestMatchers("/api/service-orders/**").hasAnyAuthority("MANAGER", "TECHNICIAN", "ADMIN")
 
                         .anyRequest().authenticated())
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                // Runs first so a Bearer token sent alongside the HMAC headers still wins in the JWT filter.
+                .addFilterBefore(estimateGatewayHmacAuthenticationFilter, JwtAuthenticationFilter.class);
         return http.build();
     }
 }

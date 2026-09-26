@@ -601,6 +601,9 @@ escolhe Spring Security + JWT no próprio monólito. Os papéis propostos são C
 Modelo de usuário, matriz final de autorização, refresh/revogação de tokens e gestão de credenciais ainda exigem
 detalhamento.
 
+Chamadores sistema-a-sistema (canais externos de entrada) não usam JWT: a **ADR-007** adota assinatura HMAC de
+webhook com segredo compartilhado, aplicada primeiro em `POST /api/estimates/{estimateId}/decisions` (RF41).
+
 ### 8.5 Notificações e sistemas externos (B/D)
 
 Notification reage a eventos e pode enviar e-mail/push. O Event Storming mantém como hotspot a forma de entrega e
@@ -647,6 +650,7 @@ Relações relevantes expostas pelos diagramas:
 | IDs e snapshots entre aggregates | Definida | Evitar acoplamento e preservar histórico |
 | Domain events entre contexts | Definida em nível conceitual | Consistência eventual sem transação distribuída |
 | Spring Security + JWT | Aceita | Atender ao requisito com menor complexidade no MVP |
+| HMAC de webhook para canais externos de entrada (ADR-007) | Aceita/implementada em `POST /api/estimates/{estimateId}/decisions` (RF41) | Autenticar sistemas externos sem contas de usuário nem extensão do modelo role→domain-ID (AD-016) |
 | Tempo médio por `ServiceExecution` (`startedAt` → `completedAt`) | Aceita/implementada (AD-019, ADR-006) | Medir tempo transcorrido das execuções concluídas, sob demanda e exclusivamente em horas |
 | Decisão de Estimate por linha | Refinamento mais recente | Permitir aprovação parcial sem recriar execuções |
 | `statusSnapshot` atualizado em comandos (AD-010) | Implementado e presente no refinamento recente; ratificação do time pendente | Preservar comportamento atual sem declarar a alternativa compartilhada resolvida |
