@@ -114,7 +114,7 @@ Revisar:
       rota).
 - [x] Testes de integração HTTP cobrindo sucesso HMAC, falha HMAC (ausente/inválido/expirado) e regressão
       JWT.
-- [ ] `README.md`, OpenAPI e Postman atualizados.
+- [x] `README.md`, OpenAPI e Postman atualizados.
 - [ ] Testes relevantes passando.
 - [ ] `make verify` passando.
 - [ ] Revisão de segurança concluída (ver abaixo).
@@ -224,6 +224,38 @@ A preencher durante a implementação (comandos executados, resultados de teste,
   - `./mvnw test -Dtest=EstimateControllerGatewayAuthenticationTest,EstimateControllerDecideLinesTest,SecurityAuthorizationTest,EstimateGatewayHmacAuthenticationFilterTest,ModuleStructureTest`:
     8 + 8 + 15 + 16 + 2 testes, 0 falhas;
   - `./mvnw test` (suíte completa): 729 testes, 0 falhas, 0 erros, 0 skipped.
+
+### Checkpoint 4 — Documentação e contrato (2026-09-26)
+
+- OpenAPI (`EstimateController.decide`): descrição da operação com os dois caminhos de autenticação; headers
+  opcionais `X-Estimate-Gateway-Timestamp`/`X-Estimate-Gateway-Signature` declarados como `@Parameter`
+  (`in = HEADER`); respostas `401` e `403` documentadas. Não foi criado `SecurityScheme` para o HMAC: o par de
+  headers só vale junto (AND), o que as anotações de `@SecurityRequirement` do springdoc não expressam sem
+  virar alternativas independentes (OR) — os headers como parâmetros descrevem o contrato sem ambiguidade.
+- `OpenApiContractTest.documentEstimateDecisionsGatewayAuthentication`: verifica `401`, `403` e os dois
+  headers no `/v3/api-docs`.
+- Postman:
+  - `Estimates / Decide estimate lines without credentials (expect 401)` — `noauth`, sem headers HMAC,
+    espera `401`; determinística em qualquer estado da Estimate;
+  - `Isolated / Decide estimate lines via external gateway (HMAC)` — `noauth`, pre-request script com
+    `CryptoJS.HmacSHA256` sobre o corpo já resolvido (`pm.variables.replaceIn`), espera `200`. Fica na pasta
+    `Isolated` porque substitui o passo 10 (a linha precisa estar `PENDING`);
+  - nova variável de coleção `estimateGatewaySecret`, com o mesmo valor padrão de desenvolvimento da
+    aplicação;
+  - nenhuma das duas requisições entrou em `E2E_STEPS` do `Makefile`, então `make e2e` não muda.
+- `.env.example` e `docker-compose.yml`: `APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET` com o mesmo padrão de
+  desenvolvimento, para o Postman funcionar sem configuração no ambiente Docker local.
+- `README.md`: as duas afirmações de "todos os endpoints exigem JWT" passaram a citar a exceção; nova
+  variável na tabela; passo 10 aponta a alternativa; nova seção "Decisão de orçamento pelo gateway externo
+  (HMAC)" com headers, janela, roteiro Postman e exemplo `bash`/`openssl`/`curl`. O plano citava um
+  "README.md da feature", que não existe no padrão do projeto; o fluxo foi documentado no `README.md` raiz,
+  onde ficam as demais instruções de teste manual pelo Postman.
+- Receita `openssl dgst -sha256 -hmac` do README conferida contra `crypto.createHmac('sha256')` do Node para
+  o mesmo timestamp/corpo/segredo: assinaturas idênticas.
+- `./mvnw test -Dtest=OpenApiContractTest,EstimateControllerDecideLinesTest,EstimateControllerGatewayAuthenticationTest`:
+  18 + 8 + 8 testes, 0 falhas.
+- Não executado neste checkpoint: chamada real via Postman/newman contra a aplicação em Docker (fica para a
+  validação final).
 
 ## Rollback ou recuperação
 
