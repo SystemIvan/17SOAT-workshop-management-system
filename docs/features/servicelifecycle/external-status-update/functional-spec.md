@@ -1,154 +1,151 @@
-# Especificação Funcional: Decisão do Customer sobre orçamento via canal externo de e-mail
+# Especificação Funcional: Atualização de status da OS via canal externo (e-mail)
 
 | Campo | Valor |
 |---|---|
 | Feature | `external-status-update` |
 | Status | Draft |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-09-23 |
+| Atualizado em | 2026-09-26 |
 | Aprovado por | — |
 | Aprovado em | — |
-| Referências | RF40; RF41 (`docs/features/servicelifecycle/estimate-approval-email-authentication/functional-spec.md` — mecanismo de autenticação deste mesmo endpoint); enunciado do Tech Challenge Fase 2; `docs/features/servicelifecycle/decide-estimate-lines/functional-spec.md` (RF15/RF16, regra de domínio reaproveitada); `docs/features/servicelifecycle/notifications-estimate-generated/functional-spec.md` (canal de saída que este endpoint espelha na direção contrária); `.claude/rules/epic-3-service-lifecycle.md` |
+| Referências | RF40 ("Endpoint de atualização de status da OS via canal externo (e-mail)"); RF41 (`docs/features/servicelifecycle/estimate-decisions-external-auth/` — autenticação HMAC do gateway externo, implementada); `docs/features/servicelifecycle/decide-estimate-lines/functional-spec.md` (RF15/RF16, regra de decisão reaproveitada); `docs/features/servicelifecycle/status-nominal-mapping/functional-spec.md` (RF39, nomes nominais de status); `docs/Architecture-Decisions.md` AD-010 (`statusSnapshot` recalculado por comando); `.claude/rules/epic-3-service-lifecycle.md` |
 
 ## Nota sobre a origem do requisito
 
-RF40 é um requisito novo da Fase 2 do Tech Challenge, ainda **não registrado no board do Miro** — na
-mesma situação de RF38/RF39. `docs/Architecture.md` §2.3 ainda não cobre a faixa RF39–RF41. RF41, título
-confirmado pelo responsável: "Mecanismo de autenticação do endpoint de aprovação de orçamento" — ou seja,
-RF41 **não é** um segundo endpoint de canal externo independente, é a decisão de autenticação
-especificamente para o endpoint desta spec. Por isso RF41 vira sua própria feature/spec (ver referências),
-e este documento não decide autenticação — apenas depende do resultado dela.
+RF40 é um requisito da Fase 2 do Tech Challenge ainda **não registrado no board do Miro** (mesma situação de
+RF38/RF39/RF41). O texto de referência usado aqui foi fornecido pelo responsável em 2026-09-26:
 
-## Decisões confirmadas nesta sessão
+- existe hoje só notificação de **saída** ao Customer (`SimulatedEmailCustomerNotificationAdapter`,
+  `SimulatedEmailCustomerEstimateNotificationAdapter`); não há canal de **entrada** que receba uma
+  atualização de status originada externamente (ex.: resposta de e-mail processada por ferramenta de
+  terceiros);
+- o payload externo identifica a OS e o novo status pretendido; a transição só ocorre se for válida no
+  domínio, sem contornar invariantes do agregado;
+- transição inválida (ex.: pular etapas, OS já `DELIVERED`) → `409` com código de erro estável, sem mudar o
+  estado;
+- o mecanismo de autenticação/verificação de origem deve ser decidido, provavelmente com a mesma decisão de
+  desenho de RF41;
+- a spec deve dizer explicitamente se o "e-mail" é literal ou simbólico; o texto de referência admite que
+  uma simulação simples (endpoint HTTP com a intenção já extraída do e-mail) atende.
+
+Esta versão substitui o rascunho de 2026-09-23, escrito antes de RF41 existir, que assumia um payload
+literal de e-mail com conferência de remetente e tratava RF41 como autenticação de um endpoint novo. Na
+prática, RF41 foi implementado como autenticação HMAC do endpoint já existente
+`POST /api/estimates/{estimateId}/decisions`.
+
+## Decisões desta spec
 
 | # | Decisão | Resolução |
 |---|---|---|
-| 1 | O que o "novo status pretendido" representa | **(a)** Este endpoint é um canal alternativo (e-mail) para a **mesma decisão comercial do Customer** já coberta por `decide-estimate-lines` (RF15/RF16): aprovar ou rejeitar uma ou mais `ServiceExecution` de uma Estimate. Não é um setter genérico de `ServiceOrderStatus`. |
-| 2 | Mecanismo de autenticação/verificação de origem | Fora desta spec — é o próprio RF41, tratado como pré-requisito (ver "Relação com RF41"). |
-| 3 | E-mail literal ou simbólico | Literal na modelagem do payload (ver "Regras de negócio" e "Decisão: e-mail literal" abaixo), sem implementar um cliente SMTP/MIME real. |
-| 4 | Relação com RF41 | Esclarecida: RF41 é a spec de autenticação deste mesmo endpoint, não um endpoint irmão. |
+| 1 | O que é o "novo status pretendido" | O status da OS **não é setável**: `statusSnapshot` é recalculado a partir de comandos sobre as `ServiceExecution` (AD-010). O "status pretendido" é, portanto, a **intenção do Customer sobre o orçamento pendente da OS**, traduzida para o comando de domínio já existente de decisão de orçamento (`decide-estimate-lines`). É a única transição de status da OS que legitimamente se origina de uma resposta do Customer; iniciar, concluir ou entregar a execução são ações internas da oficina. |
+| 2 | E-mail literal ou simbólico | **Simbólico.** O endpoint é HTTP simples e recebe a intenção **já extraída** do e-mail por uma ferramenta de automação de terceiros (simulada). Não há payload no formato de mensagem de e-mail, parsing de conteúdo, SMTP/MIME nem conferência do remetente. |
+| 3 | Autenticação/verificação de origem | **A mesma de RF41**: assinatura HMAC-SHA256 com os headers `X-Estimate-Gateway-Timestamp`/`X-Estimate-Gateway-Signature`, segredo compartilhado, janela de 300s e limite de tamanho de corpo. O gateway externo não é um usuário interno e não usa JWT. Estender a proteção HMAC ao novo path exige um adendo em `estimate-decisions-external-auth/technical-spec.md` (hoje o filtro protege só `/api/estimates/*/decisions`), a ser tratado no technical-spec desta feature. |
+| 4 | Granularidade da decisão | **A OS inteira**: a intenção aprova ou rejeita **todas** as linhas ainda `PENDING` do orçamento `SENT` da OS. Decisão linha a linha continua disponível só pelo endpoint existente de `decide-estimate-lines`. |
 
 ## Problema e resultado esperado
 
-Hoje o Customer só recebe uma notificação de saída quando uma Estimate é gerada
-(`SimulatedEmailCustomerEstimateNotificationAdapter`, feature `notifications-estimate-generated`). Para
-decidir (aprovar/rejeitar) essa Estimate, ele depende de um canal interno já autenticado
-(`POST /api/estimates/{estimateId}/decisions`, feature `decide-estimate-lines`) — não existe hoje um jeito
-do Customer responder à notificação de e-mail e essa resposta virar, por si só, a decisão.
+Hoje o Customer é avisado por e-mail (simulado) quando um orçamento é gerado, mas sua resposta não tem por
+onde entrar no sistema: a decisão só é registrada por um canal interno autenticado por JWT
+(`POST /api/estimates/{estimateId}/decisions`) ou, desde RF41, por um gateway que já conhece a Estimate e cada
+`ServiceExecution`. Uma ferramenta que processa a resposta de e-mail do Customer tipicamente só sabe **qual OS**
+e **o que o Customer quer** ("aprovo" / "não aprovo"), não os identificadores internos do orçamento.
 
-Resultado esperado: existe um endpoint HTTP que recebe um payload no formato de uma mensagem de e-mail
-recebida (remetente, referência à Estimate/OS, corpo com a decisão), processado por uma automação externa
-simulada, e que aplica a mesma regra de negócio e o mesmo caminho de domínio já usados por
-`decide-estimate-lines` — nunca uma segunda fonte de verdade para a decisão do Customer.
-
-## Decisão: e-mail literal
-
-Diferente da proposta original (payload simbólico já pré-extraído), o payload deste endpoint **modela uma
-mensagem de e-mail**: contém o remetente (endereço de e-mail) e o conteúdo de onde a decisão é extraída
-(ex.: referência à Estimate/OS e à(s) `ServiceExecution`(s) decidida(s), e se cada uma foi aprovada ou
-rejeitada). Continua sendo HTTP simples — não há integração SMTP/MIME real nem recebimento de e-mail de
-fato; o payload apenas **representa** o e-mail já recebido por uma ferramenta de automação externa
-(análoga a um provedor de inbound-email parsing). O formato exato de campos é definido no technical-spec.
-
-O remetente informado é cruzado com o e-mail do Customer já registrado (`registration.Customer`/`Email`)
-associado à Service Order/Estimate — isso é uma regra de negócio desta feature (garantir que a decisão
-veio do Customer certo), não o mecanismo de autenticação do chamador (isso é RF41: quem tem permissão de
-chamar o endpoint em si, independente de qual e-mail o payload alega representar).
-
-## Relação com RF41
-
-RF41 decide **como o chamador do endpoint é autenticado/verificado** (ex.: segredo compartilhado entre a
-automação de e-mail e o backend). Esta feature (RF40) decide **o que o payload significa e qual regra de
-negócio ele aciona**, e depende do resultado de RF41 para o technical-spec (o contrato HTTP inclui os
-elementos exigidos pelo mecanismo de autenticação escolhido em RF41 — ex. um header de credencial). RF40
-não deve ser implementado (checkpoint de código) antes de RF41 estar aprovado, já que o technical-spec
-desta feature precisa incorporar o contrato de autenticação definido lá.
+Resultado esperado: existe um endpoint de entrada no nível da OS que recebe a intenção do Customer extraída
+do e-mail e, se ela for válida para o estado atual da OS, aplica a decisão de orçamento pelo mesmo caminho de
+domínio de `decide-estimate-lines`, fazendo o status da OS avançar conforme as regras já existentes. Se a
+intenção não for aplicável, nada muda e a resposta é `409` com código estável.
 
 ## Atores e cenários
 
 | Ator | Cenário |
 |---|---|
-| Automação externa de e-mail (simulada) | Envia um payload representando a resposta do Customer a uma Estimate, identificando a(s) `ServiceExecution`(s) e a decisão (aprovar/rejeitar); a mesma regra de domínio de `decide-estimate-lines` é aplicada. |
-| Automação externa de e-mail | Envia um payload cuja decisão não é aplicável ao estado atual (ex.: `ServiceExecution` já decidida, ou não pertence à Estimate referenciada); a API responde `409 Conflict`/erro estável e nada muda. |
-| Automação externa de e-mail | Envia um payload cujo remetente não corresponde ao e-mail do Customer registrado para aquela OS/Estimate; a API rejeita a chamada sem aplicar nenhuma decisão. |
-| Chamador não autenticado | Chama o endpoint sem a credencial exigida por RF41; a API rejeita antes de tocar qualquer regra de domínio (comportamento definido em RF41, referenciado aqui). |
-| Customer, Manager, Service Advisor | Continuam usando `POST /api/estimates/{estimateId}/decisions` (`decide-estimate-lines`) sem qualquer mudança de comportamento; este endpoint é um canal adicional para a mesma decisão, não uma substituição. |
+| Ferramenta externa de automação de e-mail (simulada) | Envia, autenticada por HMAC, a OS e a intenção `APPROVED`; as linhas pendentes do orçamento são autorizadas e a OS avança para execução. |
+| Ferramenta externa de automação de e-mail | Envia a intenção `REJECTED`; as linhas pendentes são rejeitadas e a OS segue as regras já existentes para execuções rejeitadas. |
+| Ferramenta externa de automação de e-mail | Envia uma intenção para uma OS sem orçamento pendente de decisão (ainda em diagnóstico, já decidida, expirada, finalizada ou entregue); a API responde `409` e nada muda. |
+| Chamador sem assinatura válida | Chama o endpoint sem os headers HMAC, com assinatura incorreta ou fora da janela; a API responde `401` antes de qualquer regra de domínio. |
+| Customer, Manager, Admin | Continuam usando `POST /api/estimates/{estimateId}/decisions` (JWT ou HMAC) sem nenhuma mudança; o novo endpoint é um canal adicional, não uma substituição. |
 
-### Cenário principal — decisão aplicada via e-mail
+### Cenário principal — aprovação via e-mail
 
-1. Uma Estimate tem uma ou mais `ServiceExecution` em `PENDING`.
-2. A automação externa (autenticada conforme RF41) chama o endpoint com um payload representando o e-mail
-   do Customer, identificando a Estimate/OS, o remetente, e a decisão (`APPROVED`/`REJECTED`) para uma ou
-   mais `ServiceExecution`.
-3. O remetente confere com o e-mail do Customer associado.
-4. A mesma regra de domínio de `decide-estimate-lines` é aplicada (mesmo caso de uso/mesmos métodos de
-   domínio `ServiceOrder.authorizeExecutionFromEstimate`/`rejectExecutionFromEstimate`), com os mesmos
-   efeitos já documentados naquela feature (reserva de estoque quando aplicável, `statusSnapshot`
-   recalculado etc.).
+1. A OS tem um orçamento `SENT` com uma ou mais `ServiceExecution` `PENDING`.
+2. O Customer responde ao e-mail aprovando; a ferramenta externa extrai a intenção e chama o endpoint com o
+   identificador da OS e `intendedStatus = APPROVED`, assinando a chamada conforme RF41.
+3. Todas as linhas `PENDING` desse orçamento são decididas como `APPROVED` pelo mesmo caso de uso de
+   `decide-estimate-lines`, com os mesmos efeitos (autorização da execução, tentativa de reserva de estoque,
+   orçamento `CLOSED` quando não restarem linhas pendentes, `statusSnapshot` recalculado).
+4. A resposta é `200` com a OS atualizada, no mesmo formato da resposta de `decide-estimate-lines`.
 
-### Cenário alternativo — decisão inválida para o estado atual
+### Cenário alternativo — rejeição via e-mail
 
-1. O payload referencia uma `ServiceExecution` que não está `PENDING`, ou que não pertence à Estimate
-   informada.
-2. A API responde `409 Conflict` com o código de erro estável já usado em `decide-estimate-lines`
-   (`INVALID_STATE_TRANSITION`/"não encontrado", conforme o caso), sem aplicar nenhuma decisão da chamada
-   (mesma regra tudo-ou-nada de `decide-estimate-lines`).
+Igual ao principal, com `intendedStatus = REJECTED`: todas as linhas pendentes vão para `REJECTED`. Se todas
+as execuções da OS ficarem terminais, a OS passa a `COMPLETED` pelas regras já existentes.
 
-### Cenário alternativo — remetente não corresponde ao Customer
+### Cenário alternativo — intenção não aplicável
 
-1. O payload informa um remetente que não corresponde ao e-mail do Customer registrado para a OS/Estimate
-   referenciada.
-2. A API rejeita a chamada com um erro estável, sem aplicar nenhuma decisão.
+1. A OS não tem orçamento `SENT` com linha `PENDING` (ex.: ainda em diagnóstico, orçamento já decidido,
+   `EXPIRED`, OS `COMPLETED` ou `DELIVERED`), ou tem mais de um orçamento `SENT` ao mesmo tempo.
+2. A API responde `409` com código de erro estável e nenhuma linha é decidida.
+
+### Cenário alternativo — OS inexistente
+
+A API responde `404` com o código `NOT_FOUND` já usado pelas demais rotas de OS.
 
 ### Cenário alternativo — chamador não autenticado
 
-1. Uma chamada chega sem a credencial exigida por RF41.
-2. A API rejeita a chamada conforme definido em RF41, sem invocar nenhum caso de uso de domínio.
+A API responde `401` (mesmo `ErrorResponse` `UNAUTHORIZED` de RF41), sem invocar nenhum caso de uso.
 
 ## Regras de negócio
 
-1. O endpoint **reaproveita integralmente** a regra de negócio e o caso de uso já existentes em
-   `decide-estimate-lines` (RF15/RF16) — não cria uma segunda implementação da decisão de aprovação/
-   rejeição de `ServiceExecution`.
-2. O payload é modelado como uma mensagem de e-mail recebida (remetente + referência à decisão), não como
-   um comando de domínio já pré-extraído; o mapeamento payload → chamada do caso de uso é responsabilidade
-   desta feature (detalhado no technical-spec).
-3. O e-mail remetente informado no payload deve corresponder ao e-mail do Customer associado à Service
-   Order/Estimate referenciada; divergência é rejeitada sem aplicar decisão.
-4. Todas as regras de negócio já documentadas em `decide-estimate-lines` (decisão em lote, tudo-ou-nada,
-   `serviceExecutionId` repetido rejeitado, só decide `PENDING`, efeitos de `APPROVED`/`REJECTED`) se
-   aplicam integralmente a este canal — nenhuma delas é relaxada ou duplicada.
-5. A autenticação do chamador (quem pode invocar este endpoint) é definida por RF41, não por esta feature;
-   este documento apenas consome esse contrato.
-6. Este endpoint não introduz nenhuma transição de estado nova além das já cobertas por
-   `authorizeExecutionFromEstimate`/`rejectExecutionFromEstimate`.
+1. O endpoint não altera `statusSnapshot` diretamente nem cria transição de estado nova: ele só traduz a
+   intenção em decisões de orçamento e delega ao caso de uso de `decide-estimate-lines`, que aplica
+   `authorizeExecutionFromEstimate`/`rejectExecutionFromEstimate`. O status resultante é o que o agregado
+   recalcular.
+2. Valores aceitos para `intendedStatus`: somente `APPROVED` e `REJECTED` (a decisão do Customer sobre o
+   orçamento). Qualquer outro valor é erro de validação (`400`), não uma tentativa de transição — o endpoint
+   não aceita nomes de status da OS (internos ou nominais de RF39) porque não é um setter de status.
+3. O orçamento alvo é o único orçamento `SENT` da OS. Sem orçamento `SENT`, sem linha `PENDING` nele, ou com
+   mais de um orçamento `SENT` (ambiguidade que a intenção simbólica não resolve), a resposta é `409` com
+   código estável e nada muda.
+4. A decisão é tudo-ou-nada, como em `decide-estimate-lines`: ou todas as linhas pendentes são decididas, ou
+   nenhuma.
+5. Linhas já decididas antes da chamada (ex.: parte decidida pelo canal interno) não são alteradas; a
+   intenção se aplica só às que continuam `PENDING`.
+6. A autenticação é exclusivamente a assinatura HMAC de RF41. Um JWT de usuário interno **não** dá acesso a
+   este endpoint: usuários internos continuam decidindo pelo endpoint de `decide-estimate-lines`.
+7. Todas as falhas de autenticação respondem `401`, sem revelar se a OS existe (a verificação acontece antes
+   de qualquer acesso a dados de domínio).
 
 ## Fora de escopo
 
-- implementar um cliente de e-mail real, parsing de MIME/SMTP ou integração com um provedor de e-mail de
-  fato — o payload apenas representa uma mensagem já processada por uma automação externa simulada;
-- decidir o mecanismo de autenticação/verificação de origem do chamador — isso é RF41;
-- qualquer transição de estado da Service Order/`ServiceExecution` fora da decisão de aprovação/rejeição
-  de Estimate já coberta por `decide-estimate-lines` (ex.: iniciar execução, atribuir técnico, finalizar
-  OS) — este endpoint não é um "setter" genérico de status;
-- alterar o endpoint interno já existente `POST /api/estimates/{estimateId}/decisions` ou seu contrato;
-- os 6 nomes nominais de status (RF39) — não fazem parte do payload nem da resposta deste endpoint;
-- registrar RF40/RF41 no board do Miro (task separada, mesma situação de RF38/RF39).
+- payload no formato de mensagem de e-mail, parsing de texto livre, SMTP/MIME ou integração com provedor de
+  e-mail real — a intenção chega já extraída;
+- conferência do remetente do e-mail com o e-mail do Customer cadastrado;
+- qualquer transição da OS que não seja a decisão do orçamento (diagnóstico, atribuição de técnico, início,
+  progresso, conclusão, entrega);
+- decisão parcial (aprovar algumas linhas e rejeitar outras) por este canal — continua em
+  `decide-estimate-lines`;
+- alterar o contrato de `POST /api/estimates/{estimateId}/decisions`;
+- idempotência além da já garantida pelo domínio (reenviar a mesma intenção depois de aplicada resulta em
+  `409`, pois não restam linhas `PENDING`);
+- registrar RF40 no board do Miro (task separada).
 
 ## Critérios de aceite
 
-- [ ] Dado um payload representando um e-mail do Customer com decisão de aprovação para uma
-      `ServiceExecution` `PENDING` de uma Estimate existente, com remetente correspondente ao Customer da
-      OS e credencial válida (RF41), quando o endpoint é chamado, então a mesma regra de domínio de
-      `decide-estimate-lines` é aplicada e a `ServiceExecution` é autorizada com os mesmos efeitos já
-      especificados naquela feature.
-- [ ] O mesmo cenário, com decisão de rejeição, move a `ServiceExecution` para `REJECTED`.
-- [ ] Dado um payload referenciando uma `ServiceExecution` que não está `PENDING` ou que não pertence à
-      Estimate informada, quando o endpoint é chamado, então a API responde com erro estável (`409`/"não
-      encontrado", conforme o caso) e nenhuma decisão é aplicada.
-- [ ] Dado um payload cujo remetente não corresponde ao e-mail do Customer associado à OS/Estimate, quando
-      o endpoint é chamado, então a chamada é rejeitada e nenhuma decisão é aplicada.
-- [ ] Dado um payload sem a credencial exigida por RF41, quando o endpoint é chamado, então a chamada é
-      rejeitada antes de qualquer efeito de domínio.
-- [ ] Todas as regras de `decide-estimate-lines` (lote tudo-ou-nada, `serviceExecutionId` duplicado
-      rejeitado, apenas `PENDING` pode ser decidida) continuam valendo integralmente por este canal.
+- [ ] Dada uma OS com orçamento `SENT` e linhas `PENDING`, quando o endpoint é chamado com assinatura HMAC
+      válida e `intendedStatus = APPROVED`, então todas as linhas pendentes são autorizadas pelo caso de uso
+      de `decide-estimate-lines` e a resposta é `200` com a OS atualizada.
+- [ ] O mesmo cenário com `intendedStatus = REJECTED` rejeita todas as linhas pendentes.
+- [ ] Dada uma OS sem orçamento `SENT` com linha `PENDING` (em diagnóstico, já decidida, orçamento `EXPIRED`,
+      `COMPLETED` ou `DELIVERED`), quando o endpoint é chamado, então a resposta é `409` com código estável e
+      nenhum estado muda.
+- [ ] Dada uma OS com mais de um orçamento `SENT`, quando o endpoint é chamado, então a resposta é `409` e
+      nada muda.
+- [ ] Dada uma OS inexistente com assinatura válida, a resposta é `404` `NOT_FOUND`.
+- [ ] Dado `intendedStatus` ausente ou com valor diferente de `APPROVED`/`REJECTED`, a resposta é `400`
+      `VALIDATION_ERROR` e nada muda.
+- [ ] Dada uma chamada sem assinatura, com assinatura inválida, fora da janela ou com corpo acima do limite,
+      a resposta é `401` e nenhum caso de uso é invocado.
+- [ ] Dada uma chamada apenas com JWT válido (qualquer role, inclusive `ADMIN`), sem assinatura HMAC, a
+      resposta é `403` (autenticado, mas sem a authority do gateway) e nada muda.
+- [ ] Reenviar a mesma intenção depois de aplicada resulta em `409`, sem efeito adicional.
+- [ ] `POST /api/estimates/{estimateId}/decisions` continua com o mesmo comportamento (JWT e HMAC).
