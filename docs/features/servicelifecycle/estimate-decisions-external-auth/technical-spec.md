@@ -5,7 +5,7 @@
 | Feature | `estimate-decisions-external-auth` |
 | Status | Approved |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-09-23 |
+| Atualizado em | 2026-09-26 |
 | Aprovado por | Santiago Silvestre |
 | Aprovado em | 2026-09-23 |
 | Especificação funcional | `./functional-spec.md` (Approved, 2026-09-23 — decisão (b) HMAC de webhook) |
@@ -167,3 +167,60 @@ Classificação: **nenhum seed necessário**.
     `decide-estimate-lines` (teste de regressão pontual, não duplicar a suíte inteira daquela feature).
 - `ModuleStructureTest` deve continuar verde — nenhum import cruzado novo entre módulos.
 - Cobertura: manter ≥80% no código novo (filtro + wrapper), meta do projeto.
+
+## Adendo 1 — Limite de tamanho do corpo e leitura condicional (2026-09-26)
+
+| Campo | Valor |
+|---|---|
+| Origem | Achado de segurança do checkpoint 5 (`implementation-plan.md`, "Revisão de segurança") |
+| Decisão de desenho | Opção (a) + (b), escolhida por Santiago Silvestre em 2026-09-26 |
+| Aprovação do adendo | Pendente — o status `Approved` acima se refere ao texto original de 2026-09-23 |
+
+### Problema
+
+O fluxo de verificação original (passos 2 e 5 de "Fluxo de verificação") lia o corpo inteiro para a memória em
+toda `POST /api/estimates/*/decisions`, sem limite e antes de saber se o chamador era válido. Antes desta
+feature, uma chamada sem credencial era rejeitada na autorização sem o corpo ser lido; com o desenho original,
+um chamador anônimo podia forçar o servidor a manter um corpo arbitrariamente grande em memória (a aplicação
+não configura limite de tamanho para corpos JSON).
+
+### Mudanças no fluxo de verificação
+
+Substituem os passos 2, 3 e 5 de "Fluxo de verificação" onde conflitarem:
+
+1. **Leitura condicional** — se **qualquer um** dos headers `X-Estimate-Gateway-Timestamp`/
+   `X-Estimate-Gateway-Signature` estiver ausente, o filtro não lê nem envolve o corpo: executa
+   `SecurityContextHolder.clearContext()` e segue a cadeia com a requisição **original**. Chamadas anônimas e
+   chamadas JWT têm o mesmo custo de antes desta feature.
+2. **Limite de tamanho** — com os dois headers presentes:
+   - se `Content-Length` declarado for maior que o limite, a chamada é rejeitada sem ler nenhum byte;
+   - caso contrário (inclusive sem `Content-Length`, ex.: chunked), `CachedBodyHttpServletRequest` lê no
+     máximo `limite + 1` bytes (`readNBytes`) e rejeita se o teto for ultrapassado.
+3. **Rejeição direta** — corpo acima do limite é o **único** caso em que o filtro responde por conta própria:
+   chama `ApiAuthenticationEntryPoint.commence(...)` e **não** chama o restante da cadeia, porque o corpo já
+   foi parcialmente consumido e não pode ser entregue ao controller. Nos demais casos (ausente/inválido/
+   expirado) o comportamento original se mantém: contexto limpo, sem exceção, cadeia continua.
+
+### Contrato e configuração
+
+- Nova property `app.security.estimate-gateway.max-body-bytes` (env `APP_SECURITY_ESTIMATE_GATEWAY_MAX_BODY_BYTES`,
+  padrão `65536` = 64 KiB). Valor não positivo falha no startup. Um corpo legítimo de decisão tem poucos KB.
+- A resposta de rejeição é o mesmo `401` `ErrorResponse("UNAUTHORIZED", "Authentication is required")` de
+  "Tradução de falhas" — a regra "toda falha do caminho HMAC → `401`, nunca `403`" continua valendo, e a
+  resposta não revela que o motivo foi o tamanho (não-enumeração preservada).
+- **Exceção à precedência do JWT**: com corpo assinado acima do limite, um `Authorization: Bearer` válido
+  enviado na mesma chamada não chega a ser avaliado, pois a chamada é rejeitada antes do
+  `JwtAuthenticationFilter`. Sem headers HMAC, o JWT não é afetado pelo limite (o corpo não é lido pelo
+  filtro).
+- OpenAPI (descrição do endpoint) e `README.md` mencionam o limite.
+
+### Testes adicionados
+
+- Unitário — `CachedBodyHttpServletRequestTest`: corpo exatamente no limite aceito; acima do limite lança
+  `BodyTooLargeException`.
+- Unitário — `EstimateGatewayHmacAuthenticationFilterTest`: sem headers, a cadeia recebe a requisição original
+  (corpo não lido), mesmo com corpo acima do limite; corpo assinado acima do limite → `401` sem chamar a
+  cadeia; `Content-Length` declarado acima do limite → `401` sem ler o corpo; corpo assinado exatamente no
+  limite → autenticado; limite não positivo rejeitado no startup.
+- Integração HTTP — `EstimateControllerGatewayAuthenticationTest`: corpo JSON válido e corretamente assinado,
+  acima de 64 KiB → `401` pela cadeia real, sem alterar a linha (continua `PENDING`).
