@@ -119,7 +119,7 @@ Revisar:
 - [x] `make verify` passando.
 - [x] Revisão de segurança concluída (ver abaixo) — achado médio de buffer do corpo resolvido com (a) + (b).
 - [x] Chamada real via Postman (Newman) contra a aplicação em Docker (2026-09-26, ver evidências).
-- [x] PR pronto para review (2026-09-26).
+- [ ] PR pronto para review.
 
 ## Revisão de segurança
 
