@@ -1368,6 +1368,37 @@
             "url": "{{baseUrl}}/api/estimates/{{estimateId}}/decisions",
             "description": "RF41: sem JWT e sem os headers X-Estimate-Gateway-Timestamp/X-Estimate-Gateway-Signature a chamada é rejeitada com 401 antes de qualquer regra de domínio, independentemente do estado da estimate. Pode ser executada a qualquer momento."
           }
+        },
+        {
+          "name": "Update service order status via external channel without credentials (expect 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"intendedStatus\": \"APPROVED\"\n}"
+            },
+            "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/external-status-updates",
+            "description": "RF40: sem os headers HMAC do gateway a chamada é rejeitada com 401 antes de qualquer regra de domínio, em qualquer estado da OS. Pode ser executada a qualquer momento. Com o JWT da collection (sem HMAC) a resposta seria 403: este endpoint é exclusivo do gateway."
+          }
         }
       ]
     },
@@ -1970,6 +2001,62 @@
             },
             "url": "{{baseUrl}}/api/estimates/{{estimateId}}/decisions",
             "description": "RF41: alternativa a \"Estimates / Decide estimate lines\" que simula o gateway externo de aprovação do Customer — sem JWT, autenticada só por HMAC. Rode NO LUGAR do passo 10 do README (a linha precisa estar PENDING; depois de decidida, uma segunda decisão retorna 409). O pre-request script calcula X-Estimate-Gateway-Timestamp (epoch seconds) e X-Estimate-Gateway-Signature (hex de HMAC-SHA256(timestamp + '.' + corpo)) com a variável estimateGatewaySecret, que deve ser igual a APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET da aplicação. Assinatura errada, timestamp com mais de 300s de diferença ou corpo alterado após a assinatura retornam 401."
+          }
+        },
+        {
+          "name": "Update service order status via external channel (HMAC)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// RF40 uses the RF41 gateway signature: HMAC-SHA256(timestamp + '.' + rawBody), hex.",
+                  "const timestamp = Math.floor(Date.now() / 1000).toString();",
+                  "const rawBody = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const secret = pm.collectionVariables.get('estimateGatewaySecret');",
+                  "const signature = CryptoJS.HmacSHA256(timestamp + '.' + rawBody, secret).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-Estimate-Gateway-Timestamp', value: timestamp });",
+                  "pm.request.headers.upsert({ key: 'X-Estimate-Gateway-Signature', value: signature });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Response is the updated service order', function () {",
+                  "    pm.expect(body.id).to.eql(pm.variables.get('serviceOrderId'));",
+                  "});",
+                  "pm.test('No execution is left PENDING', function () {",
+                  "    pm.expect(body.executions.filter(e => e.status === 'PENDING')).to.be.empty;",
+                  "});",
+                  "const execution = body.executions.find(e => e.id === pm.collectionVariables.get('executionId'));",
+                  "if (execution && execution.stockReservationId) {",
+                  "    pm.collectionVariables.set('stockReservationId', execution.stockReservationId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"intendedStatus\": \"APPROVED\"\n}"
+            },
+            "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/external-status-updates",
+            "description": "RF40: simula a ferramenta externa que processou a resposta de e-mail do Customer e envia só a intenção (APPROVED ou REJECTED) para a OS. Todas as linhas PENDING do orçamento SENT da OS são decididas, pelas mesmas regras de \"Estimates / Decide estimate lines\". Rode NO LUGAR do passo 10 do README (com a OS no ponto em que o orçamento foi gerado); reenviar depois de aplicado retorna 409. Autenticação: a mesma assinatura HMAC de RF41, calculada pelo pre-request script com estimateGatewaySecret; sem assinatura válida retorna 401, e um JWT sem assinatura retorna 403."
           }
         },
         {

@@ -124,7 +124,7 @@ Revisar:
 - [x] Migração do índice e consulta `findByServiceOrderIdAndStatus` implementadas e testadas.
 - [x] `ApplyExternalStatusUpdateUseCase` e DTOs implementados e testados.
 - [x] Controller, filtro HMAC e `SecurityConfig` atualizados, com testes HTTP pela cadeia real.
-- [ ] OpenAPI, Postman e `README.md` atualizados.
+- [x] OpenAPI, Postman e `README.md` atualizados.
 - [ ] Testes relevantes passando.
 - [ ] `make verify` passando.
 - [ ] Revisão de segurança concluída (ver abaixo).
@@ -217,6 +217,28 @@ A preencher checkpoint a checkpoint (comandos, resultados, contagens de testes, 
   `SecurityAuthorizationTest` (15), `ModuleStructureTest` (2), 0 falhas.
 - Estilo: a linha acima de 120 caracteres no controller é o import de `ApplyExternalStatusUpdateUseCase`
   (imports não podem ser quebrados).
+
+### Checkpoint 5 — Documentação e contrato (2026-09-26)
+
+- OpenAPI em `ExternalStatusUpdateController`: `@Tag("Service Orders")`, `@Operation` (uso exclusivo do
+  gateway, valores aceitos, regra das linhas `PENDING`, formato da assinatura, janela e limite de corpo), os dois
+  headers HMAC como `@Parameter(in = HEADER, required = true)` e `@ApiResponses` `200`/`400`/`401`/`403`/`404`/
+  `409`. Aqui os headers são obrigatórios (em `/decisions` são opcionais, porque lá o JWT também vale).
+- `OpenApiContractTest.documentExternalStatusUpdateEndpoint`: path, respostas `200`/`401`/`403`/`409`, os dois
+  headers e o enum de `intendedStatus` no schema `ExternalStatusUpdateRequest`.
+- Postman:
+  - `Isolated / Update service order status via external channel (HMAC)` — `noauth`, pre-request script de
+    assinatura igual ao de RF41, corpo `{"intendedStatus": "APPROVED"}`, testes: `200`, OS correta, nenhuma
+    execução `PENDING`;
+  - `Estimates / Update service order status via external channel without credentials (expect 401)` — `noauth`,
+    sem headers, espera `401`. **Divergência do plano**: ficou na pasta `Estimates`, ao lado da requisição
+    equivalente de RF41, e não em `Service Lifecycle` (as duas checagens negativas do gateway ficam juntas);
+  - nenhuma das duas entrou em `E2E_STEPS`; JSON validado com `node` (`JSON.parse`).
+- `README.md`: os dois parágrafos sobre "todos os endpoints exigem JWT" citam os dois endpoints do gateway; passo
+  10 aponta a alternativa de RF40; nova seção "Atualização de status da OS via canal externo (HMAC)" com payload,
+  valores aceitos, tabela de respostas, roteiro Postman e exemplo `bash`/`openssl`/`curl` autocontido. Também
+  reflui uma linha pré-existente de 170 caracteres no parágrafo editado.
+- `./mvnw test -Dtest=OpenApiContractTest,ExternalStatusUpdateControllerTest`: 19 + 11 testes, 0 falhas.
 
 ## Rollback ou recuperação
 
