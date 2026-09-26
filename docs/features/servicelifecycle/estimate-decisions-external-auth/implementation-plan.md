@@ -115,10 +115,13 @@ Revisar:
 - [x] Testes de integração HTTP cobrindo sucesso HMAC, falha HMAC (ausente/inválido/expirado) e regressão
       JWT.
 - [x] `README.md`, OpenAPI e Postman atualizados.
-- [ ] Testes relevantes passando.
-- [ ] `make verify` passando.
-- [ ] Revisão de segurança concluída (ver abaixo).
-- [ ] PR pronto para review.
+- [x] Testes relevantes passando.
+- [x] `make verify` passando.
+- [ ] Revisão de segurança concluída (ver abaixo) — revisão feita; 1 achado médio aguardando decisão do
+      responsável (buffer do corpo sem limite antes da autenticação).
+- [ ] Chamada real via Postman contra a aplicação em Docker — pendente, adiada pelo responsável
+      (2026-09-26).
+- [ ] PR pronto para review — pendente, adiado pelo responsável (2026-09-26).
 
 ## Revisão de segurança
 
@@ -150,6 +153,37 @@ Achados durante a implementação:
 - **Checkpoint 2 — overflow na janela de timestamp (alto, resolvido)**: `Math.abs(now - timestamp)` estoura
   para timestamps extremos e aceitaria uma assinatura válida fora de qualquer janela (replay indefinido).
   Mitigado com comparação de limites e teste `extremeTimestampDoesNotOverflowIntoTheWindow`.
+- **Checkpoint 5 — corpo lido para a memória sem limite antes da autenticação (médio, EM ABERTO)**:
+  `CachedBodyHttpServletRequest` usa `readAllBytes()` sem teto, e o filtro envolve toda
+  `POST /api/estimates/*/decisions` antes de saber se o chamador é válido. Antes desta feature, uma chamada
+  sem credencial era rejeitada na autorização sem o corpo ser lido; agora um chamador anônimo pode forçar o
+  servidor a manter o corpo inteiro em memória (a aplicação não configura limite de tamanho para corpos
+  JSON). Mitigações candidatas, a decidir pelo responsável: (a) só envolver/ler o corpo quando os dois
+  headers HMAC estiverem presentes (reduz o custo, mas não elimina o vetor); (b) teto de tamanho na leitura
+  (ex.: 64 KiB) com rejeição `401` via `ApiAuthenticationEntryPoint` quando excedido; (c) aceitar como risco
+  de MVP e registrar em `docs/tech-debt/`. (b) altera o comportamento descrito no `technical-spec.md`
+  aprovado (o filtro passaria a responder diretamente), por isso não foi aplicado sem decisão.
+- **Checkpoint 5 — segredo padrão conhecido (baixo, aceito)**: se
+  `APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET` não for definida, a aplicação sobe com o segredo de
+  desenvolvimento publicado no repositório. É o mesmo padrão já aceito para `APP_SECURITY_JWT_SECRET`;
+  `.env.example` e README orientam trocar o valor em qualquer ambiente real.
+
+Revisão dos itens do checkpoint 5 (2026-09-26):
+
+- **Validação de entrada**: confirmada — timestamp não numérico, header ausente ou assinatura inválida
+  resultam em não autenticado, sem exceção (testes do checkpoint 2). Corpo sem limite: ver achado acima.
+- **Autenticação/autorização**: `ESTIMATE_APPROVAL_GATEWAY` só é concedida pelo filtro HMAC e só aparece na
+  regra de `POST /api/estimates/*/decisions`; headers válidos em outra rota → `401` (teste de integração).
+  Nenhuma mudança no enum `Role` nem no mapeamento role→domain-ID (`git diff 61646cc HEAD -- .../identity/auth`
+  vazio).
+- **Exposição de dados**: nenhuma resposta nova; falha continua sendo o `401` genérico.
+- **Segredos/logs**: o filtro não tem logger; segredo, assinatura e corpo nunca são logados.
+- **SQL/persistência/migration**: N/A — nenhuma migration nem acesso a dados.
+- **Erros e disclosure**: `401` para toda falha do caminho HMAC; `403` só para JWT válido com role sem
+  permissão (comportamento anterior, agora documentado no OpenAPI), conforme `technical-spec.md`.
+- **Dependências novas**: nenhuma.
+- **Abuso**: replay fora da janela bloqueado (incluindo overflow, corrigido); replay dentro da janela de
+  300s é risco de MVP já aceito no `technical-spec.md`; buffer do corpo, ver achado em aberto.
 
 ## Evidências de verificação
 
@@ -256,6 +290,23 @@ A preencher durante a implementação (comandos executados, resultados de teste,
   18 + 8 + 8 testes, 0 falhas.
 - Não executado neste checkpoint: chamada real via Postman/newman contra a aplicação em Docker (fica para a
   validação final).
+
+### Checkpoint 5 — Validação final (2026-09-26)
+
+- `./mvnw clean verify` (equivalente a `make verify`): `BUILD SUCCESS`; 730 testes, 0 falhas, 0 erros,
+  0 skipped (inclui `ModuleStructureTest`); `jacoco:check` — "All coverage checks have been met".
+- Cobertura (JaCoCo, linhas): projeto 93,92% (instruções 93,05%, branches 75,46%);
+  `CachedBodyHttpServletRequest` 8/8; `CachedBodyServletInputStream` 6/8 (`isReady`/`setReadListener` não
+  exercitados); `EstimateGatewayHmacAuthenticationFilter` 40/42 (o não coberto é o `catch` de
+  `GeneralSecurityException`, inalcançável em JDK conforme); `SecurityConfig` 37/37; `EstimateController`
+  18/18.
+- Revisão de escopo: todo código de produção novo está em `identity`. A única mudança em `servicelifecycle`
+  é de documentação OpenAPI em `EstimateController` (anotações), exigida pelo checkpoint 4; controller,
+  caso de uso e DTOs não mudaram de comportamento.
+- OpenAPI e Postman conferidos contra `technical-spec.md`: mesmos nomes de header, formato
+  `HMAC-SHA256(timestamp + "." + rawBody)` em hex, janela de 300s, `401` para falha do caminho HMAC.
+- Pendente por decisão do responsável: execução real via Postman contra a aplicação em Docker e abertura do
+  PR. Pendente de decisão: achado médio de buffer do corpo sem limite (ver "Revisão de segurança").
 
 ## Rollback ou recuperação
 
