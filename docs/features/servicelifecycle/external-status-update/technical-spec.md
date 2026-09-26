@@ -3,11 +3,11 @@
 | Campo | Valor |
 |---|---|
 | Feature | `external-status-update` |
-| Status | Draft |
+| Status | Approved |
 | Responsável | Santiago Silvestre |
 | Atualizado em | 2026-09-26 |
-| Aprovado por | — |
-| Aprovado em | — |
+| Aprovado por | Santiago Silvestre |
+| Aprovado em | 2026-09-26 |
 | Especificação funcional | `./functional-spec.md` (Approved, 2026-09-26) |
 
 ## Contexto e desenho
