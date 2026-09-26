@@ -121,7 +121,7 @@ Revisar:
 ## Definition of Done
 
 - [x] Adendo 2 da technical-spec de RF41 escrito e aprovado pelo responsável (Santiago Silvestre, 2026-09-26).
-- [ ] Migração do índice e consulta `findByServiceOrderIdAndStatus` implementadas e testadas.
+- [x] Migração do índice e consulta `findByServiceOrderIdAndStatus` implementadas e testadas.
 - [ ] `ApplyExternalStatusUpdateUseCase` e DTOs implementados e testados.
 - [ ] Controller, filtro HMAC e `SecurityConfig` atualizados, com testes HTTP pela cadeia real.
 - [ ] OpenAPI, Postman e `README.md` atualizados.
@@ -150,6 +150,30 @@ A preencher no Checkpoint 6. Itens previstos, conforme `technical-spec.md`:
 ## Evidências de verificação
 
 A preencher checkpoint a checkpoint (comandos, resultados, contagens de testes, cobertura).
+
+### Checkpoint 1 — Adendo 2 em RF41 (2026-09-26)
+
+- "Adendo 2 — Segundo path protegido pelo filtro HMAC (RF40)" adicionado a
+  `estimate-decisions-external-auth/technical-spec.md` e aprovado por Santiago Silvestre em 2026-09-26.
+
+### Checkpoint 2 — Persistência (2026-09-26)
+
+- Migração `V20260926043630__add_service_order_status_index_to_estimates.sql`: índice
+  `idx_estimates_service_order_id_status` em `estimates (service_order_id, status)`.
+- `EstimateJpaRepository.findByServiceOrderIdAndStatus` (consulta derivada) e
+  `EstimateRepositoryImpl.findByServiceOrderIdAndStatus`, mapeando para o domínio.
+- `EstimateRepository.findByServiceOrderIdAndStatus` declarado como método `default` que lança
+  `UnsupportedOperationException`: os três fakes em memória existentes (`DecideEstimateLinesUseCaseTest`,
+  `ExpireEstimatesUseCaseTest`, `GenerateEstimateUseCaseTest`) não usam a consulta e ficam inalterados. É o mesmo
+  padrão já usado por `ServiceOrderRepository.search`.
+- `EstimateRepositoryIntegrationTest` (`@SpringBootTest`, H2 em modo MySQL com Flyway habilitado — a subida do
+  contexto aplica a migração nova): 3 testes, 0 falhas — só as Estimates da OS e do status pedidos; as duas
+  quando a OS tem duas `SENT`; lista vazia sem correspondência. O teste roda em `@Transactional`: as linhas
+  da Estimate são carregadas sob demanda e, neste projeto, quem abre a transação é o caso de uso, nunca o
+  adaptador de repositório (sem transação, o mapeamento falha com `LazyInitializationException`). O
+  `ApplyExternalStatusUpdateUseCase` do Checkpoint 3 é `@Transactional`, como o spec prevê.
+- Regressão: `EstimateStatusMigrationTest` (1), `DecideEstimateLinesUseCaseTest` (12),
+  `ExpireEstimatesUseCaseTest` (2), `GenerateEstimateUseCaseTest` (6) e `ModuleStructureTest` (2), 0 falhas.
 
 ## Rollback ou recuperação
 
