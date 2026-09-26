@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Feature | `estimate-decisions-external-auth` |
-| Status | In Progress |
+| Status | Implemented |
 | Responsável | Santiago Silvestre |
 | Atualizado em | 2026-09-26 |
 | Especificação técnica | `./technical-spec.md` (Approved, 2026-09-23) |
@@ -118,9 +118,8 @@ Revisar:
 - [x] Testes relevantes passando.
 - [x] `make verify` passando.
 - [x] Revisão de segurança concluída (ver abaixo) — achado médio de buffer do corpo resolvido com (a) + (b).
-- [ ] Chamada real via Postman contra a aplicação em Docker — pendente, adiada pelo responsável
-      (2026-09-26).
-- [ ] PR pronto para review — pendente, adiado pelo responsável (2026-09-26).
+- [x] Chamada real via Postman (Newman) contra a aplicação em Docker (2026-09-26, ver evidências).
+- [x] PR pronto para review (2026-09-26).
 
 ## Revisão de segurança
 
@@ -343,6 +342,25 @@ A preencher durante a implementação (comandos executados, resultados de teste,
   have been met". Cobertura do projeto: linhas 93,94%, instruções 93,07%, branches 75,56%.
   `EstimateGatewayHmacAuthenticationFilter` 56/58 linhas (não coberto: `catch` de
   `GeneralSecurityException`); `CachedBodyHttpServletRequest` 11/11.
+
+### Checkpoint 5 — Chamada real contra a aplicação em Docker (2026-09-26)
+
+- Ambiente: `docker compose` local (`workshop-app`, `workshop-mysql`, `workshop-supplier-simulator`), imagem
+  da aplicação construída depois do último commit de código da branch (`e04f7c8`).
+- Newman 6.2.2 sobre `docs/api/postman/workshop-management-system.postman_collection.json`, na ordem de
+  `make e2e`, substituindo `Decide estimate lines` (JWT) por
+  `Isolated / Decide estimate lines via external gateway (HMAC)`. Todas as requisições e asserções passaram:
+  - `Decide estimate lines without credentials (expect 401)` → `401 Unauthorized`;
+  - `Decide estimate lines via external gateway (HMAC)` → `200 OK`, sem JWT, assinada pelo pre-request script
+    com o `estimateGatewaySecret` padrão;
+  - o fluxo seguiu normalmente após a decisão pelo gateway: `Assign technician`, `Start execution`,
+    `Update execution progress` e `Complete execution` → `200 OK`.
+- Receita `curl` + `openssl` do README, contra a mesma Estimate (já decidida):
+  - assinatura válida → `409` `INVALID_STATE_TRANSITION` (autenticação aceita; a regra de negócio responde);
+  - segredo errado, timestamp 301 s no passado, corpo alterado após a assinatura, corpo assinado acima de
+    64 KiB e header de assinatura ausente → `401` `UNAUTHORIZED`, sem detalhe interno na resposta.
+- Observação de ambiente, sem impacto no código: o cache local do `npx` estava corrompido
+  (`Cannot find module './lodash'`), então o Newman foi instalado isoladamente fora do repositório.
 
 ## Rollback ou recuperação
 
