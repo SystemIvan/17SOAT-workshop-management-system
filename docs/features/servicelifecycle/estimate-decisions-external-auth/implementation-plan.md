@@ -176,7 +176,7 @@ Achados durante a implementação:
   - Divergência do `technical-spec.md` aprovado: o spec descreve o filtro como nunca respondendo
     diretamente ("ausente/inválido → clearContext, sem lançar exceção") e envolvendo sempre o corpo. O
     contrato externo (toda falha do caminho HMAC → `401`) não muda. Registrado como "Adendo 1" no
-    `technical-spec.md` (2026-09-26), com aprovação do adendo pendente do responsável.
+    `technical-spec.md`, aprovado por Santiago Silvestre em 2026-09-26.
 - **Checkpoint 5 — segredo padrão conhecido (baixo, aceito)**: se
   `APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET` não for definida, a aplicação sobe com o segredo de
   desenvolvimento publicado no repositório. É o mesmo padrão já aceito para `APP_SECURITY_JWT_SECRET`;

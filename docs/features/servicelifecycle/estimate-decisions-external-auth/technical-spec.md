@@ -174,7 +174,7 @@ Classificação: **nenhum seed necessário**.
 |---|---|
 | Origem | Achado de segurança do checkpoint 5 (`implementation-plan.md`, "Revisão de segurança") |
 | Decisão de desenho | Opção (a) + (b), escolhida por Santiago Silvestre em 2026-09-26 |
-| Aprovação do adendo | Pendente — o status `Approved` acima se refere ao texto original de 2026-09-23 |
+| Aprovação do adendo | Approved — Santiago Silvestre, 2026-09-26 |
 
 ### Problema
 
