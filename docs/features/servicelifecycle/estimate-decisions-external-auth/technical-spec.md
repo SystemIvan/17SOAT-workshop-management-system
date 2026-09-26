@@ -224,3 +224,41 @@ Substituem os passos 2, 3 e 5 de "Fluxo de verificação" onde conflitarem:
   limite → autenticado; limite não positivo rejeitado no startup.
 - Integração HTTP — `EstimateControllerGatewayAuthenticationTest`: corpo JSON válido e corretamente assinado,
   acima de 64 KiB → `401` pela cadeia real, sem alterar a linha (continua `PENDING`).
+
+## Adendo 2 — Segundo path protegido pelo filtro HMAC (RF40) (2026-09-26)
+
+| Campo | Valor |
+|---|---|
+| Origem | RF40 — `docs/features/servicelifecycle/external-status-update/technical-spec.md` (Approved, 2026-09-26) |
+| Aprovação do adendo | Pendente |
+
+### Mudança
+
+`EstimateGatewayHmacAuthenticationFilter` passa a proteger **dois** paths `POST`, em vez de um:
+
+| Path | Origem | Regra em `SecurityConfig` |
+|---|---|---|
+| `/api/estimates/*/decisions` | RF41 (inalterado) | `hasAnyAuthority("CUSTOMER", "ADMIN", "ESTIMATE_APPROVAL_GATEWAY")` |
+| `/api/service-orders/*/external-status-updates` | RF40 (novo) | `hasAuthority("ESTIMATE_APPROVAL_GATEWAY")` |
+
+- O comportamento do filtro é idêntico nos dois paths: leitura do corpo só com os dois headers presentes, limite
+  de tamanho do Adendo 1, janela de 300s, comparação em tempo constante e a mesma authority sintética
+  `ESTIMATE_APPROVAL_GATEWAY`. O nome da authority continua adequado: o endpoint de RF40 também aplica a decisão
+  do Customer sobre um orçamento, vinda do mesmo gateway.
+- A regra do novo path é declarada **antes** de `.requestMatchers("/api/service-orders/**")`, que hoje concede
+  `MANAGER`/`TECHNICIAN`/`ADMIN`. Sem essa ordem, um JWT `ADMIN` alcançaria o endpoint de RF40.
+- Diferente do path de RF41, o novo path **não** aceita JWT: anônimo → `401`; JWT de qualquer role sem HMAC →
+  `403`; JWT junto com HMAC válido → `403` (o filtro JWT roda depois e substitui a authority do gateway pela
+  role do usuário). Justificativa em `external-status-update/functional-spec.md` (regra 6): usuários internos
+  decidem pelo endpoint de `decide-estimate-lines`.
+- `identity` continua referenciando os paths só como string, sem importar tipos de `servicelifecycle`.
+- Nenhuma mudança no enum `Role`, no mapeamento role→domain-ID (AD-016) nem no contrato de
+  `/api/estimates/*/decisions`.
+
+### Testes adicionados (em RF40)
+
+- `EstimateGatewayHmacAuthenticationFilterTest`: o novo path é autenticado com assinatura válida e rejeita
+  assinatura inválida; outro path de `/api/service-orders/**` continua sem leitura de corpo.
+- `ExternalStatusUpdateControllerTest`: anônimo → `401`, assinatura inválida → `401`, JWT `ADMIN` sem HMAC →
+  `403`, HMAC válido → `200`, pela cadeia de segurança real.
+- Regressão: `EstimateControllerGatewayAuthenticationTest` e `SecurityAuthorizationTest` continuam verdes.

@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Feature | `external-status-update` |
-| Status | Draft |
+| Status | In Progress |
 | Responsável | Santiago Silvestre |
 | Atualizado em | 2026-09-26 |
 | Especificação técnica | `./technical-spec.md` (Approved, 2026-09-26) |
