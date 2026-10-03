@@ -6,8 +6,9 @@
 
 **Deciders:** Santiago Silvestre
 
-**Affected By:** `identity` (cadeia de segurança HTTP), `servicelifecycle` (`POST /api/estimates/{estimateId}/decisions`),
-canais externos futuros (RF37, RF40)
+**Affected By:** `identity` (cadeia de segurança HTTP), `servicelifecycle`
+(`POST /api/estimates/{estimateId}/decisions`, RF41;
+`POST /api/service-orders/{serviceOrderId}/external-status-updates`, RF40), canais externos futuros (RF37)
 
 ---
 
@@ -101,7 +102,10 @@ Princípios que valem para qualquer canal que adotar este mecanismo:
 
 Headers, formato exato da string assinada, valores padrão de janela e de tamanho, precedência entre JWT e HMAC e a
 estratégia de testes pertencem à `technical-spec.md` de cada feature que consome esta decisão. A primeira é
-`docs/features/servicelifecycle/estimate-decisions-external-auth/technical-spec.md`.
+`docs/features/servicelifecycle/estimate-decisions-external-auth/technical-spec.md` (RF41). A segunda,
+`docs/features/servicelifecycle/external-status-update/technical-spec.md` (RF40), reaproveita o mesmo filtro, segredo
+e authority, registrados no Adendo 2 da technical-spec de RF41. Ao contrário de RF41, a rota de RF40 aceita **só** o
+caminho HMAC.
 
 Um novo canal externo que precise de outro mecanismo deve registrar essa exceção em uma nova ADR.
 
@@ -112,7 +116,7 @@ Um novo canal externo que precise de outro mecanismo deve registrar essa exceç�
 - Sistemas externos integram sem contas de usuário artificiais.
 - O modelo de identidade (AD-016) e o fluxo JWT interno permanecem inalterados.
 - A assinatura sobre o corpo garante que o payload não foi alterado em trânsito.
-- RF40 e RF37 têm um mecanismo definido e não precisam decidir de novo.
+- RF40 adotou o mecanismo sem decidir de novo; RF37 também já tem um mecanismo definido.
 - A mudança fica na borda HTTP, sem acoplar `identity` a tipos de `servicelifecycle`.
 
 ### Negativas ❌
@@ -143,9 +147,10 @@ Um novo canal externo que precise de outro mecanismo deve registrar essa exceç�
 - `docs/features/servicelifecycle/estimate-decisions-external-auth/functional-spec.md` — RF41 e registro original da
   escolha entre as opções.
 - `docs/features/servicelifecycle/estimate-decisions-external-auth/technical-spec.md` — contrato de headers, fluxo de
-  verificação e Adendo 1 (limite de tamanho do corpo).
+  verificação, Adendo 1 (limite de tamanho do corpo) e Adendo 2 (segundo path protegido, RF40).
 - `docs/features/servicelifecycle/estimate-decisions-external-auth/implementation-plan.md` — revisão de segurança e
   evidências.
+- `docs/features/servicelifecycle/external-status-update/` — RF40, segundo canal que consome esta decisão.
 - `docs/Architecture-Decisions.md` — AD-016 (Identity/Auth module, mapeamento role→domain-ID).
 
 ## Approval Checklist
@@ -156,11 +161,13 @@ Um novo canal externo que precise de outro mecanismo deve registrar essa exceç�
 - [x] Limite de tamanho do corpo incorporado aos princípios — Adendo 1 do `technical-spec.md`, aprovado por Santiago
       Silvestre em 2026-09-26.
 - [x] Esta ADR aprovada como padrão para canais externos de entrada — Santiago Silvestre, 2026-09-26.
+- [x] Aplicada a RF40 (`external-status-update`) — Adendo 2 da technical-spec de RF41, aprovado por Santiago
+      Silvestre em 2026-09-26.
 - [ ] Aplicabilidade a RF37 confirmada quando o requisito for detalhado.
 
 ---
 
-**Last Updated:** 2026-09-26
+**Last Updated:** 2026-10-03
 
 **Decision Maker:** Santiago Silvestre
 
