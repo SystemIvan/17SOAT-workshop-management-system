@@ -9,6 +9,7 @@
 | Aprovado por | Santiago Silvestre |
 | Aprovado em | 2026-09-23 |
 | Especificação funcional | `./functional-spec.md` (Approved, 2026-09-23 — decisão (b) HMAC de webhook) |
+| ADR | `docs/adr/ADR-007-external-gateway-hmac-authentication.md` (Accepted, 2026-09-26) |
 
 ## Contexto e desenho
 

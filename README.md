@@ -39,15 +39,13 @@ O ambiente Docker local utiliza o perfil `dev` e carrega dados de demonstração
 Copie `.env.example` para `.env` para alterar esse comportamento. Os seeds ficam desativados no perfil padrão da
 aplicação.
 
-Todos os endpoints administrativos exigem JWT (consulte `docs/adr/ADR-003-authentication-strategy.md`). As exceções
-são os dois endpoints do gateway externo de aprovação do Customer, autenticados por assinatura HMAC:
-`POST /api/estimates/{estimateId}/decisions`, que também aceita JWT (RF41, ver
-[Decisão de orçamento pelo gateway externo](#decisão-de-orçamento-pelo-gateway-externo-hmac)), e
-`POST /api/service-orders/{serviceOrderId}/external-status-updates`, que aceita só HMAC (RF40, ver
-[Atualização de status da OS via canal externo](#atualização-de-status-da-os-via-canal-externo-hmac)). Defina
+Todos os endpoints administrativos exigem JWT (consulte `docs/adr/ADR-003-authentication-strategy.md`). A única
+exceção é `POST /api/estimates/{estimateId}/decisions`, que também aceita, sem JWT, uma chamada assinada por HMAC
+do gateway externo de aprovação do Customer (RF41, `docs/adr/ADR-007-external-gateway-hmac-authentication.md`;
+ver [Decisão de orçamento pelo gateway externo](#decisão-de-orçamento-pelo-gateway-externo-hmac)). Defina
 `APP_SECURITY_JWT_SECRET` e `APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET` no `.env` para qualquer ambiente real; os
-valores padrão de `.env.example` são exclusivos para desenvolvimento local. A conta obrigatória `admin`/`ADMIN`,
-criada por migration Flyway, permite obter um token e criar outras contas, conforme o roteiro Postman abaixo.
+valores padrão de `.env.example` são exclusivos para desenvolvimento local. A conta obrigatória `admin`/`ADMIN`, criada por migration Flyway, permite obter um token e criar
+outras contas, conforme o roteiro Postman abaixo.
 
 URLs úteis:
 
@@ -162,9 +160,9 @@ docker compose up -d --build
 
 Espere a aplicação estar disponível em `http://localhost:8080/swagger-ui.html`, importe a coleção e mantenha as
 variáveis no escopo da coleção. Todos os endpoints administrativos exigem um JWT (`AD-016`,
-`docs/adr/ADR-003-authentication-strategy.md`), exceto os caminhos por HMAC do gateway externo de aprovação do
-Customer (RF40 e RF41); a coleção já está configurada com autenticação `Bearer {{authToken}}` no nível de
-collection, então basta executar o login do passo 0 antes do restante do roteiro. `baseUrl` deve conter
+`docs/adr/ADR-003-authentication-strategy.md`), exceto o caminho alternativo por HMAC da decisão de orçamento
+(RF41, `docs/adr/ADR-007-external-gateway-hmac-authentication.md`); a coleção já está configurada com
+autenticação `Bearer {{authToken}}` no nível de collection, então basta executar o login do passo 0 antes do restante do roteiro. `baseUrl` deve conter
 apenas a origem, sem `/api`: para a execução local, use `http://localhost:8080`.
 
 | Variável | Como preencher |
@@ -385,12 +383,6 @@ retornados em respostas `201 Created` são os que devem ser usados no restante d
     corpo, sem JWT, assinada pelo pre-request script. O resultado esperado é o mesmo `200 OK`. Os detalhes estão em
     [Decisão de orçamento pelo gateway externo](#decisão-de-orçamento-pelo-gateway-externo-hmac).
 
-    Para simular a resposta de e-mail do Customer processada por uma ferramenta externa (RF40), envie, também **no
-    lugar** de `Decide estimate lines`, a requisição
-    `Isolated / Update service order status via external channel (HMAC)`, com `{"intendedStatus": "APPROVED"}`: ela
-    decide de uma vez todas as linhas pendentes do orçamento da OS. Os detalhes estão em
-    [Atualização de status da OS via canal externo](#atualização-de-status-da-os-via-canal-externo-hmac).
-
 11. Verifique se a execução aprovada está `READY`.
 
     - Se o diagnóstico não tiver peça (`"stockRequirements": []`), ela já estará pronta; siga para o passo 12.
@@ -500,57 +492,6 @@ Assinatura errada, segredo diferente, timestamp fora da janela, corpo alterado a
 maior que 64 KiB (`APP_SECURITY_ESTIMATE_GATEWAY_MAX_BODY_BYTES`, padrão `65536`) resultam em
 `401`, sem alterar a Estimate. Se a chamada também trouxer um `Authorization: Bearer` válido, o JWT prevalece, exceto
 quando o corpo assinado passa do limite: nesse caso a chamada é rejeitada antes de o JWT ser avaliado.
-
-### Atualização de status da OS via canal externo (HMAC)
-
-`POST /api/service-orders/{serviceOrderId}/external-status-updates` é o canal de entrada para a resposta do
-Customer a um e-mail de orçamento, já processada por uma ferramenta externa (RF40,
-`docs/features/servicelifecycle/external-status-update/`). O e-mail é simbólico: o endpoint recebe só a intenção
-extraída, não a mensagem.
-
-```json
-{ "intendedStatus": "APPROVED" }
-```
-
-- `intendedStatus` aceita só `APPROVED` ou `REJECTED`. Nomes de status da OS (internos ou os nominais do RF39,
-  como `EXECUCAO`) não são aceitos: o status da OS é recalculado a partir das decisões, nunca setado.
-- A intenção decide **todas** as linhas `PENDING` do orçamento `SENT` da OS, pelas mesmas regras do passo 10. A
-  resposta `200 OK` é a Service Order atualizada, no mesmo formato de `Decide estimate lines`.
-- Autenticação: a mesma assinatura HMAC da seção anterior (headers, segredo, janela de 300 segundos e limite de
-  64 KiB). Este endpoint é exclusivo do gateway: um JWT, mesmo de `ADMIN`, recebe `403`.
-
-| Resposta | Quando |
-| --- | --- |
-| `200` | Intenção aplicada. |
-| `400 VALIDATION_ERROR` | `intendedStatus` ausente ou diferente de `APPROVED`/`REJECTED`. |
-| `401` | Sem assinatura, assinatura inválida, fora da janela ou corpo assinado acima do limite. |
-| `403` | Chamada com JWT e sem a assinatura do gateway. |
-| `404 NOT_FOUND` | OS inexistente. |
-| `409 INVALID_STATE_TRANSITION` | A OS não tem exatamente um orçamento `SENT` com linha `PENDING`: ainda em diagnóstico, orçamento já decidido (inclusive reenvio da mesma intenção), expirado, OS finalizada ou entregue. |
-
-Pelo Postman, com a Service Order no ponto do passo 10 (orçamento gerado, linhas `PENDING`):
-
-1. Confirme que `estimateGatewaySecret` é igual ao segredo da aplicação (o padrão local já coincide).
-2. Envie `Isolated / Update service order status via external channel (HMAC)`. Espere `200 OK` e nenhuma execução
-   `PENDING` na resposta; siga para o passo 11.
-3. Reenviar a mesma requisição resulta em `409`, sem efeito adicional.
-4. Opcionalmente, envie
-   `Estimates / Update service order status via external channel without credentials (expect 401)`: sem
-   assinatura, a API responde `401` em qualquer estado da OS.
-
-Para reproduzir fora do Postman, com `bash` e `openssl` (a assinatura é sempre calculada sobre o corpo exato):
-
-```bash
-SECRET=local-development-only-estimate-gateway-secret-please-rotate
-BODY='{"intendedStatus":"APPROVED"}'
-TS=$(date +%s)
-SIG=$(printf '%s' "$TS.$BODY" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
-curl -i -X POST "http://localhost:8080/api/service-orders/<serviceOrderId>/external-status-updates" \
-  -H 'Content-Type: application/json' \
-  -H "X-Estimate-Gateway-Timestamp: $TS" \
-  -H "X-Estimate-Gateway-Signature: $SIG" \
-  --data-raw "$BODY"
-```
 
 ### Fluxo executável de Purchase Order
 

@@ -8,7 +8,7 @@
 | Atualizado em | 2026-09-23 |
 | Aprovado por | Santiago Silvestre |
 | Aprovado em | 2026-09-23 |
-| Referências | RF41; RF37 (decisão de desenho candidata a ser compartilhada — conteúdo ainda não detalhado, ver "Relação com RF37"); RF40 (`docs/features/servicelifecycle/external-status-update/functional-spec.md`, Draft, bloqueada por esta decisão); `docs/features/servicelifecycle/decide-estimate-lines/functional-spec.md` (endpoint e caso de uso protegidos por esta feature, comportamento de negócio inalterado); `docs/Architecture-Decisions.md` AD-016 (Identity/Auth module, mapeamento role→domain-ID); README.md (afirma hoje que todos os endpoints administrativos exigem JWT — texto impactado por esta feature) |
+| Referências | RF41; RF37 (decisão de desenho candidata a ser compartilhada — conteúdo ainda não detalhado, ver "Relação com RF37"); RF40 (`docs/features/servicelifecycle/external-status-update/functional-spec.md`, Draft, bloqueada por esta decisão); `docs/features/servicelifecycle/decide-estimate-lines/functional-spec.md` (endpoint e caso de uso protegidos por esta feature, comportamento de negócio inalterado); `docs/Architecture-Decisions.md` AD-016 (Identity/Auth module, mapeamento role→domain-ID); README.md (afirma hoje que todos os endpoints administrativos exigem JWT — texto impactado por esta feature); `docs/adr/ADR-007-external-gateway-hmac-authentication.md` (formalização da decisão abaixo como padrão para canais externos de entrada, 2026-09-26) |
 
 ## Nota sobre a origem do requisito
 
@@ -67,6 +67,10 @@ module sem mudança, isolando toda a mudança em um filtro de segurança dedicad
 não reaproveitar a infraestrutura JWT já pronta, e precisar de gestão de segredo compartilhado (rotação,
 armazenamento) — que já seria necessária de qualquer forma na opção (a) para o segredo/credencial do
 client credentials.
+
+Em 2026-09-26 esta decisão foi formalizada em `docs/adr/ADR-007-external-gateway-hmac-authentication.md`
+(Accepted, Santiago Silvestre) como padrão de autenticação para canais externos de entrada. O comportamento
+especificado aqui não muda.
 
 ## Relação com RF37
 
