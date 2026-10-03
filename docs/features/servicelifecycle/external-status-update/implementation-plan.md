@@ -3,9 +3,9 @@
 | Campo | Valor |
 |---|---|
 | Feature | `external-status-update` |
-| Status | In Progress |
+| Status | Implemented |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-09-26 |
+| Atualizado em | 2026-10-03 |
 | Especificação técnica | `./technical-spec.md` (Approved, 2026-09-26) |
 
 ## Objetivo
@@ -128,7 +128,7 @@ Revisar:
 - [x] Testes relevantes passando.
 - [x] `make verify` passando.
 - [x] Revisão de segurança concluída (ver abaixo) — nenhum achado crítico, alto ou médio.
-- [ ] Chamada real via Postman contra a aplicação em Docker — pendente, a cargo do responsável.
+- [x] Chamada real via Postman contra a aplicação em Docker (Santiago Silvestre, 2026-10-03, ver evidências).
 
 ## Revisão de segurança
 
@@ -269,8 +269,22 @@ A preencher checkpoint a checkpoint (comandos, resultados, contagens de testes, 
     `/decisions` com JWT e HMAC coberto pelos testes de regressão;
   - OpenAPI e Postman conferidos contra o contrato do `technical-spec.md` (path, `intendedStatus`, headers,
     códigos).
-- Pendente: chamada real via Postman contra a aplicação em Docker (a cargo do responsável). Por isso o plano
-  continua `In Progress`.
+- Pendente neste checkpoint: chamada real via Postman contra a aplicação em Docker (a cargo do responsável),
+  concluída no Checkpoint 7.
+
+### Checkpoint 7 — Chamada real contra a aplicação em Docker (2026-10-03)
+
+- Ambiente: `docker compose` local, com a aplicação construída a partir da branch
+  `feat/servicelifecycle-external-status-update` depois do merge de `dev` (`16b258a`) e da restauração da
+  documentação (`54da1b5`); nenhum código de produção mudou desde o Checkpoint 6.
+- Execução manual no Postman por Santiago Silvestre, seguindo `./manual-test-guide.md` (cenários `409` sem
+  orçamento, `401` sem credenciais, `403` com JWT `ADMIN`, `400` com `intendedStatus` inválido, `404` com OS
+  inexistente, `APPROVED`, `REJECTED` e reenvio). O responsável confirmou a conclusão do teste real; os
+  resultados por cenário não foram anexados a este plano.
+- Observação durante a execução: um `serviceOrderId` malformado na URL (não UUID) responde
+  `400 VALIDATION_ERROR` em vez de `404`, porque a conversão do path variable falha antes do caso de uso
+  (`MethodArgumentTypeMismatchException` no `GlobalExceptionHandler`). É o comportamento esperado da
+  plataforma; o cenário `404` exige um UUID bem formado e inexistente.
 
 ## Rollback ou recuperação
 
