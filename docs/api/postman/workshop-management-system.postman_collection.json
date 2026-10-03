@@ -35,7 +35,8 @@
     { "key": "lowStockPurchaseOrderIdempotencyKey", "value": "" },
     { "key": "metricFrom", "value": "" },
     { "key": "metricTo", "value": "" },
-    { "key": "authToken", "value": "" }
+    { "key": "authToken", "value": "" },
+    { "key": "estimateGatewaySecret", "value": "local-development-only-estimate-gateway-secret-please-rotate" }
   ],
   "item": [
     {
@@ -1336,6 +1337,37 @@
             "url": "{{baseUrl}}/api/estimates/{{estimateId}}/decisions",
             "description": "Retorna 409/INVALID_STATE_TRANSITION se a service execution não estiver PENDING ou se a estimate não estiver SENT (ex.: já CLOSED por uma decisão anterior ter fechado todas as linhas)."
           }
+        },
+        {
+          "name": "Decide estimate lines without credentials (expect 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401', function () { pm.response.to.have.status(401); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decisions\": [\n    { \"serviceExecutionId\": \"{{executionId}}\", \"decision\": \"APPROVED\" }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/api/estimates/{{estimateId}}/decisions",
+            "description": "RF41: sem JWT e sem os headers X-Estimate-Gateway-Timestamp/X-Estimate-Gateway-Signature a chamada é rejeitada com 401 antes de qualquer regra de domínio, independentemente do estado da estimate. Pode ser executada a qualquer momento."
+          }
         }
       ]
     },
@@ -1887,6 +1919,59 @@
       "name": "Isolated (run manually, not part of the full-collection E2E run)",
       "description": "Estas requisições arquivam/desativam recursos usados pelas demais pastas ou só se aplicam a um estado condicional. Rodar a collection inteira via Collection Runner/Newman do início ao fim NÃO deve incluir esta pasta; execute cada item aqui manualmente e isoladamente, quando necessário.",
       "item": [
+        {
+          "name": "Decide estimate lines via external gateway (HMAC)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// RF41: signs the resolved body exactly as it will be sent: HMAC-SHA256(timestamp + '.' + rawBody).",
+                  "const timestamp = Math.floor(Date.now() / 1000).toString();",
+                  "const rawBody = pm.variables.replaceIn(pm.request.body.raw);",
+                  "const secret = pm.collectionVariables.get('estimateGatewaySecret');",
+                  "const signature = CryptoJS.HmacSHA256(timestamp + '.' + rawBody, secret).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-Estimate-Gateway-Timestamp', value: timestamp });",
+                  "pm.request.headers.upsert({ key: 'X-Estimate-Gateway-Signature', value: signature });"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Response is the updated service order', function () {",
+                  "    pm.expect(body.id).to.eql(pm.variables.get('serviceOrderId'));",
+                  "});",
+                  "const execution = body.executions.find(e => e.id === pm.collectionVariables.get('executionId'));",
+                  "if (execution && execution.stockReservationId) {",
+                  "    pm.collectionVariables.set('stockReservationId', execution.stockReservationId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decisions\": [\n    { \"serviceExecutionId\": \"{{executionId}}\", \"decision\": \"APPROVED\" }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/api/estimates/{{estimateId}}/decisions",
+            "description": "RF41: alternativa a \"Estimates / Decide estimate lines\" que simula o gateway externo de aprovação do Customer — sem JWT, autenticada só por HMAC. Rode NO LUGAR do passo 10 do README (a linha precisa estar PENDING; depois de decidida, uma segunda decisão retorna 409). O pre-request script calcula X-Estimate-Gateway-Timestamp (epoch seconds) e X-Estimate-Gateway-Signature (hex de HMAC-SHA256(timestamp + '.' + corpo)) com a variável estimateGatewaySecret, que deve ser igual a APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET da aplicação. Assinatura errada, timestamp com mais de 300s de diferença ou corpo alterado após a assinatura retornam 401."
+          }
+        },
         {
           "name": "Create Purchase Order from demand",
           "event": [

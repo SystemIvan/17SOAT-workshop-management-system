@@ -422,6 +422,19 @@ class OpenApiContractTest {
     }
 
     @Test
+    void documentEstimateDecisionsGatewayAuthentication() throws Exception {
+        String decide = "$.paths['/api/estimates/{estimateId}/decisions'].post";
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(decide + ".responses['401']").exists())
+                .andExpect(jsonPath(decide + ".responses['403']").exists())
+                .andExpect(jsonPath(decide + ".parameters[?(@.in == 'header')].name",
+                        hasItem("X-Estimate-Gateway-Timestamp")))
+                .andExpect(jsonPath(decide + ".parameters[?(@.in == 'header')].name",
+                        hasItem("X-Estimate-Gateway-Signature")));
+    }
+
+    @Test
     void documentEstimateTotalsContract() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
