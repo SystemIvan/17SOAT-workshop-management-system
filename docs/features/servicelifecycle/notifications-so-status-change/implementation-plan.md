@@ -117,7 +117,21 @@ Commits:
 1. (opcional) `refactor(servicelifecycle): move estimate total calculation into the Estimate aggregate`
 2. `feat(servicelifecycle): add SMTP customer notification channel selectable by property`
 
-## Checkpoint 5 — Testes de módulo e ciclo ponta a ponta
+## Checkpoint 5 — Testes de módulo e ciclo ponta a ponta ⛔ Bloqueado (2026-10-05)
+
+**Bloqueio:** o teste de módulo encontrou um bug que já existia fora desta feature. `ServiceOrder` nunca entra em
+`AWAITING_APPROVAL` em produção, porque `markEstimateSentWithPendingLines()`/`markEstimateFullyDecided()` não são
+chamados por nenhum use case desde `61b44da`. Gerar o orçamento deixa a OS em "Diagnóstico", e o critério de aceite
+"Diagnóstico → Aguardando Aprovação" não tem como passar. Decisão de Santiago Silvestre em 2026-10-05: corrigir
+numa branch própria (`fix/servicelifecycle-awaiting-approval-status`, opção A), com orçamento expirado voltando a OS
+para "Diagnóstico". Este checkpoint continua depois do merge desse fix em `dev` e do rebase desta branch.
+
+Estado no bloqueio:
+- `ServiceOrderStatusChangeNotificationModuleTest` foi escrito e guardado em `git stash` (não commitado, para não
+  deixar a branch vermelha). 3 dos 4 cenários passaram pelo pipeline real (rollback sem e-mail, falha de envio sem
+  desfazer status, reposição `AWAITING_ITEMS → IN_PROGRESS` sem e-mail).
+- O cenário do ciclo completo falhou em `expectNotification(..., AGUARDANDO_APROVACAO)`: só houve a chamada
+  `DIAGNOSTICO`. Ele deve passar sem alteração depois do fix.
 
 `ServiceOrderStatusChangeNotificationModuleTest` (`@ApplicationModuleTest(DIRECT_DEPENDENCIES)`, H2 + Flyway,
 `CustomerNotificationPort` e `CustomerEstimateNotificationPort` como `@MockitoBean`, `Scenario` API):
