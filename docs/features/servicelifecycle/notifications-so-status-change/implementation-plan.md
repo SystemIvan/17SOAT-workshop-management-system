@@ -52,7 +52,7 @@ Testes:
 
 Commit: `feat(servicelifecycle): publish ServiceOrderStatusChanged when a service order is saved`
 
-## Checkpoint 3 — Porta, listener e consolidação do RF33
+## Checkpoint 3 — Porta, listener e consolidação do RF33 ✅ (2026-10-05)
 
 - `CustomerNotificationPort`: troca `notifyServiceOrderFinalized(...)` por
   `notifyServiceOrderStatusChanged(UUID serviceOrderId, UUID customerId, ServiceOrderStatusLabel newStatus)`.
@@ -205,6 +205,34 @@ Commits:
   `ModuleStructureTest` verde.
 - O comportamento depois do commit e com rollback (listener só roda se a transação confirmar) é coberto no
   Checkpoint 5, quando existir o listener. `@RecordApplicationEvents` registra a publicação, não a entrega.
+
+### Checkpoint 3
+
+- Commit de refatoração `188180f`: `EmailMasking` (público, final, em `serviceorder.infrastructure.notification`)
+  substitui as duas cópias privadas de `maskEmail` nos adapters simulados (status e orçamento). O comportamento não
+  mudou; o caso `null` passou a devolver `***`. `EmailMaskingTest` com 4 testes. Suíte: 776 testes, 0 falhas.
+- `CustomerNotificationPort`: `notifyServiceOrderFinalized` foi substituído por
+  `notifyServiceOrderStatusChanged(serviceOrderId, customerId, ServiceOrderStatusLabel)`.
+- Novo `ServiceOrderStatusChangedNotificationListener` (`@ApplicationModuleListener`): ignora transições com o
+  mesmo nominal e captura falhas da porta. O `WARN` traz só IDs, o nominal e o tipo da exceção, sem a mensagem nem
+  o stack trace, que podem conter o endereço do destinatário.
+- `FinalizeServiceOrderUseCase`: removida a dependência da porta e o `notifyCustomer`. O aviso de "Entregue" passa
+  pelo fluxo genérico (opção (a)).
+- `SimulatedEmailCustomerNotificationAdapter`: implementa o método novo. O `WARN` cobre cliente não encontrado ou
+  sem e-mail.
+- Novo `CustomerEmail` (record package-private), que resolve o e-mail do Customer e trata o caso sem e-mail. Será
+  reaproveitado pelo adapter SMTP.
+- Testes:
+  - `ServiceOrderStatusChangedNotificationListenerTest`, 10 testes: 7 transições nominais parametrizadas,
+    `AWAITING_ITEMS ↔ IN_PROGRESS` ignorados, e falha da porta sem PII no log;
+  - `FinalizeServiceOrderUseCaseTest` reescrito, 4 testes, sem a porta;
+  - `SimulatedEmailCustomerNotificationAdapterTest`, 2 testes;
+  - `CustomerEmailTest`, 3 testes.
+- `FinalizeServiceOrderFlowApplicationModuleTest` continua válido sem alteração: prova a fiação real entre os
+  módulos, e o teste é `@Transactional` com rollback, então o listener não dispara. O fluxo da notificação depois do
+  commit é coberto no Checkpoint 5.
+- `mvn test` (suíte completa): 785 testes, 0 falhas, 0 erros, 0 ignorados, mais os 3 de `CustomerEmailTest`.
+  `ModuleStructureTest` verde.
 
 ## Rollback ou recuperação
 

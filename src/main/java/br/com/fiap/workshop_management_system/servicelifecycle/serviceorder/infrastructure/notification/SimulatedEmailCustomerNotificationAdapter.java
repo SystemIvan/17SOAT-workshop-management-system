@@ -1,7 +1,7 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.infrastructure.notification;
 
-import br.com.fiap.workshop_management_system.registration.customer.domain.model.Customer;
 import br.com.fiap.workshop_management_system.registration.customer.domain.repository.CustomerRepository;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderStatusLabel;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.port.CustomerNotificationPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,17 +27,21 @@ public class SimulatedEmailCustomerNotificationAdapter implements CustomerNotifi
     }
 
     @Override
-    public void notifyServiceOrderFinalized(UUID serviceOrderId, UUID customerId) {
-        customerRepository.findById(customerId).ifPresentOrElse(
-                customer -> logSimulatedEmail(serviceOrderId, customerId, customer),
-                () -> log.warn("Cannot notify customer {} about finalized service order {}: customer not found",
-                        customerId, serviceOrderId));
+    public void notifyServiceOrderStatusChanged(
+            UUID serviceOrderId, UUID customerId, ServiceOrderStatusLabel newStatus) {
+        customerRepository.findById(customerId)
+                .map(CustomerEmail::of)
+                .filter(CustomerEmail::isPresent)
+                .ifPresentOrElse(
+                        email -> logSimulatedEmail(serviceOrderId, customerId, newStatus, email.value()),
+                        () -> log.warn("Cannot notify customer {} about service order {} status change: "
+                                + "customer not found or without e-mail", customerId, serviceOrderId));
     }
 
-    private void logSimulatedEmail(UUID serviceOrderId, UUID customerId, Customer customer) {
-        String maskedEmail = EmailMasking.mask(customer.contactInfo().email().value());
-        log.info("Simulated e-mail sent | to={} | customerId={} | subject=\"Your vehicle is ready for pickup\" "
-                        + "| serviceOrderId={}",
-                maskedEmail, customerId, serviceOrderId);
+    private void logSimulatedEmail(
+            UUID serviceOrderId, UUID customerId, ServiceOrderStatusLabel newStatus, String email) {
+        log.info("Simulated e-mail sent | to={} | customerId={} | subject=\"Service order status changed\" "
+                        + "| serviceOrderId={} | newStatus={}",
+                EmailMasking.mask(email), customerId, serviceOrderId, newStatus);
     }
 }
