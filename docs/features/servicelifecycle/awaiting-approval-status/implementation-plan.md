@@ -82,7 +82,7 @@ Commit: `fix(servicelifecycle): return service order to diagnosis when its estim
 
 Commit: `test(servicelifecycle): cover awaiting approval status across estimate generation, decision and expiry`
 
-## Checkpoint 5 — Documentação
+## Checkpoint 5 — Documentação ✅ (2026-10-06)
 
 - `README.md`, seção "Bifurcações e acompanhamento de status":
   - incluir `AWAITING_APPROVAL` no roteiro de status (depois da geração do orçamento até a decisão);
@@ -194,6 +194,24 @@ Commit: `docs(servicelifecycle): document awaiting approval status and register 
 - Testes existentes: nenhum assumia `IN_DIAGNOSIS` depois da geração; nenhum ajuste necessário (confirmado nos
   Checkpoints 2–4).
 - `mvn test` (suíte completa): 777 testes, 0 falhas, 0 erros, 0 ignorados.
+
+### Checkpoint 5
+
+- `README.md`:
+  - passo 9 da sequência executável: depois de `Generate estimate`, consultar `/status` e esperar
+    `AWAITING_APPROVAL` / `AGUARDANDO_APROVACAO`;
+  - seção "Bifurcações e acompanhamento de status": `AWAITING_APPROVAL` no roteiro, saída por decisão total
+    (interna ou canal externo), decisão parcial e volta a `IN_DIAGNOSIS` na expiração, com referência à `TD-004`;
+  - removido o parágrafo que dizia que a geração do orçamento preservava o diagnóstico aberto.
+- `docs/tech-debt/TD-004-os-sem-saida-apos-expiracao-do-orcamento.md` (próximo número livre depois de TD-003), a
+  partir de `TD-template.md`, com evidências nos três pontos que bloqueiam a retomada e as opções A/B/C.
+- `service-order-status-projection/implementation-plan.md`: nota posterior apontando que a regra 5 passou a ser
+  alimentada por esta correção. A functional-spec aprovada daquela feature não foi alterada.
+- `external-status-update/manual-test-guide.md`: na "Conferência — nada mudou", `Get service order status` passa a
+  esperar `AWAITING_APPROVAL` / `AGUARDANDO_APROVACAO` antes da decisão. T7 (`IN_PROGRESS`) e T10 (`COMPLETED`)
+  continuam corretos.
+- OpenAPI e Postman: N/A (forma do contrato inalterada; nenhuma asserção do Postman depende do status nesse
+  intervalo).
 
 ## Rollback ou recuperação
 
