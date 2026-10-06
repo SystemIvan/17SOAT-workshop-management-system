@@ -53,7 +53,7 @@ Testes:
 
 Commit: `fix(servicelifecycle): move service order to awaiting approval while an estimate is pending`
 
-## Checkpoint 3 — Expiração
+## Checkpoint 3 — Expiração ✅ (2026-10-06)
 
 - `ExpireEstimatesUseCase` recebe `ServiceOrderRepository` (nos dois construtores):
   1. expira e salva os candidatos, como hoje;
@@ -163,6 +163,24 @@ Commit: `docs(servicelifecycle): document awaiting approval status and register 
 - Nenhum teste existente dependia da OS ficar em `IN_DIAGNOSIS` depois da geração: nenhum ajuste foi necessário.
   `ApplyExternalStatusUpdateUseCaseTest` (7 testes) segue verde.
 - `mvn test` (suíte completa): 769 testes, 0 falhas, 0 erros, 0 ignorados; `ModuleStructureTest` verde.
+
+### Checkpoint 3
+
+- `ExpireEstimatesUseCase` recebe `ServiceOrderRepository` (construtor `@Autowired` e construtor de teste com
+  `Clock`). Depois de expirar os candidatos, reavalia cada OS afetada uma única vez:
+  - se não houver outro orçamento `SENT` (os expirados nesta execução são filtrados pelo id), carrega a OS com
+    `findByIdForUpdate`, chama `markSentEstimateExpired()` e salva;
+  - se a OS não existir, registra `WARN` só com o id e segue.
+
+  O retorno (quantidade de orçamentos expirados) não mudou. `EstimateExpirationScheduler` mocka o use case e não
+  foi afetado.
+- `ExpireEstimatesUseCaseTest`: 6 testes, sendo 2 que já existiam (adaptados ao construtor novo, mesma asserção) e
+  4 novos:
+  - orçamento expirado devolve a OS a `IN_DIAGNOSIS`;
+  - outro `SENT` válido mantém `AWAITING_APPROVAL` e a OS não é salva;
+  - dois orçamentos da mesma OS expirando juntos geram 1 bloqueio e 1 save;
+  - OS inexistente gera `WARN` com o id e o job segue atualizando a outra OS.
+- `mvn test` (suíte completa): 773 testes, 0 falhas, 0 erros, 0 ignorados; `ModuleStructureTest` verde.
 
 ## Rollback ou recuperação
 
