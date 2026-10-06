@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Feature | `awaiting-approval-status` (correção) |
-| Status | In Progress |
+| Status | Implemented |
 | Responsável | Santiago Silvestre |
 | Atualizado em | 2026-10-05 |
 | Especificação técnica | `./technical-spec.md` (Approved, 2026-10-05) |
@@ -100,7 +100,7 @@ Commit: `test(servicelifecycle): cover awaiting approval status across estimate 
 
 Commit: `docs(servicelifecycle): document awaiting approval status and register TD-004`
 
-## Checkpoint 6 — Verificação e revisão de segurança
+## Checkpoint 6 — Verificação e revisão de segurança ✅ (2026-10-06)
 
 - `make test`, `make verify`, `make coverage` (código alterado ≥ 80%), `ModuleStructureTest` e
   `OpenApiContractTest` verdes.
@@ -116,9 +116,9 @@ Commit: `docs(servicelifecycle): document awaiting approval status and register 
 | Validação de entrada e mass assignment | N/A: nenhum endpoint ou request novo. | — |
 | Autenticação e autorização | N/A: nenhuma regra de acesso muda. | — |
 | Exposição de dados | N/A: nenhum campo novo; só o valor de `statusSnapshot` muda entre a geração e a decisão. | — |
-| Segredos e logs | `WARN` do job de expiração só com IDs. | Pendente |
-| SQL, persistência e migração | Sem schema novo; coluna existente. Sem backfill (decisão registrada). | — |
-| Concorrência | `ExpireEstimatesUseCase` passa a usar `findByIdForUpdate`, como geração e decisão. | Pendente |
+| Segredos e logs | `WARN` do job de expiração traz só o id da OS, sem dado pessoal (verificado em `ExpireEstimatesUseCaseTest`). | OK |
+| SQL, persistência e migração | Sem schema novo; coluna existente. Sem backfill (decisão registrada). Consultas via repositório JPA já existente (`findByServiceOrderIdAndStatus`), sem SQL novo. | — |
+| Concorrência | `ExpireEstimatesUseCase` usa `findByIdForUpdate`, como geração e decisão já usavam; a OS é reavaliada uma vez por execução (verificado por teste: 1 bloqueio e 1 save para 2 orçamentos da mesma OS). | OK |
 | Respostas de erro | N/A: nenhuma resposta muda. | — |
 | Dependências novas | N/A. | — |
 
@@ -212,6 +212,34 @@ Commit: `docs(servicelifecycle): document awaiting approval status and register 
   continuam corretos.
 - OpenAPI e Postman: N/A (forma do contrato inalterada; nenhuma asserção do Postman depende do status nesse
   intervalo).
+
+### Checkpoint 6
+
+- `mvn clean verify` (equivalente a `make verify` e a `make coverage`, que executam o mesmo `clean verify`; rodado com
+  o Maven 3.9.16 extraído do zip do wrapper porque o `./mvnw` desta máquina está quebrado): 777 testes, 0 falhas,
+  0 erros, 0 ignorados; `jacoco:check` "All coverage checks have been met"; `BUILD SUCCESS`. Inclui
+  `ModuleStructureTest` (2) e `OpenApiContractTest` (19) verdes.
+- JaCoCo (`target/site/jacoco/jacoco.csv`), linhas / branches:
+  - `ExpireEstimatesUseCase`: 100% / 83,3%;
+  - `GenerateEstimateUseCase`: 98,5% / 78,6% (os branches descobertos já existiam; o fix não acrescentou branch);
+  - `DecideEstimateLinesUseCase`: 90,6% / 88,6%;
+  - `ServiceOrder`: 90,1% / 83,9%;
+  - projeto: 94,1% / 75,7%. O gate do projeto é `LINE COVEREDRATIO ≥ 0,80`.
+- Revisão de segurança: tabela abaixo preenchida; nenhum achado crítico ou alto.
+- Validação manual com Docker (2026-10-06): ambiente `docker compose` no ar (app recém-construído a partir desta
+  branch, MySQL 8.0). O roteiro foi executado por script Node com `fetch` contra `http://localhost:8080`, só com
+  dados fictícios (e-mail `@example.test`, CPF, placa e chassi gerados), seguindo a sequência do README no caminho
+  sem peça de estoque. OS `f58a4f4b-f0dd-4b6d-bcfe-26a053addc7d`, orçamento `c684d40c-a094-4799-9b50-8b176d199f85`:
+
+  | Passo | `GET .../status` |
+  |---|---|
+  | 1. OS criada | `RECEIVED` / `RECEBIDA` |
+  | 2. Diagnóstico registrado | `IN_DIAGNOSIS` / `DIAGNOSTICO` |
+  | 3. Orçamento gerado (`SENT`, total 150,00 BRL) | **`AWAITING_APPROVAL` / `AGUARDANDO_APROVACAO`** |
+  | 4. Linha aprovada (`POST /api/estimates/{id}/decisions`), orçamento `CLOSED` | `IN_PROGRESS` / `EXECUCAO` |
+
+  Todas as chamadas devolveram o status HTTP esperado (`200`/`201`). O passo 3 é o comportamento que o bug
+  impedia. A expiração é coberta pelo teste de integração com `Clock` adiantado, porque o prazo real é longo.
 
 ## Rollback ou recuperação
 
