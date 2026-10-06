@@ -435,6 +435,23 @@ class OpenApiContractTest {
     }
 
     @Test
+    void documentExternalStatusUpdateEndpoint() throws Exception {
+        String update = "$.paths['/api/service-orders/{serviceOrderId}/external-status-updates'].post";
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(update + ".responses['200']").exists())
+                .andExpect(jsonPath(update + ".responses['401']").exists())
+                .andExpect(jsonPath(update + ".responses['403']").exists())
+                .andExpect(jsonPath(update + ".responses['409']").exists())
+                .andExpect(jsonPath(update + ".parameters[?(@.in == 'header')].name",
+                        hasItem("X-Estimate-Gateway-Timestamp")))
+                .andExpect(jsonPath(update + ".parameters[?(@.in == 'header')].name",
+                        hasItem("X-Estimate-Gateway-Signature")))
+                .andExpect(jsonPath("$.components.schemas.ExternalStatusUpdateRequest.properties.intendedStatus.enum",
+                        hasItem("APPROVED")));
+    }
+
+    @Test
     void documentEstimateTotalsContract() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
