@@ -39,7 +39,7 @@ Testes (`ServiceOrderTest`):
 
 Commit: `feat(servicelifecycle): record service order status transitions in the aggregate`
 
-## Checkpoint 2 — Publicação no repositório
+## Checkpoint 2 — Publicação no repositório ✅ (2026-10-05)
 
 - `ServiceOrderRepositoryImpl` recebe `ApplicationEventPublisher` por construtor. Depois de
   `jpaRepository.save(...)`, chama `serviceOrder.pullStatusChange().ifPresent(eventPublisher::publishEvent)`.
@@ -189,6 +189,22 @@ Commits:
   `HttpRequestRetryHandler`), porque jars somem das distribuições extraídas em `~/.m2/wrapper/dists`, embora o zip
   baixado esteja íntegro. Os testes rodaram com a mesma versão do wrapper (Maven 3.9.16), extraída do zip original
   numa pasta temporária. O problema é da máquina, não do projeto.
+
+### Checkpoint 2
+
+- `ServiceOrderRepositoryImpl` recebe `ApplicationEventPublisher` por construtor e publica
+  `pullStatusChange()` depois de `jpaRepository.save(...)`. A interface `ServiceOrderRepository` não mudou, e
+  nenhum teste instanciava o repositório manualmente.
+- Novo `ServiceOrderStatusChangePublicationTest` (`@SpringBootTest` + `@RecordApplicationEvents`, H2 + Flyway),
+  com 4 testes:
+  - criar a OS não publica nada;
+  - uma transição publica um único evento, mesmo salvando duas vezes;
+  - OS recarregada publica a transição a partir do status persistido;
+  - salvar sem mudança de status não publica nada.
+- `mvn test` (suíte completa): 772 testes, 0 falhas, 0 erros, 0 ignorados; `BUILD SUCCESS`.
+  `ModuleStructureTest` verde.
+- O comportamento depois do commit e com rollback (listener só roda se a transação confirmar) é coberto no
+  Checkpoint 5, quando existir o listener. `@RecordApplicationEvents` registra a publicação, não a entrega.
 
 ## Rollback ou recuperação
 
