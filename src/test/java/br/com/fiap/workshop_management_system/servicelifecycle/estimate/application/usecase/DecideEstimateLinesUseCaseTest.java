@@ -11,6 +11,7 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.doma
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Money;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceExecutionStatus;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrderStatus;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockItemType;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockRequirement;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.VehicleSnapshot;
@@ -138,6 +139,69 @@ class DecideEstimateLinesUseCaseTest {
                         new LineDecisionRequest(approvedId, EstimateLineDecision.APPROVED))));
 
         assertEquals(EstimateStatus.SENT, estimates.findById(estimate.id()).orElseThrow().status());
+    }
+
+    @Test
+    void closingTheOnlySentEstimateEndsTheAwaitingApprovalCondition() {
+        ServiceOrder serviceOrder = diagnosedServiceOrder("Troca de óleo");
+        serviceOrder.markEstimateSentWithPendingLines();
+        UUID executionId = serviceOrder.serviceExecutions().get(0).id();
+        InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository(serviceOrder);
+        Estimate estimate = estimateFor(serviceOrder);
+        InMemoryEstimateRepository estimates = new InMemoryEstimateRepository(estimate);
+        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(
+                estimates, serviceOrders, commands -> List.of());
+
+        useCase.execute(estimate.id(), new DecideEstimateLinesRequest(List.of(
+                new LineDecisionRequest(executionId, EstimateLineDecision.REJECTED))));
+
+        ServiceOrder saved = serviceOrders.findById(serviceOrder.id()).orElseThrow();
+        assertFalse(saved.hasSentEstimateWithPendingLines());
+        // The only execution was rejected, so it is terminal and nothing is awaiting approval anymore.
+        assertEquals(ServiceOrderStatus.COMPLETED, saved.status());
+    }
+
+    @Test
+    void anotherSentEstimateKeepsTheServiceOrderAwaitingApproval() {
+        ServiceOrder serviceOrder = diagnosedServiceOrder("Troca de óleo");
+        serviceOrder.markEstimateSentWithPendingLines();
+        UUID executionId = serviceOrder.serviceExecutions().get(0).id();
+        InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository(serviceOrder);
+        Estimate estimate = estimateFor(serviceOrder);
+        Estimate otherSentEstimate = Estimate.create(
+                serviceOrder.id(), UUID.randomUUID(), serviceOrder.customerId(),
+                Instant.parse("2026-08-20T12:00:00Z"), Instant.parse("2026-08-22T12:00:00Z"),
+                List.of(new br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model.EstimateLine(
+                        UUID.randomUUID(), "Alinhamento", Money.brl(BigDecimal.TEN), List.of())));
+        otherSentEstimate.markSent();
+        InMemoryEstimateRepository estimates = new InMemoryEstimateRepository(estimate, otherSentEstimate);
+        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(
+                estimates, serviceOrders, commands -> List.of());
+
+        useCase.execute(estimate.id(), new DecideEstimateLinesRequest(List.of(
+                new LineDecisionRequest(executionId, EstimateLineDecision.REJECTED))));
+
+        assertEquals(EstimateStatus.CLOSED, estimates.findById(estimate.id()).orElseThrow().status());
+        assertTrue(serviceOrders.findById(serviceOrder.id()).orElseThrow().hasSentEstimateWithPendingLines());
+    }
+
+    @Test
+    void partialDecisionKeepsTheAwaitingApprovalCondition() {
+        ServiceOrder serviceOrder = diagnosedServiceOrder("Troca de óleo", "Alinhamento");
+        serviceOrder.markEstimateSentWithPendingLines();
+        UUID rejectedId = serviceOrder.serviceExecutions().get(0).id();
+        InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository(serviceOrder);
+        Estimate estimate = estimateFor(serviceOrder);
+        InMemoryEstimateRepository estimates = new InMemoryEstimateRepository(estimate);
+        DecideEstimateLinesUseCase useCase = new DecideEstimateLinesUseCase(
+                estimates, serviceOrders, commands -> List.of());
+
+        useCase.execute(estimate.id(), new DecideEstimateLinesRequest(List.of(
+                new LineDecisionRequest(rejectedId, EstimateLineDecision.REJECTED))));
+
+        ServiceOrder saved = serviceOrders.findById(serviceOrder.id()).orElseThrow();
+        assertTrue(saved.hasSentEstimateWithPendingLines());
+        assertEquals(ServiceOrderStatus.AWAITING_APPROVAL, saved.status());
     }
 
     @Test
@@ -440,5 +504,13 @@ public List<Estimate> findSentExpiredAtOrBefore(Instant now) {
 public void save(Estimate estimate) {
     byId.put(estimate.id(), estimate);
 }
+
+        @Override
+        public List<Estimate> findByServiceOrderIdAndStatus(UUID serviceOrderId, EstimateStatus status) {
+            return byId.values().stream()
+                    .filter(estimate -> estimate.serviceOrderId().equals(serviceOrderId))
+                    .filter(estimate -> estimate.status() == status)
+                    .toList();
+        }
     }
 }

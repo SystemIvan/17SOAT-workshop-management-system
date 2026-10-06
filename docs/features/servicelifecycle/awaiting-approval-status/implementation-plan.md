@@ -32,7 +32,7 @@ Testes (`ServiceOrderTest`):
 
 Commit: `fix(servicelifecycle): add intention-revealing expiry transition to the service order`
 
-## Checkpoint 2 — Geração e decisão do orçamento
+## Checkpoint 2 — Geração e decisão do orçamento ✅ (2026-10-06)
 
 - `GenerateEstimateUseCase`: chamar `serviceOrder.markEstimateSentWithPendingLines()` depois de
   `estimate.markSent()` e antes de `serviceOrderRepository.save(serviceOrder)`.
@@ -140,6 +140,29 @@ Commit: `docs(servicelifecycle): document awaiting approval status and register 
   coluna `TIMESTAMP(6)` que arredonda, e `completedAt`, truncado para micros pelo use case. A regra violada seria
   "completedAt must not be before startedAt". Sem o corpo da resposta não dá para confirmar. Registrado para
   acompanhamento; não tratado neste fix.
+
+### Checkpoint 2
+
+- `GenerateEstimateUseCase`: `serviceOrder.markEstimateSentWithPendingLines()` logo depois de `estimate.markSent()`,
+  antes de salvar a OS.
+- `DecideEstimateLinesUseCase`: ao fechar o orçamento, chama `markEstimateFullyDecided()` só se não houver outro
+  orçamento `SENT` da OS (`findByServiceOrderIdAndStatus`, filtrando o id do orçamento fechado).
+- Fakes: o `InMemoryEstimateRepository` de `DecideEstimateLinesUseCaseTest` não implementava
+  `findByServiceOrderIdAndStatus`, cujo método default lança `UnsupportedOperationException`. Passou a implementar.
+  Os outros dois fakes (`GenerateEstimateUseCaseTest` e `ExpireEstimatesUseCaseTest`) não chamam esse caminho neste
+  checkpoint.
+- Testes novos:
+  - `GenerateEstimateUseCaseTest`: a OS salva fica `AWAITING_APPROVAL`, com a flag ligada;
+  - `DecideEstimateLinesUseCaseTest`:
+    - fechar o único orçamento `SENT` desliga a flag (linha recusada → `COMPLETED`);
+    - outro orçamento `SENT` mantém a flag;
+    - decisão parcial mantém `AWAITING_APPROVAL`.
+
+  Quando uma linha aprovada leva a `IN_PROGRESS`, que tem precedência sobre `AWAITING_APPROVAL`, a flag é afirmada
+  diretamente.
+- Nenhum teste existente dependia da OS ficar em `IN_DIAGNOSIS` depois da geração: nenhum ajuste foi necessário.
+  `ApplyExternalStatusUpdateUseCaseTest` (7 testes) segue verde.
+- `mvn test` (suíte completa): 769 testes, 0 falhas, 0 erros, 0 ignorados; `ModuleStructureTest` verde.
 
 ## Rollback ou recuperação
 
