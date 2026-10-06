@@ -31,8 +31,10 @@ class EstimateGeneratedNotificationListener {
             notificationPort.notifyEstimateGenerated(
                     event.estimateId(), event.serviceOrderId(), event.customerId(), event.expiresAt());
         } catch (RuntimeException ex) {
-            log.warn("Failed to notify customer {} about generated estimate {}",
-                    event.customerId(), event.estimateId(), ex);
+            // RF52: only the exception type is logged - with a real SMTP channel the message/stack trace of a
+            // delivery failure may contain the recipient address.
+            log.warn("Failed to notify customer {} about generated estimate {}: {}",
+                    event.customerId(), event.estimateId(), ex.getClass().getSimpleName());
         }
     }
 }

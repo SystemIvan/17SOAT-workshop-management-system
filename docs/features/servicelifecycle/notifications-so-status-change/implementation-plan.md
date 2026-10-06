@@ -81,7 +81,7 @@ Commits:
 1. `refactor(servicelifecycle): extract e-mail masking shared by notification adapters`
 2. `feat(servicelifecycle): notify customer on nominal service order status change`
 
-## Checkpoint 4 — Canal SMTP
+## Checkpoint 4 — Canal SMTP ✅ (2026-10-05)
 
 - `pom.xml`: `spring-boot-starter-mail`, com versão do parent.
 - `application.properties`:
@@ -233,6 +233,42 @@ Commits:
   commit é coberto no Checkpoint 5.
 - `mvn test` (suíte completa): 785 testes, 0 falhas, 0 erros, 0 ignorados, mais os 3 de `CustomerEmailTest`.
   `ModuleStructureTest` verde.
+
+### Checkpoint 4
+
+- Commit de refatoração `42ce40d`: `Estimate.total()` no aggregate, reaproveitado por `EstimateResponse`. O
+  contrato HTTP não mudou: `OpenApiContractTest` com 19 testes verdes. `EstimateTest` ganhou o teste do total.
+- `pom.xml`: `spring-boot-starter-mail` 4.1.0 (versão do parent), que traz `jakarta.mail-api` 2.1.5 e
+  `angus-mail` 2.0.5 (`mvn dependency:tree`).
+- `application.properties`:
+  - `app.notification.email.channel` (padrão `log`) e `app.notification.email.from`;
+  - timeouts SMTP de 5000 ms;
+  - `spring.mail.host/port/username/password` **não** foram declarados: vêm só do ambiente, para que nenhuma
+    credencial tenha padrão versionado e para que nenhum `JavaMailSender` seja criado sem host.
+- `src/test/resources/application.properties`: `channel=log` e `from`. Esse arquivo substitui o principal nos
+  testes; sem a propriedade, o contexto SMTP falhava com `PlaceholderResolutionException` (achado e corrigido
+  durante o checkpoint).
+- Adapters simulados com `@ConditionalOnProperty(channel=log, matchIfMissing=true)`. Os novos
+  `SmtpCustomerNotificationAdapter` e `SmtpCustomerEstimateNotificationAdapter` usam `channel=smtp`. Com `smtp` e
+  sem `spring.mail.host` não existe `JavaMailSender`, e a aplicação falha na subida em vez de descartar e-mails em
+  silêncio. Esse comportamento está documentado, mas não tem teste automatizado.
+- E-mail de status: texto puro, assunto `OS <id>: status atualizado para <nome legível>`, nomes RF39 em pt-BR
+  mapeados localmente no adapter (as constantes do enum continuam no contrato JSON).
+- E-mail de orçamento: serviços com `lineTotal()`, total (`Estimate.total()`), validade em
+  `America/Sao_Paulo` ou "Validade: não definida" quando `expiresAt` é nulo, e valores em pt-BR. Orienta
+  "entre em contato com a oficina" e não tem `Reply-To` nem pedido de resposta. O corpo é montado num método
+  próprio (`body`), ponto de extensão para `estimate-approval-link`.
+- `CustomerEmail` passou a ser público, porque o adapter de orçamento está em outro pacote do mesmo módulo.
+- Achado de segurança corrigido: `EstimateGeneratedNotificationListener` logava a exceção completa. Com SMTP real,
+  a mensagem pode trazer o destinatário. Agora loga só o tipo, como o listener de status. Teste novo em
+  `EstimateGeneratedNotificationListenerTest`.
+- Testes:
+  - `SmtpCustomerNotificationAdapterTest`, 11 testes;
+  - `SmtpCustomerEstimateNotificationAdapterTest`, 7 testes;
+  - `EmailNotificationChannelSelectionTest`, 2 contextos: `log` → adapters simulados e nenhum `JavaMailSender`;
+    `smtp` + host → adapters SMTP;
+  - `EstimateGeneratedNotificationListenerTest`, com 1 teste novo.
+- `mvn test` (suíte completa): 810 testes, 0 falhas, 0 erros, 0 ignorados; `ModuleStructureTest` verde.
 
 ## Rollback ou recuperação
 
