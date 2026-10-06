@@ -70,7 +70,7 @@ Testes (`ExpireEstimatesUseCaseTest`, `EstimateExpirationSchedulerTest` se depen
 
 Commit: `fix(servicelifecycle): return service order to diagnosis when its estimate expires`
 
-## Checkpoint 4 — Integração e testes existentes
+## Checkpoint 4 — Integração e testes existentes ✅ (2026-10-06)
 
 - Novo `AwaitingApprovalStatusIntegrationTest` (`@SpringBootTest`, H2 + Flyway, dados criados pelo próprio teste):
   - geração → `AWAITING_APPROVAL` persistido;
@@ -181,6 +181,19 @@ Commit: `docs(servicelifecycle): document awaiting approval status and register 
   - dois orçamentos da mesma OS expirando juntos geram 1 bloqueio e 1 save;
   - OS inexistente gera `WARN` com o id e o job segue atualizando a outra OS.
 - `mvn test` (suíte completa): 773 testes, 0 falhas, 0 erros, 0 ignorados; `ModuleStructureTest` verde.
+
+### Checkpoint 4
+
+- Novo `AwaitingApprovalStatusIntegrationTest` (`@SpringBootTest`, H2 + Flyway, use cases reais). O status é lido por
+  `GetServiceOrderStatusUseCase`, que também confere o `statusLabel` nominal exposto. 4 testes:
+  - geração → `AWAITING_APPROVAL` / `AGUARDANDO_APROVACAO` (antes da geração, `IN_DIAGNOSIS` / `DIAGNOSTICO`);
+  - decisão interna (`DecideEstimateLinesUseCase`) → `IN_PROGRESS` / `EXECUCAO`, orçamento `CLOSED`;
+  - decisão via RF40 (`ApplyExternalStatusUpdateUseCase`) → `IN_PROGRESS` / `EXECUCAO`;
+  - expiração (`ExpireEstimatesUseCase` com `Clock` 1 min depois de `expiresAt`, em transação) → orçamento `EXPIRED`
+    e OS em `IN_DIAGNOSIS` / `DIAGNOSTICO`.
+- Testes existentes: nenhum assumia `IN_DIAGNOSIS` depois da geração; nenhum ajuste necessário (confirmado nos
+  Checkpoints 2–4).
+- `mvn test` (suíte completa): 777 testes, 0 falhas, 0 erros, 0 ignorados.
 
 ## Rollback ou recuperação
 
