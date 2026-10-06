@@ -35,20 +35,9 @@ public class SimulatedEmailCustomerNotificationAdapter implements CustomerNotifi
     }
 
     private void logSimulatedEmail(UUID serviceOrderId, UUID customerId, Customer customer) {
-        String maskedEmail = maskEmail(customer.contactInfo().email().value());
+        String maskedEmail = EmailMasking.mask(customer.contactInfo().email().value());
         log.info("Simulated e-mail sent | to={} | customerId={} | subject=\"Your vehicle is ready for pickup\" "
                         + "| serviceOrderId={}",
                 maskedEmail, customerId, serviceOrderId);
-    }
-
-    private static String maskEmail(String email) {
-        int atIndex = email.indexOf('@');
-        if (atIndex <= 0) {
-            return "***";
-        }
-        String maskedLocal = email.charAt(0) + "***";
-        String domain = email.substring(atIndex + 1);
-        String maskedDomain = domain.isEmpty() ? "***" : domain.charAt(0) + "***";
-        return maskedLocal + "@" + maskedDomain;
     }
 }

@@ -3,6 +3,7 @@ package br.com.fiap.workshop_management_system.servicelifecycle.estimate.notific
 import br.com.fiap.workshop_management_system.registration.customer.domain.model.Customer;
 import br.com.fiap.workshop_management_system.registration.customer.domain.repository.CustomerRepository;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.notification.application.port.CustomerEstimateNotificationPort;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.infrastructure.notification.EmailMasking;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -37,20 +38,9 @@ public class SimulatedEmailCustomerEstimateNotificationAdapter implements Custom
 
     private void logSimulatedEmail(
             UUID estimateId, UUID serviceOrderId, UUID customerId, Instant expiresAt, Customer customer) {
-        String maskedEmail = maskEmail(customer.contactInfo().email().value());
+        String maskedEmail = EmailMasking.mask(customer.contactInfo().email().value());
         log.info("Simulated e-mail sent | to={} | customerId={} | subject=\"Your estimate is awaiting approval\" "
                         + "| estimateId={} | serviceOrderId={} | expiresAt={}",
                 maskedEmail, customerId, estimateId, serviceOrderId, expiresAt);
-    }
-
-    private static String maskEmail(String email) {
-        int atIndex = email.indexOf('@');
-        if (atIndex <= 0) {
-            return "***";
-        }
-        String maskedLocal = email.charAt(0) + "***";
-        String domain = email.substring(atIndex + 1);
-        String maskedDomain = domain.isEmpty() ? "***" : domain.charAt(0) + "***";
-        return maskedLocal + "@" + maskedDomain;
     }
 }
