@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Feature | `awaiting-approval-status` (correção) |
-| Status | Draft |
+| Status | In Progress |
 | Responsável | Santiago Silvestre |
 | Atualizado em | 2026-10-05 |
 | Especificação técnica | `./technical-spec.md` (Approved, 2026-10-05) |
@@ -18,7 +18,7 @@ Branch: `fix/servicelifecycle-awaiting-approval-status`, criada a partir de `dev
 checkpoint (Conventional Commits). Ao final, abrir PR para `dev` e, depois do merge, retomar o Checkpoint 5 da RF52
 (`../notifications-so-status-change/implementation-plan.md`).
 
-## Checkpoint 1 — Domínio
+## Checkpoint 1 — Domínio ✅ (2026-10-06)
 
 - `ServiceOrder.markSentEstimateExpired()`: desliga a flag e recalcula o status; intenção distinta de
   `markEstimateFullyDecided()`.
@@ -124,7 +124,22 @@ Commit: `docs(servicelifecycle): document awaiting approval status and register 
 
 ## Evidências de verificação
 
-A preencher durante a implementação.
+### Checkpoint 1
+
+- `ServiceOrder.markSentEstimateExpired()` adicionado. O comentário da flag agora aponta os três use cases que a
+  alternam, no lugar de "policies reacting to Estimate domain events", que nunca existiram.
+- `ServiceOrderTest`: 27 testes, 2 novos:
+  - orçamento expirado com diagnóstico aberto volta a `IN_DIAGNOSIS`;
+  - expiração não rebaixa uma OS em `IN_PROGRESS`.
+- `mvn test` (suíte completa): 765 testes, 0 falhas, 0 erros, 0 ignorados; `BUILD SUCCESS`.
+- **Falha intermitente que já existia (fora deste fix):** na primeira execução completa,
+  `ServiceOrderControllerCompleteExecutionTest.completesAnInProgressExecutionAndReturns200` falhou com `409` em vez
+  de `200`. Isolado, passou 3 de 3 vezes, e a execução completa seguinte passou. A mudança deste checkpoint só
+  acrescenta um método de domínio que nenhum código chama ainda, então não pode causar a falha. Suspeita não
+  confirmada: diferença de precisão entre `startedAt`, gravado pelo teste com `Instant.now()` sem truncar numa
+  coluna `TIMESTAMP(6)` que arredonda, e `completedAt`, truncado para micros pelo use case. A regra violada seria
+  "completedAt must not be before startedAt". Sem o corpo da resposta não dá para confirmar. Registrado para
+  acompanhamento; não tratado neste fix.
 
 ## Rollback ou recuperação
 

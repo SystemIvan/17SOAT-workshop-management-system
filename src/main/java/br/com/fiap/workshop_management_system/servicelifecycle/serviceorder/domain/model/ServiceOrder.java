@@ -32,8 +32,10 @@ public class ServiceOrder {
     /**
      * Integration points for the Diagnoses & Estimate bounded context (Epic 2):
      * ServiceOrder does not hold Estimate objects (one-way reference), so it relies
-     * on these flags - toggled by policies reacting to Estimate domain events - to
-     * know what to show in the derived status.
+     * on these flags to know what to show in the derived status. The Estimate use cases
+     * that already load this ServiceOrder in the same transaction toggle it directly
+     * (GenerateEstimateUseCase, DecideEstimateLinesUseCase, ExpireEstimatesUseCase - see
+     * docs/features/servicelifecycle/awaiting-approval-status).
      */
     private boolean hasSentEstimateWithPendingLines;
 
@@ -275,6 +277,16 @@ public class ServiceOrder {
     }
 
     public void markEstimateFullyDecided() {
+        this.hasSentEstimateWithPendingLines = false;
+        recomputeStatusSnapshot(false);
+    }
+
+    /**
+     * The sent Estimate expired before every line was decided. Same state change as
+     * {@link #markEstimateFullyDecided()}, kept separate to reveal the intent: with the diagnosis
+     * still open, the ServiceOrder goes back to IN_DIAGNOSIS.
+     */
+    public void markSentEstimateExpired() {
         this.hasSentEstimateWithPendingLines = false;
         recomputeStatusSnapshot(false);
     }
