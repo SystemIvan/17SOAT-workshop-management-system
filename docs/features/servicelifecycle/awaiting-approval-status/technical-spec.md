@@ -3,11 +3,11 @@
 | Campo | Valor |
 |---|---|
 | Feature | `awaiting-approval-status` (correção) |
-| Status | Draft |
+| Status | Approved |
 | Responsável | Santiago Silvestre |
 | Atualizado em | 2026-10-05 |
-| Aprovado por | — |
-| Aprovado em | — |
+| Aprovado por | Santiago Silvestre |
+| Aprovado em | 2026-10-05 |
 | Especificação funcional | `./functional-spec.md` (Approved, 2026-10-05) |
 
 ## Contexto e desenho
