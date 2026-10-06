@@ -3,7 +3,7 @@
 | Campo | Valor |
 |---|---|
 | Feature | `notifications-so-status-change` |
-| Status | Draft |
+| Status | In Progress |
 | Responsável | Santiago Silvestre |
 | Atualizado em | 2026-10-05 |
 | Especificação técnica | `./technical-spec.md` (Approved, 2026-10-05) |
@@ -18,7 +18,7 @@ validade. Nenhuma mudança de schema nem de contrato HTTP.
 Branch: `feat/servicelifecycle-notifications-so-status-change`. Um commit por checkpoint (Conventional Commits),
 sem misturar refatoração com comportamento.
 
-## Checkpoint 1 — Evento de domínio e detecção no aggregate
+## Checkpoint 1 — Evento de domínio e detecção no aggregate ✅ (2026-10-05)
 
 - Novo pacote `servicelifecycle.serviceorder.domain.event` com o record `ServiceOrderStatusChanged(serviceOrderId,
   customerId, previousStatus, currentStatus, occurredAt)`, com validação de não nulos, sem Spring.
@@ -177,7 +177,18 @@ Commits:
 
 ## Evidências de verificação
 
-A preencher durante a implementação: comandos, resultados, cobertura e prints do Mailpit.
+### Checkpoint 1
+
+- Verificação de gravação dupla: cada use case que altera a OS chama `ServiceOrderRepository.save` uma única vez
+  por transação (`grep` em `servicelifecycle`; `ApplyExternalStatusUpdateUseCase` delega ao
+  `DecideEstimateLinesUseCase`, que grava uma vez). Nenhum ajuste necessário antes do Checkpoint 2.
+- `mvn test -Dtest=ServiceOrderTest,ModuleStructureTest`: `ServiceOrderTest` 30 testes (5 novos `rf52_*`) e
+  `ModuleStructureTest` 2 testes, 0 falhas.
+- `mvn test` (suíte completa): 768 testes, 0 falhas, 0 erros, 0 ignorados; `BUILD SUCCESS`.
+- Observação de ambiente: `./mvnw` falha nesta máquina com `ClassNotFoundException` (`MavenCli` e
+  `HttpRequestRetryHandler`), porque jars somem das distribuições extraídas em `~/.m2/wrapper/dists`, embora o zip
+  baixado esteja íntegro. Os testes rodaram com a mesma versão do wrapper (Maven 3.9.16), extraída do zip original
+  numa pasta temporária. O problema é da máquina, não do projeto.
 
 ## Rollback ou recuperação
 
