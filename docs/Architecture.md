@@ -112,6 +112,22 @@ A feature `average-service-execution-time` implementa a decisão AD-019 ratifica
 - Domínio, casos de uso, persistência, migration, endpoint, autorização e OpenAPI possuem cobertura automatizada; o
   roteiro Postman executa a consulta imediatamente depois da conclusão de uma execução.
 
+## Atualização de implementação — 06 de outubro de 2026: Container Readiness (I)
+
+A feature `container-readiness` (tarefa K8S-1) prepara a aplicação para probes de orquestrador. Esta atualização
+substitui, para o estado vigente, as menções da baseline de 10 de agosto à ausência de Actuator.
+
+- O Spring Boot Actuator expõe somente o endpoint `health`, na porta de gestão `8081`, separada da porta de negócio
+  `8080`: `/actuator/health/liveness` (só `livenessState`), `/actuator/health/readiness` (`readinessState` e banco) e
+  o agregado `/actuator/health`. As respostas trazem apenas o status (o agregado também lista os nomes dos grupos).
+- Uma `SecurityFilterChain` dedicada (`@Order(1)`, `securityMatcher("/actuator/**")`, módulo `identity`) libera só
+  `GET` nesses três caminhos e nega todo o resto com `401`; ela não autentica, então um JWT válido não concede acesso.
+  A matriz de autorização de negócio não mudou.
+- `ContainerProbesIntegrationTest` sobe a aplicação com porta de gestão separada e prova: probes sem token na
+  porta de gestão, `401` para os demais caminhos e métodos, `401` nos caminhos de health na porta de negócio e
+  readiness `503` com liveness `200` quando o indicador do banco falha.
+- `server.shutdown=graceful` com `spring.lifecycle.timeout-per-shutdown-phase=30s`.
+
 ## 1. Tech Challenge overview
 
 ### 1.1 Problema oficial (A)
