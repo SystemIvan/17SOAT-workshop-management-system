@@ -59,6 +59,15 @@ services:
       APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET: ${APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET:-local-development-only-estimate-gateway-secret-please-rotate}
       SERVER_PORT: 8080
       TZ: 'America/Sao_Paulo'
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0}
+    healthcheck:
+      test: ["CMD", "/app/healthcheck.sh"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+    # Longer than spring.lifecycle.timeout-per-shutdown-phase (30s), so Docker does not SIGKILL a graceful shutdown.
+    stop_grace_period: 35s
     ports:
       - "${APP_PORT:-8080}:8080"
     depends_on:

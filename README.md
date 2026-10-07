@@ -39,6 +39,13 @@ O ambiente Docker local utiliza o perfil `dev` e carrega dados de demonstração
 Copie `.env.example` para `.env` para alterar esse comportamento. Os seeds ficam desativados no perfil padrão da
 aplicação.
 
+A aplicação também escuta na porta de gestão `8081`, que serve apenas os probes de saúde (`GET` anônimo):
+`/actuator/health/liveness`, `/actuator/health/readiness` e `/actuator/health`. Qualquer outro caminho de gestão
+responde `401`, mesmo com JWT válido. No Docker, a `8081` não é publicada no host; o healthcheck do serviço `app` usa o
+readiness e o serviço aparece como `healthy` quando a aplicação terminou de subir e o MySQL está acessível (detalhes,
+`JAVA_OPTS` e `DB_PORT` em [DOCKER.md](DOCKER.md)). Executando fora do Docker com `make run-dev`, os probes ficam em
+`http://localhost:8081/actuator/health/readiness` e equivalentes.
+
 Todos os endpoints administrativos exigem JWT (consulte `docs/adr/ADR-003-authentication-strategy.md`). As exceções
 são os dois endpoints do gateway externo de aprovação do Customer, autenticados por assinatura HMAC
 (`docs/adr/ADR-007-external-gateway-hmac-authentication.md`): `POST /api/estimates/{estimateId}/decisions`, que

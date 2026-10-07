@@ -127,6 +127,11 @@ substitui, para o estado vigente, as menções da baseline de 10 de agosto à au
   porta de gestão, `401` para os demais caminhos e métodos, `401` nos caminhos de health na porta de negócio e
   readiness `503` com liveness `200` quando o indicador do banco falha.
 - `server.shutdown=graceful` com `spring.lifecycle.timeout-per-shutdown-phase=30s`.
+- Imagem: build com `./mvnw` sobre `eclipse-temurin:21.0.12.1_1-jdk-noble` e runtime
+  `eclipse-temurin:21.0.12.1_1-jre-noble`, ambas fixadas pelo digest do índice multi-arch; camadas do Spring Boot
+  (`jarmode=tools`); UID/GID `10001`; `ENTRYPOINT` com `exec java $JAVA_OPTS`, deixando a JVM como PID 1.
+- Compose: o serviço `app` não publica a `8081`, usa `docker/healthcheck.sh` (readiness via `/dev/tcp`, sem pacotes
+  extras) e define `stop_grace_period: 35s`, acima do timeout de shutdown do Spring.
 
 ## 1. Tech Challenge overview
 
