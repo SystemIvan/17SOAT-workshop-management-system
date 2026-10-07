@@ -3,9 +3,9 @@
 | Campo | Valor |
 |---|---|
 | Feature | `notifications-so-status-change` |
-| Status | In Progress |
+| Status | Implemented |
 | Responsável | Santiago Silvestre |
-| Atualizado em | 2026-10-05 |
+| Atualizado em | 2026-10-06 |
 | Especificação técnica | `./technical-spec.md` (Approved, 2026-10-05) |
 
 ## Objetivo
@@ -283,6 +283,35 @@ Commits:
     `smtp` + host → adapters SMTP;
   - `EstimateGeneratedNotificationListenerTest`, com 1 teste novo.
 - `mvn test` (suíte completa): 810 testes, 0 falhas, 0 erros, 0 ignorados; `ModuleStructureTest` verde.
+
+## Checkpoint 7 — Verificação e revisão de segurança ✅ (2026-10-06)
+
+### Evidências finais
+
+| Evidência | Resultado |
+|---|---|
+| `mvn clean verify` (suíte completa) | **BUILD SUCCESS** — 828 testes, 0 falhas, 0 erros, 0 ignorados |
+| JaCoCo Coverage | Todos os checks passaram (meta do projeto: ≥80%) |
+| `ModuleStructureTest` | Verde (2 testes, 0 falhas) |
+| Código fora do escopo | Sem mudanças inesperadas. Unicamente código novo de notificação e adapters SMTP. |
+| Segredos / dados pessoais em logs | ✅ Verificado — logs contêm só IDs opacos e e-mail mascarado. |
+| Configuração e credenciais | ✅ Nenhuma senha versionada em `application.properties`; variáveis de ambiente e Secret (K8s). |
+| Docker Compose + Mailpit | ✅ Adicionados e documentados em `README.md` e `DOCKER.md`. |
+| Migração Flyway | N/A — sem schema novo. |
+
+### Checklist de completude
+
+- [x] Todos os checkpoints (CP1-CP7) concluídos;
+- [x] Especificações funcional e técnica aprovadas;
+- [x] Implementação alinhada com as specs;
+- [x] Testes passando (828 testes, 0 falhas);
+- [x] Cobertura verificada;
+- [x] ModuleStructureTest verde;
+- [x] Docker Compose + Mailpit funcional;
+- [x] Documentação atualizada (README, DOCKER, feature specs);
+- [x] Revisão de segurança registrada;
+- [x] Nenhuma mudança inesperada fora de escopo;
+- [x] Commits Conventional (feat, refactor, chore, test).
 
 ## Rollback ou recuperação
 
