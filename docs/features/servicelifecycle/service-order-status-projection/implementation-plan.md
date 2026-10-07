@@ -113,6 +113,14 @@ Não há achado crítico/alto identificado no desenho. Reavaliar com migration e
   sem request mutável, segredo, dependência ou erro novo; nenhum achado crítico ou alto aberto. `make test`,
   `make coverage` e `make verify` passaram; cobertura de linhas: 92,75%; `ModuleStructureTest` permaneceu verde.
 
+## Nota posterior — regra 5 (`AWAITING_APPROVAL`)
+
+2026-10-06 — A regra 5 da functional-spec (`AWAITING_APPROVAL` enquanto houver linhas de Estimate enviadas sem
+decisão) tinha a precedência implementada aqui, mas a flag `hasSentEstimateWithPendingLines` nunca era ligada por
+nenhum caso de uso, então a OS nunca chegava a esse estado em produção. A correção está em
+`../awaiting-approval-status/` (branch `fix/servicelifecycle-awaiting-approval-status`): geração, decisão e expiração
+do orçamento passaram a alternar a flag. A precedência definida nesta feature não mudou.
+
 ## Rollback ou recuperação
 
 Rollback da aplicação restaura a semântica antiga, mas não deve desfazer a correção de dados. Manter a migration

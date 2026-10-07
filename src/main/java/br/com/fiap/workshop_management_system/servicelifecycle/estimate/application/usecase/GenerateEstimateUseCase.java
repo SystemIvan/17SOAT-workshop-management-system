@@ -204,6 +204,9 @@ public class GenerateEstimateUseCase {
         );
 
         estimate.markSent();
+        // Every line of a just-sent Estimate is pending, so the ServiceOrder awaits approval
+        // (service-order-status-projection rule 5; awaiting-approval-status fix).
+        serviceOrder.markEstimateSentWithPendingLines();
 
         estimateRepository.save(estimate);
         serviceOrderRepository.save(serviceOrder);
