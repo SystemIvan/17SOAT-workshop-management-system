@@ -97,6 +97,9 @@ Execute entre A9 e A10.
 
 - Envie `Estimates / Get estimate`.
 - **Esperado:** a linha continua `PENDING`, o que confirma que T1 a T5 não alteraram estado.
+- Envie `Service Lifecycle / Service Orders / Get service order status`.
+- **Esperado:** `status` `AWAITING_APPROVAL` e `statusLabel` `AGUARDANDO_APROVACAO`, porque o orçamento enviado ainda
+  tem linha pendente (correção `awaiting-approval-status`).
 
 ## Parte C — Caminho feliz (`APPROVED`)
 

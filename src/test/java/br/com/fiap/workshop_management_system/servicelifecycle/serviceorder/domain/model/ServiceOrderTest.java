@@ -10,6 +10,7 @@ import java.util.UUID;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -254,6 +255,35 @@ class ServiceOrderTest {
         serviceOrder.markEstimateSentWithPendingLines();
 
         assertEquals(ServiceOrderStatus.AWAITING_APPROVAL, serviceOrder.status());
+    }
+
+    @Test
+    void expiredSentEstimateReturnsTheServiceOrderToDiagnosisWhileTheDiagnosisIsOpen() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        diagnoseWithOneExecution(serviceOrder);
+        serviceOrder.markEstimateSentWithPendingLines();
+
+        serviceOrder.markSentEstimateExpired();
+
+        assertFalse(serviceOrder.hasSentEstimateWithPendingLines());
+        assertEquals(ServiceOrderStatus.IN_DIAGNOSIS, serviceOrder.status());
+    }
+
+    @Test
+    void expiredSentEstimateDoesNotDemoteAMoreAdvancedPhase() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        UUID firstExecutionId = diagnoseWithOneExecution(serviceOrder);
+        authorizeExecution(serviceOrder, firstExecutionId);
+        serviceOrder.startExecution(firstExecutionId, Instant.now());
+        DiagnosisItem additionalRepair = new DiagnosisItem(
+                UUID.randomUUID(), "Reparo adicional", Money.brl(BigDecimal.TEN), List.of());
+        serviceOrder.performDiagnosis(List.of(additionalRepair), UUID.randomUUID(), Instant.EPOCH);
+        serviceOrder.markEstimateSentWithPendingLines();
+        assertEquals(ServiceOrderStatus.IN_PROGRESS, serviceOrder.status());
+
+        serviceOrder.markSentEstimateExpired();
+
+        assertEquals(ServiceOrderStatus.IN_PROGRESS, serviceOrder.status());
     }
 
     @Test

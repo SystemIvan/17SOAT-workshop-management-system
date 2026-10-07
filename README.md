@@ -363,6 +363,9 @@ retornados em respostas `201 Created` são os que devem ser usados no restante d
    deve apresentar um `lineTotal` de `195.90 BRL`. Como há apenas uma linha, o `total` da Estimate também deve ser
    `195.90 BRL`.
 
+   Consulte `/status` mais uma vez: com o orçamento enviado e a linha ainda sem decisão, espere `status`
+   `AWAITING_APPROVAL` e `statusLabel` `AGUARDANDO_APROVACAO`.
+
 10. Decida todas as linhas consultadas em `Decide estimate lines`:
 
     ```http
@@ -594,16 +597,22 @@ não substitui a geração e decisão da Estimate. Ao final, volte ao passo do f
 
 ### Bifurcações e acompanhamento de status
 
-`statusSnapshot` é recalculado a partir das execuções e da entrega. Em uma ordem recém-criada ele é `RECEIVED`; após
-o diagnóstico aberto, `IN_DIAGNOSIS`; uma execução aprovada sem requisito de estoque, ou com reserva confirmada, deixa
-a ordem `IN_PROGRESS`; falta de peça deixa-a `AWAITING_ITEMS`; e todas as execuções terminais (`COMPLETED` ou
-`REJECTED`) deixam-na `COMPLETED`. A entrega confirmada no passo final muda-a para `DELIVERED`.
+`statusSnapshot` é recalculado a partir das execuções, dos orçamentos e da entrega. Em uma ordem recém-criada ele é
+`RECEIVED`; após o diagnóstico aberto, `IN_DIAGNOSIS`; com um orçamento enviado e linha ainda sem decisão,
+`AWAITING_APPROVAL`; uma execução aprovada sem requisito de estoque, ou com reserva confirmada, deixa a ordem
+`IN_PROGRESS`; falta de peça deixa-a `AWAITING_ITEMS`; e todas as execuções terminais (`COMPLETED` ou `REJECTED`)
+deixam-na `COMPLETED`. A entrega confirmada no passo final muda-a para `DELIVERED`.
+
+A ordem sai de `AWAITING_APPROVAL` quando o orçamento é totalmente decidido, por `Decide estimate lines` ou pelo canal
+externo, e segue o estado que as decisões produzirem. Uma decisão parcial a mantém em `AWAITING_APPROVAL`, salvo se
+uma execução aprovada já levar a uma fase mais avançada (`IN_PROGRESS`, `AWAITING_ITEMS`). Se o orçamento expirar
+sem decisão, a ordem volta para `IN_DIAGNOSIS`. Nesse caso, hoje não é possível gerar um novo orçamento para o mesmo
+diagnóstico (limitação registrada em `docs/tech-debt/TD-004-os-sem-saida-apos-expiracao-do-orcamento.md`).
 
 Uma linha rejeitada recebe `REJECTED` e não deve ser atribuída, iniciada nem concluída. Se houver linhas aprovadas e
 rejeitadas, execute apenas as aprovadas e complete todas elas; a rejeitada já conta como terminal. Se todas forem
 rejeitadas, a ordem alcança `COMPLETED` e ainda pode ser finalizada com `vehicleDelivered: true`.
 
-Embora `AWAITING_APPROVAL` exista entre os valores possíveis de status, a geração do orçamento preserva o diagnóstico
-aberto no contrato atual; valide o status sempre pela resposta real de `Get service order status`, especialmente entre
-geração e decisão do orçamento. Para erros de validação, referências inexistentes ou transições inválidas, espere os
-status HTTP documentados no Swagger, em geral `400`, `404` ou `409`, e corrija a condição antes de continuar.
+Valide o status sempre pela resposta real de `Get service order status`. Para erros de validação, referências
+inexistentes ou transições inválidas, espere os status HTTP documentados no Swagger, em geral `400`, `404` ou `409`, e
+corrija a condição antes de continuar.
