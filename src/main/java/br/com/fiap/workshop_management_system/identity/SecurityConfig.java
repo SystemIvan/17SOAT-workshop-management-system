@@ -3,6 +3,7 @@ package br.com.fiap.workshop_management_system.identity;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -32,6 +33,33 @@ public class SecurityConfig {
         this.estimateGatewayHmacAuthenticationFilter = estimateGatewayHmacAuthenticationFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
+    }
+
+    /**
+     * Actuator chain (container-readiness), matched before the business chain on every port that serves
+     * {@code /actuator/**}. It registers no authentication filter, so every request here is anonymous: the
+     * three probes are reachable without a token (the kubelet sends none), and every other management path
+     * is rejected with 401 through the shared entry point, whatever Authorization header is sent.
+     */
+    @Bean
+    @Order(1)
+    public SecurityFilterChain actuatorSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher("/actuator/**")
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(handling -> handling
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler))
+                .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/actuator/health",
+                                "/actuator/health/liveness",
+                                "/actuator/health/readiness"
+                        ).permitAll()
+                        .anyRequest().denyAll());
+        return http.build();
     }
 
     @Bean
