@@ -1,12 +1,18 @@
 # Functional Specification: Service Order Finalized Notification (Customer)
 
+> **DEPRECATED — Consolidated into RF52 (2026-10-05):** This feature's dedicated e-mail is no longer sent as a
+> separate notification. The transitions to "Finalizada" and "Entregue" are now notified by the generic status-change
+> notification in `../notifications-so-status-change/`. See that feature's `functional-spec.md` (option (a), section
+> "Decisão registrada — consolidação com o aviso de 'OS finalizada'") for the consolidation decision. This file is kept
+> for historical reference; new implementations should reference `notifications-so-status-change`.
+
 | Field | Value                                                                                                  |
 |---|--------------------------------------------------------------------------------------------------------|
 | Feature | `notifications-so-finalized`                                                                           |
-| Status | Approved                                                                                               |
+| Status | Approved (deprecated, see note above)                                                                                               |
 | Owner | `Leandro Nascimento`                                                                                   |
 | Updated at | `2026-08-13`                                                                                           |
-| References | `RF33`, `docs/EPIC-5-notifications-plan-v2.md` (item #7), `../../adr/ADR-004-notifications-boundary.md` |
+| References | `RF33`, `docs/EPIC-5-notifications-plan-v2.md` (item #7), `../../adr/ADR-004-notifications-boundary.md`, `../notifications-so-status-change/functional-spec.md` |
 
 ## Problem and outcome
 
