@@ -32,11 +32,21 @@ LABEL version="1.0.0"
 # Criar usuário non-root por segurança
 RUN useradd -m -u 1000 appuser
 
+# Instalar ferramentas de diagnóstico para health checks e wait scripts
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    netcat-traditional \
+    mysql-client \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copiar JAR do stage anterior
 COPY --from=builder /app/target/*.jar app.jar
 
-# Ownership do arquivo
-RUN chown appuser:appuser app.jar
+# Copiar script de aguarda MySQL
+COPY docker/wait-for-mysql.sh ./wait-for-mysql.sh
+RUN chmod +x wait-for-mysql.sh
+
+# Ownership dos arquivos
+RUN chown appuser:appuser app.jar wait-for-mysql.sh
 
 # Trocar para usuário non-root
 USER appuser
@@ -44,6 +54,6 @@ USER appuser
 # Porta padrão do Spring Boot
 EXPOSE 8080
 
-# Comando de execução
-ENTRYPOINT ["java", "-jar", "app.jar"]
-CMD ["--server.port=8080"]
+# Aguarda MySQL antes de iniciar a aplicação
+ENTRYPOINT ["./wait-for-mysql.sh"]
+CMD ["java", "-jar", "app.jar", "--server.port=8080"]
