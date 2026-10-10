@@ -2,7 +2,6 @@ package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.app
 
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.FinalizeServiceOrderRequest;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderResponse;
-import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.port.CustomerNotificationPort;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.DiagnosisItem;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Money;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
@@ -19,25 +18,26 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/**
+ * The Customer notification for the "Entregue" transition is no longer sent from this use case (RF52 consolidated
+ * RF33 into the generic status-change flow); see ServiceOrderStatusChangedNotificationListenerTest.
+ */
 class FinalizeServiceOrderUseCaseTest {
 
     private final ServiceOrderRepository repository = mock(ServiceOrderRepository.class);
-    private final CustomerNotificationPort customerNotificationPort = mock(CustomerNotificationPort.class);
-    private final FinalizeServiceOrderUseCase useCase =
-            new FinalizeServiceOrderUseCase(repository, customerNotificationPort);
+    private final FinalizeServiceOrderUseCase useCase = new FinalizeServiceOrderUseCase(repository);
 
     private final VehicleSnapshot vehicleSnapshot = new VehicleSnapshot("ABC1D23", "Fiat", "Uno", 2015);
 
-    private ServiceOrder completedServiceOrder(UUID customerId) {
+    private ServiceOrder completedServiceOrder() {
         ServiceOrder serviceOrder = ServiceOrder.create(
-                customerId, UUID.randomUUID(), vehicleSnapshot, "Initial assessment");
+                UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, "Initial assessment");
         serviceOrder.assignDiagnosisAssignee(UUID.randomUUID());
         DiagnosisItem item = new DiagnosisItem(UUID.randomUUID(), "Troca de óleo", Money.brl(BigDecimal.TEN), List.of());
         serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), java.time.Instant.EPOCH);
@@ -50,18 +50,18 @@ class FinalizeServiceOrderUseCaseTest {
     }
 
     @Test
-    void notifiesCustomerAfterSuccessfullyFinalizingServiceOrder() {
-        UUID customerId = UUID.randomUUID();
-        ServiceOrder serviceOrder = completedServiceOrder(customerId);
+    void finalizesAndPersistsACompletedServiceOrder() {
+        ServiceOrder serviceOrder = completedServiceOrder();
         when(repository.findById(serviceOrder.id())).thenReturn(Optional.of(serviceOrder));
 
-        useCase.execute(serviceOrder.id(), new FinalizeServiceOrderRequest(true));
+        ServiceOrderResponse response = useCase.execute(serviceOrder.id(), new FinalizeServiceOrderRequest(true));
 
-        verify(customerNotificationPort).notifyServiceOrderFinalized(serviceOrder.id(), customerId);
+        assertEquals(ServiceOrderStatus.DELIVERED, response.status());
+        verify(repository).save(serviceOrder);
     }
 
     @Test
-    void doesNotNotifyWhenFinalizePreconditionsAreNotMet() {
+    void rejectsFinalizingWhenServiceOrderIsNotCompleted() {
         ServiceOrder serviceOrder = ServiceOrder.create(
                 UUID.randomUUID(), UUID.randomUUID(), vehicleSnapshot, "Initial assessment");
         when(repository.findById(serviceOrder.id())).thenReturn(Optional.of(serviceOrder));
@@ -69,19 +69,18 @@ class FinalizeServiceOrderUseCaseTest {
         assertThrows(IllegalStateException.class,
                 () -> useCase.execute(serviceOrder.id(), new FinalizeServiceOrderRequest(true)));
 
-        verifyNoInteractions(customerNotificationPort);
+        verify(repository, never()).save(any());
     }
 
     @Test
     void rejectsFinalizingWhenVehicleWasNotDelivered() {
-        UUID customerId = UUID.randomUUID();
-        ServiceOrder serviceOrder = completedServiceOrder(customerId);
+        ServiceOrder serviceOrder = completedServiceOrder();
         when(repository.findById(serviceOrder.id())).thenReturn(Optional.of(serviceOrder));
 
         assertThrows(IllegalStateException.class,
                 () -> useCase.execute(serviceOrder.id(), new FinalizeServiceOrderRequest(false)));
 
-        verifyNoInteractions(customerNotificationPort);
+        verify(repository, never()).save(any());
     }
 
     @Test
@@ -92,20 +91,6 @@ class FinalizeServiceOrderUseCaseTest {
         assertThrows(NoSuchElementException.class,
                 () -> useCase.execute(serviceOrderId, new FinalizeServiceOrderRequest(true)));
 
-        verifyNoInteractions(customerNotificationPort);
-    }
-
-    @Test
-    void finalizeSucceedsEvenWhenNotificationFails() {
-        UUID customerId = UUID.randomUUID();
-        ServiceOrder serviceOrder = completedServiceOrder(customerId);
-        when(repository.findById(serviceOrder.id())).thenReturn(Optional.of(serviceOrder));
-        doThrow(new RuntimeException("delivery failed"))
-                .when(customerNotificationPort).notifyServiceOrderFinalized(any(), any());
-
-        ServiceOrderResponse response = useCase.execute(serviceOrder.id(), new FinalizeServiceOrderRequest(true));
-
-        assertEquals(ServiceOrderStatus.DELIVERED, response.status());
-        verify(repository).save(serviceOrder);
+        verify(repository, never()).save(any());
     }
 }

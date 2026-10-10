@@ -3,8 +3,10 @@ package br.com.fiap.workshop_management_system.servicelifecycle.estimate.notific
 import br.com.fiap.workshop_management_system.registration.customer.domain.model.Customer;
 import br.com.fiap.workshop_management_system.registration.customer.domain.repository.CustomerRepository;
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.notification.application.port.CustomerEstimateNotificationPort;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.infrastructure.notification.EmailMasking;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -15,8 +17,12 @@ import java.util.UUID;
  * (technical-spec.md): writes a structured log line instead of sending a real e-mail. The log line
  * never contains the raw customer e-mail/name (AGENTS.md: no personal data in logs) - only opaque IDs,
  * expiresAt as received, and a masked e-mail for demo traceability.
+ *
+ * <p>RF52: active for {@code app.notification.email.channel=log}, the default; {@code smtp} selects
+ * {@link SmtpCustomerEstimateNotificationAdapter} instead.
  */
 @Component
+@ConditionalOnProperty(name = "app.notification.email.channel", havingValue = "log", matchIfMissing = true)
 public class SimulatedEmailCustomerEstimateNotificationAdapter implements CustomerEstimateNotificationPort {
 
     private static final Logger log = LoggerFactory.getLogger(SimulatedEmailCustomerEstimateNotificationAdapter.class);
@@ -37,20 +43,9 @@ public class SimulatedEmailCustomerEstimateNotificationAdapter implements Custom
 
     private void logSimulatedEmail(
             UUID estimateId, UUID serviceOrderId, UUID customerId, Instant expiresAt, Customer customer) {
-        String maskedEmail = maskEmail(customer.contactInfo().email().value());
+        String maskedEmail = EmailMasking.mask(customer.contactInfo().email().value());
         log.info("Simulated e-mail sent | to={} | customerId={} | subject=\"Your estimate is awaiting approval\" "
                         + "| estimateId={} | serviceOrderId={} | expiresAt={}",
                 maskedEmail, customerId, estimateId, serviceOrderId, expiresAt);
-    }
-
-    private static String maskEmail(String email) {
-        int atIndex = email.indexOf('@');
-        if (atIndex <= 0) {
-            return "***";
-        }
-        String maskedLocal = email.charAt(0) + "***";
-        String domain = email.substring(atIndex + 1);
-        String maskedDomain = domain.isEmpty() ? "***" : domain.charAt(0) + "***";
-        return maskedLocal + "@" + maskedDomain;
     }
 }

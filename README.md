@@ -35,6 +35,20 @@ Caso o GNU Make não esteja disponível, execute diretamente:
 docker compose up -d --build
 ```
 
+**Tempo de inicialização:** todos os containers iniciam automaticamente. O MySQL pode levar até 90 segundos para se tornar saudável (o script `wait-for-mysql.sh` aguarda a inicialização do InnoDB). A aplicação fica pronta em aproximadamente 3 minutos. Para monitorar o progresso:
+
+```bash
+docker logs -f workshop-app
+```
+
+Aguarde as mensagens:
+```
+⏳ Aguardando MySQL em mysql:3306...
+✓ MySQL autenticação bem-sucedida - iniciando aplicação
+🚀 Iniciando aplicação...
+Tomcat started on port 8080
+```
+
 O ambiente Docker local utiliza o perfil `dev` e carrega dados de demonstração idempotentes de Customer e Stock Item.
 Copie `.env.example` para `.env` para alterar esse comportamento. Os seeds ficam desativados no perfil padrão da
 aplicação.
@@ -616,3 +630,48 @@ rejeitadas, a ordem alcança `COMPLETED` e ainda pode ser finalizada com `vehicl
 Valide o status sempre pela resposta real de `Get service order status`. Para erros de validação, referências
 inexistentes ou transições inválidas, espere os status HTTP documentados no Swagger, em geral `400`, `404` ou `409`, e
 corrija a condição antes de continuar.
+
+## Notificações por e-mail (RF52)
+
+A API envia e-mails reais ao cliente do Workshop Management System em dois cenários: quando um orçamento é gerado
+(RF51) e a cada mudança de status nominal da Ordem de Serviço (RF39, RF52). Confira os e-mails recebidos com
+**Mailpit**, um simulador local de SMTP que oferece uma interface web.
+
+Quando a aplicação inicia com `make docker-up`, o serviço Mailpit é lançado automaticamente:
+
+- **UI do Mailpit:** `http://localhost:8025`
+- **Porta SMTP:** `localhost:1025` (configurada automaticamente no `docker-compose.yml`)
+
+### Verificando e-mails na demo
+
+Após `make docker-up`, siga os passos do fluxo manual Postman. Sempre que houver uma mudança de status da Ordem
+(geração de orçamento, aprovação, início da execução, conclusão ou entrega), abra a UI do Mailpit no navegador.
+
+Exemplo:
+
+1. Execute `Create service order` — a OS nasce em "Recebida", sem e-mail.
+2. Execute `Perform diagnosis` — nenhum e-mail, pois o status nominal continua "Recebida" (status interno muda de
+   `RECEIVED` para `IN_DIAGNOSIS`).
+3. Execute `Generate estimate` — a OS passa de "Recebida" para "Aguardando Aprovação" (nominal), e o cliente recebe
+   **dois e-mails**: (a) orçamento gerado, com serviços, valores, total e validade; (b) notificação de mudança de
+   status para "Aguardando Aprovação".
+4. Após aprovação (passo `Decide estimate lines` ou RF40), o cliente recebe um e-mail informando a mudança para
+   "Execução".
+5. Ao concluir todas as execuções (passo `Complete execution`), o cliente recebe a notificação de "Finalizada".
+6. Ao finalizar a Ordem (passo `Finalize service order`), o cliente recebe a notificação de "Entregue".
+
+### Desabilitar e-mails na demo ou em testes
+
+Para voltar ao canal de log simulado (sem SMTP real), defina:
+
+```bash
+APP_NOTIFICATION_EMAIL_CHANNEL=log make docker-up
+```
+
+Ou altere `.env` e defina `APP_NOTIFICATION_EMAIL_CHANNEL=log`. Nesse modo, e-mails são registrados em log da
+aplicação em vez de enviados:
+
+```bash
+make docker-up
+docker compose logs app | grep -i "status change notification"
+```

@@ -1,11 +1,13 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model;
 
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.event.ServiceOrderStatusChanged;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.UUID;
 import java.util.Map;
 
@@ -14,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ServiceOrderTest {
 
@@ -384,5 +387,80 @@ class ServiceOrderTest {
         assertEquals(2, serviceOrder.serviceExecutions().size());
         assertEquals(ServiceExecutionStatus.PENDING, serviceOrder.serviceExecutions().get(1).status());
         assertEquals(ServiceOrderStatus.IN_PROGRESS, serviceOrder.status());
+    }
+
+    @Test
+    void rf52_creatingAServiceOrderIsNotAStatusChange() {
+        ServiceOrder serviceOrder = newServiceOrder();
+
+        assertTrue(serviceOrder.pullStatusChange().isEmpty());
+    }
+
+    @Test
+    void rf52_reconstitutedServiceOrderReportsTheTransitionOnlyOnce() {
+        UUID serviceOrderId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        ServiceOrder serviceOrder = ServiceOrder.reconstitute(
+                serviceOrderId, customerId, UUID.randomUUID(), vehicleSnapshot, "Initial assessment",
+                UUID.randomUUID(), Priority.NORMAL, ServiceOrderStatus.IN_DIAGNOSIS, UUID.randomUUID(), false,
+                Set.of(), List.of(), Instant.EPOCH);
+
+        serviceOrder.markEstimateSentWithPendingLines();
+
+        ServiceOrderStatusChanged change = serviceOrder.pullStatusChange().orElseThrow();
+        assertEquals(serviceOrderId, change.serviceOrderId());
+        assertEquals(customerId, change.customerId());
+        assertEquals(ServiceOrderStatus.IN_DIAGNOSIS, change.previousStatus());
+        assertEquals(ServiceOrderStatus.AWAITING_APPROVAL, change.currentStatus());
+        assertNotNull(change.occurredAt());
+        assertTrue(serviceOrder.pullStatusChange().isEmpty());
+    }
+
+    @Test
+    void rf52_commandThatKeepsTheStatusDoesNotReportAChange() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        UUID executionId = diagnoseWithOneExecution(serviceOrder);
+        serviceOrder.pullStatusChange();
+
+        serviceOrder.addServiceExecution(
+                serviceOrder.openDiagnosisId(), UUID.randomUUID(), "Alinhamento", Money.brl(BigDecimal.ONE));
+        serviceOrder.definePriority(Priority.URGENT);
+        serviceOrder.confirmTechnicianAssignment(executionId, UUID.randomUUID());
+
+        assertEquals(ServiceOrderStatus.IN_DIAGNOSIS, serviceOrder.status());
+        assertTrue(serviceOrder.pullStatusChange().isEmpty());
+    }
+
+    @Test
+    void rf52_severalRecomputesInOneCommandReportASingleTransitionFromTheLoadedStatus() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        UUID executionId = diagnoseWithOneExecution(serviceOrder);
+        authorizeExecution(serviceOrder, executionId);
+
+        ServiceOrderStatusChanged change = serviceOrder.pullStatusChange().orElseThrow();
+        assertEquals(ServiceOrderStatus.RECEIVED, change.previousStatus());
+        assertEquals(ServiceOrderStatus.IN_PROGRESS, change.currentStatus());
+        assertTrue(serviceOrder.pullStatusChange().isEmpty());
+    }
+
+    @Test
+    void rf52_internalTransitionWithinTheSameNominalStatusIsStillReported() {
+        ServiceOrder serviceOrder = newServiceOrder();
+        StockRequirement pendingPart = new StockRequirement(
+                UUID.randomUUID(), StockItemType.PART, 1, "Filtro de óleo", Money.brl(BigDecimal.TEN), false);
+        DiagnosisItem item = new DiagnosisItem(
+                UUID.randomUUID(), "Troca de filtro", Money.brl(BigDecimal.TEN), List.of(pendingPart));
+        serviceOrder.performDiagnosis(List.of(item), UUID.randomUUID(), Instant.EPOCH);
+        UUID executionId = serviceOrder.serviceExecutions().get(0).id();
+        serviceOrder.authorizeExecutionFromEstimate(UUID.randomUUID(), executionId);
+        assertEquals(ServiceOrderStatus.AWAITING_ITEMS, serviceOrder.status());
+        serviceOrder.pullStatusChange();
+
+        serviceOrder.confirmStockReservation(executionId, UUID.randomUUID());
+
+        // Filtering by nominal status (AWAITING_ITEMS and IN_PROGRESS are both "Execução") is the consumer's job.
+        ServiceOrderStatusChanged change = serviceOrder.pullStatusChange().orElseThrow();
+        assertEquals(ServiceOrderStatus.AWAITING_ITEMS, change.previousStatus());
+        assertEquals(ServiceOrderStatus.IN_PROGRESS, change.currentStatus());
     }
 }

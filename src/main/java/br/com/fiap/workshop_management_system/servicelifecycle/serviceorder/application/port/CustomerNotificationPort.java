@@ -1,5 +1,7 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.port;
 
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderStatusLabel;
+
 import java.util.UUID;
 
 /**
@@ -9,5 +11,9 @@ import java.util.UUID;
  */
 public interface CustomerNotificationPort {
 
-    void notifyServiceOrderFinalized(UUID serviceOrderId, UUID customerId);
+    /**
+     * RF52 - the nominal (RF39) status of the Service Order changed. Also covers the former RF33 "finalized"
+     * notice, consolidated into this one (docs/features/servicelifecycle/notifications-so-status-change).
+     */
+    void notifyServiceOrderStatusChanged(UUID serviceOrderId, UUID customerId, ServiceOrderStatusLabel newStatus);
 }
