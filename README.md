@@ -35,6 +35,20 @@ Caso o GNU Make não esteja disponível, execute diretamente:
 docker compose up -d --build
 ```
 
+**Tempo de inicialização:** todos os containers iniciam automaticamente. O MySQL pode levar até 90 segundos para se tornar saudável (o script `wait-for-mysql.sh` aguarda a inicialização do InnoDB). A aplicação fica pronta em aproximadamente 3 minutos. Para monitorar o progresso:
+
+```bash
+docker logs -f workshop-app
+```
+
+Aguarde as mensagens:
+```
+⏳ Aguardando MySQL em mysql:3306...
+✓ MySQL autenticação bem-sucedida - iniciando aplicação
+🚀 Iniciando aplicação...
+Tomcat started on port 8080
+```
+
 O ambiente Docker local utiliza o perfil `dev` e carrega dados de demonstração idempotentes de Customer e Stock Item.
 Copie `.env.example` para `.env` para alterar esse comportamento. Os seeds ficam desativados no perfil padrão da
 aplicação.
