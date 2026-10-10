@@ -4,7 +4,7 @@ services:
     image: axllent/mailpit:latest
     container_name: workshop-mailpit
     ports:
-      - "${MAILPIT_UI_PORT:-8025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
       - "${MAILPIT_SMTP_PORT:-1025}:1025"
     networks:
       - workshop-network
@@ -24,7 +24,7 @@ services:
 
   # MySQL Database
   mysql:
-    image: mysql:8.0
+    image: mysql:8.4
     container_name: workshop-mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
