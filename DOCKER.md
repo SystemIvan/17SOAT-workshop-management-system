@@ -18,6 +18,11 @@ If port `3306` is already in use on the host (for example by a local MySQL serve
 port with `DB_PORT`, e.g. `DB_PORT=3307` in `.env` or `DB_PORT=3307 docker compose up -d --build`. The application
 keeps reaching MySQL as `mysql:3306` inside the Docker network.
 
+The `app` service only starts once the `mysql` healthcheck passes (`depends_on: condition: service_healthy`). That
+healthcheck pings MySQL over TCP (`127.0.0.1`), not through the Unix socket: on the first start with an empty volume,
+the MySQL image initializes the database through a temporary server that listens only on the socket, so a socket ping
+would report it healthy while the application still could not connect.
+
 ## Health probes
 
 The application listens on a second, management port, `8081`, which serves only three anonymous `GET` endpoints:

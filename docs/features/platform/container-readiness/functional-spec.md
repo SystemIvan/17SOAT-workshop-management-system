@@ -177,6 +177,11 @@ probes para `8081` e não a incluem no Service; o smoke test do CD (CICD-3) usa 
 - A porta de gestão `8081` **não** é publicada no host por padrão (ver pergunta em aberto 4).
 - Nada mais muda no fluxo local: mesmos serviços, mesmas portas publicadas (`8080`, `3306`, `8089`), mesmo
   `depends_on` do MySQL, mesmas variáveis de seed/perfil. `make docker-up` e `docker compose up` continuam funcionando.
+- **Emenda 2026-10-22 (E2) — decisão aprovada por Leandro Nascimento em 2026-10-22; aguarda a aprovação do Santiago
+  Silvestre no PR #55:** depois do merge do RF52 (#53), o compose tem quatro serviços (`mailpit`) e `mysql:8.4`. O
+  healthcheck do `mysql` passa a testar a conexão TCP (`-h 127.0.0.1`), para a aplicação só subir quando o servidor
+  definitivo aceita conexões. O `docker/wait-for-mysql.sh` do #53 sai, junto com os pacotes que ele exigia na imagem.
+  Detalhes na technical-spec.
 
 ### R7 — Contratos HTTP e documentação
 
@@ -245,6 +250,7 @@ Imagem e ambiente local:
       casos isolados com shutdown gracioso completo nos logs; ambos são parada limpa; `137` (SIGKILL) ou OOM é falha.
 - [ ] A imagem não contém segredos (`docker history`/`docker inspect` sem valores sensíveis).
 - [ ] `docker build` conclui com sucesso e `docker compose up` sobe os três serviços; `app` chega a `healthy`.
+      **Emenda 2026-10-22 (E2):** quatro serviços depois do RF52 (`mailpit`).
 - [ ] O healthcheck do `app` não exigiu instalar pacotes adicionais na imagem.
 
 Qualidade e documentação:
