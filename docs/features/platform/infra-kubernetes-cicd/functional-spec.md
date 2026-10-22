@@ -3,11 +3,11 @@
 | Campo | Valor |
 |---|---|
 | Feature | `infra-kubernetes-cicd` |
-| Status | Draft |
+| Status | Approved |
 | Responsável | Leandro Nascimento |
 | Atualizado em | 2026-10-22 |
-| Aprovado por | — |
-| Aprovado em | — |
+| Aprovado por | Leandro Nascimento |
+| Aprovado em | 2026-10-22 |
 | Referências | Enunciado do Tech Challenge Fase 2 (manifestos em `/k8s`, Terraform em `/infra`, pipeline de CI/CD, README e vídeo); `docs/features/platform/container-readiness/` (probes na porta `8081`, imagem não-root, `JAVA_OPTS`, emendas D1, D2, E1 e E2); `docs/features/infra-kubernetes-cicd/tasks.md` da branch `feature/infra-kubernetes-cicd` (Matheus Apostulo, 2026-10-17: contexto da conta AWS Academy); `.github/workflows/ci.yml`; `docker-compose.yml`; `.env.example`; `DOCKER.md`; `V20260824120001__seed_bootstrap_admin_account.sql` |
 
 ## Problema e resultado esperado
