@@ -10,6 +10,7 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.doma
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
@@ -21,16 +22,25 @@ import java.util.UUID;
 
 /**
  * Infrastructure adapter for the {@link ServiceOrderRepository} port, backed by JPA.
+ *
+ * <p>RF52: {@link #save} is the single persistence path for every command that changes a ServiceOrder, so it is
+ * also where the aggregate's status transition is published. Publishing happens inside the caller's transaction,
+ * so after-commit listeners only see it if that transaction commits.
  */
 @Repository
 public class ServiceOrderRepositoryImpl implements ServiceOrderRepository {
 
     private final ServiceOrderJpaRepository jpaRepository;
     private final ServiceOrderPersistenceMapper mapper;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public ServiceOrderRepositoryImpl(ServiceOrderJpaRepository jpaRepository, ServiceOrderPersistenceMapper mapper) {
+    public ServiceOrderRepositoryImpl(
+            ServiceOrderJpaRepository jpaRepository,
+            ServiceOrderPersistenceMapper mapper,
+            ApplicationEventPublisher eventPublisher) {
         this.jpaRepository = jpaRepository;
         this.mapper = mapper;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -89,5 +99,6 @@ public class ServiceOrderRepositoryImpl implements ServiceOrderRepository {
     @Override
     public void save(ServiceOrder serviceOrder) {
         jpaRepository.save(mapper.toEntity(serviceOrder));
+        serviceOrder.pullStatusChange().ifPresent(eventPublisher::publishEvent);
     }
 }

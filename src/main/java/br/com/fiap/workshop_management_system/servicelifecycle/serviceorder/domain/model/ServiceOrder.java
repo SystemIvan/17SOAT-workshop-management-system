@@ -1,11 +1,14 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model;
 
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.event.ServiceOrderStatusChanged;
+
 import java.util.ArrayList;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -28,6 +31,12 @@ public class ServiceOrder {
     private Priority priority;
     private ServiceOrderStatus statusSnapshot;
     private UUID openDiagnosisId;
+
+    /**
+     * RF52 - status this instance was created or reconstituted with, used as the baseline by
+     * {@link #pullStatusChange()}. Transient: never persisted.
+     */
+    private ServiceOrderStatus statusAtLoad;
 
     /**
      * Integration points for the Diagnoses & Estimate bounded context (Epic 2):
@@ -75,6 +84,8 @@ public class ServiceOrder {
                 requireInitialAssessment(initialAssessment),
                 Objects.requireNonNull(createdAt, "createdAt must not be null"));
         serviceOrder.statusSnapshot = ServiceOrderStatus.RECEIVED;
+        // Creation is not a status change (RF52): the baseline starts equal to the initial status.
+        serviceOrder.statusAtLoad = ServiceOrderStatus.RECEIVED;
         return serviceOrder;
     }
 
@@ -119,6 +130,7 @@ public class ServiceOrder {
                 Objects.requireNonNull(createdAt, "createdAt must not be null"));
         serviceOrder.diagnosisAssigneeId = diagnosisAssigneeId;
         serviceOrder.statusSnapshot = statusSnapshot;
+        serviceOrder.statusAtLoad = statusSnapshot;
         serviceOrder.openDiagnosisId = openDiagnosisId;
         serviceOrder.hasSentEstimateWithPendingLines = hasSentEstimateWithPendingLines;
         serviceOrder.approvedEstimateIds.addAll(approvedEstimateIds);
@@ -297,6 +309,22 @@ public class ServiceOrder {
      */
     public ServiceOrderStatus status() {
         return statusSnapshot;
+    }
+
+    /**
+     * RF52 - returns the transition between the status this instance was loaded with and the current one, if any,
+     * and moves the baseline forward so the same transition is never reported twice. Comparing against the loaded
+     * status (instead of recording every recompute) guarantees at most one event per command, even when a command
+     * recomputes the status several times.
+     */
+    public Optional<ServiceOrderStatusChanged> pullStatusChange() {
+        if (statusSnapshot == statusAtLoad) {
+            return Optional.empty();
+        }
+        ServiceOrderStatusChanged change = new ServiceOrderStatusChanged(
+                id, customerId, statusAtLoad, statusSnapshot, Instant.now());
+        statusAtLoad = statusSnapshot;
+        return Optional.of(change);
     }
 
     public String initialAssessment() {

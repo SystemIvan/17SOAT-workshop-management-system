@@ -4,6 +4,7 @@ import br.com.fiap.workshop_management_system.registration.customer.domain.model
 import br.com.fiap.workshop_management_system.registration.customer.domain.model.Customer;
 import br.com.fiap.workshop_management_system.registration.customer.domain.model.TaxId;
 import br.com.fiap.workshop_management_system.registration.customer.domain.repository.CustomerRepository;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderStatusLabel;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
@@ -50,13 +51,13 @@ class SimulatedEmailCustomerNotificationAdapterTest {
     }
 
     @Test
-    void logsSimulatedEmailWithoutRawContactDataWhenCustomerIsFound() {
+    void logsSimulatedEmailWithTheNewStatusAndWithoutRawContactDataWhenCustomerIsFound() {
         UUID serviceOrderId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
         Customer customer = Customer.create(RAW_NAME, new TaxId("52998224725"), new ContactInfo(RAW_EMAIL, "11999999999"));
         when(customerRepository.findById(customerId)).thenReturn(Optional.of(customer));
 
-        adapter.notifyServiceOrderFinalized(serviceOrderId, customerId);
+        adapter.notifyServiceOrderStatusChanged(serviceOrderId, customerId, ServiceOrderStatusLabel.ENTREGUE);
 
         assertEquals(1, appender.list.size());
         ILoggingEvent event = appender.list.get(0);
@@ -64,17 +65,19 @@ class SimulatedEmailCustomerNotificationAdapterTest {
         String message = event.getFormattedMessage();
         assertFalse(message.contains(RAW_EMAIL), "log must not contain the raw e-mail address");
         assertFalse(message.contains(RAW_NAME), "log must not contain the raw customer name");
+        assertTrue(message.contains("j***@e***"));
         assertTrue(message.contains(serviceOrderId.toString()));
         assertTrue(message.contains(customerId.toString()));
+        assertTrue(message.contains("ENTREGUE"));
     }
 
     @Test
-    void logsWarningAndDoesNotThrowWhenCustomerIsNotFound() {
+    void logsWarningWithIdsOnlyAndDoesNotThrowWhenCustomerIsNotFound() {
         UUID serviceOrderId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
         when(customerRepository.findById(customerId)).thenReturn(Optional.empty());
 
-        adapter.notifyServiceOrderFinalized(serviceOrderId, customerId);
+        adapter.notifyServiceOrderStatusChanged(serviceOrderId, customerId, ServiceOrderStatusLabel.EXECUCAO);
 
         assertEquals(1, appender.list.size());
         ILoggingEvent event = appender.list.get(0);
