@@ -3,11 +3,11 @@
 | Campo | Valor |
 |---|---|
 | Feature | `infra-kubernetes-cicd` |
-| Status | Draft |
+| Status | Approved |
 | Responsável | Leandro Nascimento |
 | Atualizado em | 2026-10-22 |
-| Aprovado por | — |
-| Aprovado em | — |
+| Aprovado por | Leandro Nascimento |
+| Aprovado em | 2026-10-22 |
 | Especificação funcional | `./functional-spec.md` (Approved em 2026-10-22) |
 | ADR | `docs/adr/ADR-008-kubernetes-infrastructure-on-aws-academy.md` (Proposed) |
 

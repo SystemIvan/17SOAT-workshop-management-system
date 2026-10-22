@@ -114,7 +114,7 @@ Option 2 passa a valer por emenda deste ADR e da technical-spec da feature `infr
 
 ## Approval Checklist
 
-- [ ] Technical-spec da `infra-kubernetes-cicd` aprovada.
+- [x] Technical-spec da `infra-kubernetes-cicd` aprovada (Leandro Nascimento, 2026-10-22).
 - [ ] Teste do checkpoint 0 confirma o EKS com a `LabRole` no Learner Lab.
 
 ---
