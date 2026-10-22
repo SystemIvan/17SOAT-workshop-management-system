@@ -41,8 +41,11 @@ services:
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - workshop-network
+    # Ping over TCP (127.0.0.1), not the Unix socket: on the first start with an empty volume the image initializes the
+    # database through a temporary socket-only server (--skip-networking), which a socket ping would already report as
+    # healthy while the app still cannot connect over the network.
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${DB_USERNAME:-workshop_user}", "-p${DB_PASSWORD:-workshop_pass}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "${DB_USERNAME:-workshop_user}", "-p${DB_PASSWORD:-workshop_pass}"]
       interval: 10s
       timeout: 5s
       retries: 5
