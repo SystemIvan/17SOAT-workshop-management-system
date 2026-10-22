@@ -260,6 +260,19 @@ class EstimateTest {
     }
 
     @Test
+    void totalSumsEveryLineTotalIncludingStockItems() {
+        // newLine(): 120.00 service + 2 x 35.90 stock = 191.80
+        EstimateLine secondLine = new EstimateLine(
+                UUID.randomUUID(), "Alinhamento", Money.brl(new BigDecimal("80.00")), List.of());
+
+        Estimate estimate = Estimate.create(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), Instant.now(), null,
+                List.of(newLine(), secondLine));
+
+        assertEquals(new Money(new BigDecimal("271.80"), "BRL"), estimate.total());
+    }
+
+    @Test
     void estimateCopiesLinesDefensively() {
         List<EstimateLine> mutableLines = new ArrayList<>();
         mutableLines.add(newLine());

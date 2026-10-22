@@ -1,5 +1,8 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.model;
 
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Money;
+
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -139,6 +142,17 @@ public class Estimate {
 
     public List<EstimateLine> lines() {
         return lines;
+    }
+
+    /**
+     * Sum of every line total, in the currency of the lines. An Estimate always has at least one line.
+     */
+    public Money total() {
+        BigDecimal value = lines.stream()
+                .map(EstimateLine::lineTotal)
+                .map(Money::value)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new Money(value, lines.getFirst().lineTotal().currency());
     }
 
     public EstimateStatus status() {

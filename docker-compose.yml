@@ -1,4 +1,15 @@
 services:
+  # Mailpit — local e-mail testing for RF52 notifications
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: workshop-mailpit
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+    networks:
+      - workshop-network
+    restart: unless-stopped
+
   supplier-simulator:
     image: wiremock/wiremock:3.13.1
     container_name: workshop-supplier-simulator
@@ -13,7 +24,7 @@ services:
 
   # MySQL Database
   mysql:
-    image: mysql:8.0
+    image: mysql:8.4
     container_name: workshop-mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
@@ -35,7 +46,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 90s
     restart: unless-stopped
 
   # Spring Boot Application
@@ -57,6 +68,12 @@ services:
       SUPPLIER_READ_TIMEOUT: ${SUPPLIER_READ_TIMEOUT:-5s}
       APP_SECURITY_JWT_SECRET: ${APP_SECURITY_JWT_SECRET:-change-me-to-a-random-secret-with-at-least-32-bytes}
       APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET: ${APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET:-local-development-only-estimate-gateway-secret-please-rotate}
+      APP_NOTIFICATION_EMAIL_CHANNEL: ${APP_NOTIFICATION_EMAIL_CHANNEL:-smtp}
+      APP_NOTIFICATION_EMAIL_FROM: ${APP_NOTIFICATION_EMAIL_FROM:-no-reply@workshop.local}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-mailpit}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-1025}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD}
       SERVER_PORT: 8080
       TZ: 'America/Sao_Paulo'
     ports:
@@ -65,6 +82,8 @@ services:
       mysql:
         condition: service_healthy
       supplier-simulator:
+        condition: service_started
+      mailpit:
         condition: service_started
     networks:
       - workshop-network

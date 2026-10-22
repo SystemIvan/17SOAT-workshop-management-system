@@ -24,7 +24,7 @@ public record EstimateResponse(
 ) {
 
     public static EstimateResponse from(Estimate estimate) {
-        Money total = calculateTotal(estimate);
+        Money total = estimate.total();
 
         return new EstimateResponse(
                 estimate.id(),
@@ -39,27 +39,6 @@ public record EstimateResponse(
                         .map(LineResponse::from)
                         .toList()
         );
-    }
-
-    private static Money calculateTotal(Estimate estimate) {
-        if (estimate.lines().isEmpty()) {
-            return Money.brl(BigDecimal.ZERO);
-        }
-
-        String currency = estimate.lines()
-                .getFirst()
-                .lineTotal()
-                .currency();
-
-        BigDecimal value = estimate.lines().stream()
-                .map(EstimateLine::lineTotal)
-                .map(Money::value)
-                .reduce(
-                        BigDecimal.ZERO,
-                        BigDecimal::add
-                );
-
-        return new Money(value, currency);
     }
 
     public record LineResponse(
