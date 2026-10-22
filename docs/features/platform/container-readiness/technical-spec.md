@@ -93,6 +93,25 @@ Decisões tomadas durante a implementação (revisão da etapa 2), registradas a
   `implementation-plan.md`, checkpoint 4. Isto ajusta o item "`docker stop` ou `SIGTERM`" de "Comportamento e
   Falhas" e a validação manual 5.
 
+## Emenda 2026-10-22 (decisão aprovada por Leandro Nascimento em 2026-10-22)
+
+Integração com a `dev` depois do merge do PR #53 (RF52, Santiago Silvestre), que mudou o compose e o `Dockerfile` em
+paralelo a esta feature. Registrada sem alterar o status da spec. **Aguarda a aprovação do Santiago Silvestre no PR #55**,
+porque substitui uma solução dele.
+
+- **E2 — a espera pelo MySQL fica no compose, não na imagem:** o #53 resolveu a subida antecipada da aplicação com
+  `docker/wait-for-mysql.sh` como `ENTRYPOINT`, instalando `netcat-traditional` e `mysql-client` na imagem de runtime.
+  Isso vai contra a R6 da functional-spec, que evita instalar pacotes na imagem para checagens de saúde, e contra o
+  `ENTRYPOINT` desta spec (JVM como PID 1, com `JAVA_OPTS`). A causa está no healthcheck do serviço `mysql`: na
+  primeira subida, a imagem `mysql:8.4` inicializa o banco num servidor temporário que só escuta no socket
+  (`--skip-networking`), e `mysqladmin ping -h localhost` (socket) já o dá como saudável antes de o servidor definitivo
+  aceitar TCP. Decisão: o healthcheck passa a usar `mysqladmin ping -h 127.0.0.1` (TCP); o `depends_on` do `app`
+  (`condition: service_healthy`) não muda; o `wait-for-mysql.sh` sai e o trecho do `README.md` que o descrevia é
+  reescrito; o `Dockerfile` continua o desta spec.
+  No Kubernetes a espera não é necessária: a readiness e o restart do pod cobrem o banco indisponível.
+- **Compose depois do #53:** quatro serviços (o `mailpit` entrou com o RF52) e `mysql:8.4`. Os critérios "sobe os três
+  serviços" e "mesmo `depends_on` do MySQL" passam a valer para os quatro serviços atuais.
+
 ## Estratégia de testes
 
 - **Cobertura Base:** Confirmar que `make verify` continua gerando verde em todas as classes, que a fronteira estanque via `ModuleStructureTest` é obedecida e a cobertura global é `>= 80%`. *Os testes existentes da matriz de autorização do SecurityConfig continuam passando inalterados.*

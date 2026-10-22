@@ -211,6 +211,64 @@ está instalado** nesta máquina: os alvos `make` foram executados pelo comando 
   ```
 
   Insumo para K8S-2: `readOnlyRootFilesystem: true` exige um volume `emptyDir` montado em `/tmp`.
+- **Revalidação após o merge da `dev` (2026-10-22, emenda E2):** o PR #53 (RF52) trouxe Mailpit, `mysql:8.4` e o
+  `docker/wait-for-mysql.sh` como `ENTRYPOINT`, com `netcat-traditional` e `mysql-client` na imagem. Pela emenda E2
+  (decisão de Leandro Nascimento em 2026-10-22, aguardando a aprovação do Santiago Silvestre no PR #55), o script sai e
+  o healthcheck do `mysql` passa a usar TCP. Ambiente: Docker 29.1.2, Compose v2.40.3, projeto compose isolado
+  (`-p wmsval`, nomes de container e portas próprios, `APP_PORT=8095`) para não tocar no volume local. Causa raiz,
+  medida com o serviço `mysql` do compose em volume novo e ping a cada ~0,3 s (horários UTC):
+
+  ```
+  17:26:51.717  /usr/sbin/mysqld: ready for connections ... port: 0      (servidor temporário, só socket)
+  17:26:51.805  mysqladmin ping -h localhost  -> OK pela primeira vez
+  17:27:08.353  [Entrypoint]: Temporary server stopped
+  17:27:22.843  /usr/sbin/mysqld: ready for connections ... port: 3306   (servidor definitivo)
+  17:27:24.929  mysqladmin ping -h 127.0.0.1  -> OK pela primeira vez
+  ```
+
+  Primeira subida com o healthcheck por TCP (volume vazio, `docker compose up -d --build`):
+
+  ```
+  build exit=0 em 177s
+  17:32:08.98 mysqld: ready for connections ... port: 3306
+  17:32:13 wmsval-mysql health_status: healthy
+  17:32:13 wmsval-app start
+  17:33:18 wmsval-app health_status: healthy
+  Started WorkshopManagementSystemApplication in 59.375 seconds
+  StartedAt=2026-10-22T17:32:13.421Z RestartCount=0 User=10001:10001 Entrypoint=["sh","-c","exec java $JAVA_OPTS -jar application.jar"]
+  falhas de conexao com o banco no log da app: 0
+  ```
+
+  Probes, imagem, banco parado, SIGTERM e segunda subida:
+
+  ```
+  /actuator/health -> HTTP/1.1 200   {"groups":["liveness","readiness"],"status":"UP"}
+  /actuator/health/liveness -> HTTP/1.1 200   {"status":"UP"}
+  /actuator/health/readiness -> HTTP/1.1 200   {"status":"UP"}
+  /actuator/env -> HTTP/1.1 401   {"code":"UNAUTHORIZED","message":"Authentication is required"}
+  host -> 8081: curl exit=7 (portas publicadas da app: só 8080/tcp -> 8095)
+  imagem: nc ausente, mysql ausente, mysqladmin ausente, /app/wait-for-mysql.sh inexistente, uid=10001 gid=10001
+  banco parado: app unhealthy em 10s, liveness 200 {"status":"UP"}, healthcheck.sh exit=1
+  banco de volta: mysql healthy em 4s, app healthy em 2s, RestartCount=0, mesmo StartedAt
+  SIGTERM: ExitCode=143 OOMKilled=false, "Commencing graceful shutdown" -> "Graceful shutdown complete"
+  segunda subida (volume existente): mysql 17:35:31 -> healthy 17:35:41; app 17:35:42 -> healthy 17:36:36; RestartCount=0
+  ```
+
+  Tempo de resposta da readiness com o banco parado (tempos via `docker exec`, que soma ~1-3 s no Windows):
+
+  ```
+  banco no ar:   /actuator/health/readiness -> HTTP/1.1 200 {"status":"UP"}    em 2679 ms
+  banco parado:  /actuator/health/readiness -> HTTP/1.1 503 {"status":"DOWN"}  em 31871 ms e 31346 ms
+                 /actuator/health/liveness  -> HTTP/1.1 200 {"status":"UP"}    em 1423 ms
+  log: Caused by: java.net.UnknownHostException: mysql (HikariPool.createPoolEntry)
+  ```
+
+  Com o banco fora, a readiness só responde `503` depois do `connectionTimeout` padrão do Hikari (30 s). No compose isso
+  não muda o resultado: o `healthcheck.sh` tem `timeout 3` e o serviço fica `unhealthy`. **Insumo para K8S-2:** o
+  `timeoutSeconds` do readinessProbe estoura antes e conta como falha, o que tira o pod do Service como esperado; avaliar
+  reduzir `spring.datasource.hikari.connection-timeout` para não prender uma thread da porta de gestão por 30 s a cada
+  probe.
+
 - **Status:** Concluído (ver ressalva de E1).
 
 ### 5. Documentação
@@ -233,10 +291,14 @@ está instalado** nesta máquina: os alvos `make` foram executados pelo comando 
 
 - `README.md` e `DOCKER.md`: somente parágrafos acrescentados (porta de gestão, probes, `JAVA_OPTS`, `DB_PORT`);
   nenhuma frase existente foi reescrita.
+- E2 (2026-10-22): o parágrafo "Tempo de inicialização" do `README.md`, vindo do #53, foi reescrito porque descrevia o
+  `wait-for-mysql.sh` (mesma estrutura, tempos medidos na revalidação do checkpoint 4); o `DOCKER.md` ganhou um
+  parágrafo sobre o healthcheck do `mysql` por TCP.
 - `docs/Architecture.md`: seção da feature reescrita para afirmar só o que configuração e testes sustentam; a baseline
   histórica de 10 de agosto não foi alterada.
 - `.env.example`: `JAVA_OPTS=-XX:MaxRAMPercentage=75.0`.
-- Specs: emendas D1, D2 e E1 aprovadas por Leandro Nascimento em 2026-10-07; campo Status inalterado.
+- Specs: emendas D1, D2 e E1 aprovadas por Leandro Nascimento em 2026-10-07; E2 decidida por Leandro Nascimento em
+  2026-10-22, aguardando a aprovação do Santiago Silvestre no PR #55; campo Status inalterado.
 - **Status:** Concluído (aguardando revisão humana).
 
 ### 6. Validação final, PRs e checkpoint de segurança

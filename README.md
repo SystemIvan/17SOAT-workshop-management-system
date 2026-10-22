@@ -35,23 +35,36 @@ Caso o GNU Make não esteja disponível, execute diretamente:
 docker compose up -d --build
 ```
 
-**Tempo de inicialização:** todos os containers iniciam automaticamente. O MySQL pode levar até 90 segundos para se tornar saudável (o script `wait-for-mysql.sh` aguarda a inicialização do InnoDB). A aplicação fica pronta em aproximadamente 3 minutos. Para monitorar o progresso:
+**Tempo de inicialização:** todos os containers iniciam automaticamente. O serviço `app` só é iniciado depois que o
+healthcheck do `mysql` passa, e esse healthcheck testa a conexão TCP, então a aplicação não sobe antes de o banco
+aceitar conexões (detalhes em [DOCKER.md](DOCKER.md)). Na primeira subida, com o volume do MySQL vazio, o banco é
+inicializado antes de ficar saudável (cerca de 1 minuto na máquina de referência) e a aplicação fica `healthy` cerca de
+1 minuto depois, com as migrations do Flyway aplicadas. Nas subidas seguintes, o MySQL fica pronto em cerca de 10
+segundos. A primeira execução também compila a imagem (cerca de 3 minutos). Para monitorar o progresso:
 
 ```bash
+docker compose ps
 docker logs -f workshop-app
 ```
 
 Aguarde as mensagens:
-```
-⏳ Aguardando MySQL em mysql:3306...
-✓ MySQL autenticação bem-sucedida - iniciando aplicação
-🚀 Iniciando aplicação...
-Tomcat started on port 8080
+
+```text
+Tomcat started on port 8080 (http) with context path '/'
+Tomcat started on port 8081 (http) with context path '/'
+Started WorkshopManagementSystemApplication in ... seconds
 ```
 
 O ambiente Docker local utiliza o perfil `dev` e carrega dados de demonstração idempotentes de Customer e Stock Item.
 Copie `.env.example` para `.env` para alterar esse comportamento. Os seeds ficam desativados no perfil padrão da
 aplicação.
+
+A aplicação também escuta na porta de gestão `8081`, que serve apenas os probes de saúde (`GET` anônimo):
+`/actuator/health/liveness`, `/actuator/health/readiness` e `/actuator/health`. Qualquer outro caminho de gestão
+responde `401`, mesmo com JWT válido. No Docker, a `8081` não é publicada no host; o healthcheck do serviço `app` usa o
+readiness e o serviço aparece como `healthy` quando a aplicação terminou de subir e o MySQL está acessível (detalhes,
+`JAVA_OPTS` e `DB_PORT` em [DOCKER.md](DOCKER.md)). Executando fora do Docker com `make run-dev`, os probes ficam em
+`http://localhost:8081/actuator/health/readiness` e equivalentes.
 
 Todos os endpoints administrativos exigem JWT (consulte `docs/adr/ADR-003-authentication-strategy.md`). As exceções
 são os dois endpoints do gateway externo de aprovação do Customer, autenticados por assinatura HMAC
