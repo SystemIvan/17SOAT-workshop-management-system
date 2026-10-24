@@ -133,6 +133,31 @@ substitui, para o estado vigente, as menções da baseline de 10 de agosto à au
 - Compose: o serviço `app` não publica a `8081`, usa `docker/healthcheck.sh` (readiness via `/dev/tcp`, sem pacotes
   extras) e define `stop_grace_period: 35s`, acima do timeout de shutdown do Spring.
 
+## Atualização de implementação — 24 de outubro de 2026: Infraestrutura Kubernetes, IaC e CI/CD (I)
+
+A feature `infra-kubernetes-cicd` implementou a infraestrutura em nuvem, orquestração Kubernetes e entrega contínua
+exigidas na Fase 2, conforme especificado na `functional-spec.md`, `technical-spec.md` e no [ADR-008](adr/ADR-008-kubernetes-infrastructure-on-aws-academy.md).
+
+- **Manifestos Kubernetes (`k8s/`):** organizados com Kustomize sobre a base comum `k8s/base/` e dois overlays:
+  - `k8s/overlays/local/`: adaptado para cluster Kind (`wms`), incluindo StatefulSet com MySQL 8.4 local, WireMock e
+    Service NodePort 30080 exposto em `http://localhost:18080`, com metrics-server oficial e patch `--kubelet-insecure-tls`.
+  - `k8s/overlays/aws/`: adaptado para produção/AWS EKS (`wms-demo`), Service `LoadBalancer` restrito via `ALLOWED_CIDRS`,
+    e perfil de produção sem dados de demonstração (`APP_SEED_ENABLED=false`).
+  - Ambos os overlays validados estaticamente com `kubeconform -strict -summary` (zero erros).
+- **Autoescalabilidade (HPA):** configurado no deployment `workshop-app` (min: 1, max: 4) com métricas de CPU (60%) e
+  memória (90%). Validado com teste de carga k6 de 5 minutos sob 50 VUs (`scripts/load/service-orders-load.js`), comprovando
+  escalamento de 1 para 4 réplicas, ausência de restarts/OOMKilled e retorno automático (*scale down*) para 1 réplica.
+- **Infraestrutura como Código (`infra/`):** provisionada via Terraform `>= 1.10` e provider `hashicorp/aws ~> 6.0`:
+  - `infra/bootstrap/`: bucket S3 versionado e criptografado para o estado remoto com trava nativa (`use_lockfile = true`).
+  - `infra/`: VPC com 2 sub-redes públicas e 2 privadas, cluster AWS EKS (`wms-demo`, K8s 1.30, `LabRole`), 2 nós EC2 `t3.medium`,
+    RDS MySQL 8.4 privado (`workshop_app`) e repositório ECR com tags imutáveis e scan de segurança.
+  - Trava de segurança no `data "aws_caller_identity"` exigindo a role `:assumed-role/voclabs/`, impedindo deploys em contas não autorizadas.
+- **Pipelines CI/CD (`.github/workflows/`):**
+  - `ci.yml`: enriquecido com job `Infra lint` (`terraform fmt`, `terraform validate -backend=false` e `kubeconform`).
+  - `cd.yml`: pipeline completa (`guard` -> `quality-gate` -> `infra` -> `image` -> `deploy`) acionada em push na `dev` e `workflow_dispatch`.
+  - `infra-destroy.yml`: workflow de teardown com remoção de balanceadores órfãos e destruição controlada da infraestrutura.
+- Documentação detalhada em `infra/README.md` e na seção de Implantação e Nuvem do `README.md`.
+
 ## 1. Tech Challenge overview
 
 ### 1.1 Problema oficial (A)
