@@ -138,15 +138,52 @@ o ConfigMap `supplier-simulator-mappings` a partir de `docker/wiremock/mappings/
 gerados); as VUs alternam `GET /api/service-orders` e `POST /api/service-orders`; rampa até 50 VUs em 1 min, 3 min de
 patamar, 1 min de descida. Execução: `docker run --rm -i grafana/k6:<versão fixa> run - < scripts/load/service-orders-load.js`.
 
-- [ ] Resolver a versão do k6 (imagem oficial publicada há pelo menos duas semanas) e conferir no código da aplicação
-      se a mesma vehicle aceita várias OS abertas; se não aceitar, o `setup()` cria uma vehicle por VU.
-- [ ] Rodar a carga no kind e registrar: `kubectl get hpa -n workshop -w` subindo de 1 para mais réplicas; réplicas
+- [x] Resolver a versão do k6 (imagem oficial `grafana/k6:0.54.0` publicada há mais de duas semanas) e conferir no código
+      da aplicação se a mesma vehicle aceita várias OS abertas (confirmado em `CreateServiceOrderUseCase.java`, que apenas
+      valida se o veículo está ativo).
+- [x] Rodar a carga no kind e registrar: `kubectl get hpa -n workshop -w` subindo de 1 para 4 réplicas; réplicas
       novas `Ready` sem falha de readiness; `kubectl top pods` antes, durante e depois.
-- [ ] Foco de revisão 2: `restartCount` 0 e nenhum `OOMKilled` depois da carga.
-- [ ] Foco de revisão 3: o HPA volta a 1 réplica em até 10 min depois da carga. Se não voltar, ajustar a meta de
-      memória ou os requests dentro da decisão 6 e registrar aqui os valores finais com a evidência.
-- [ ] Commit: `feat(platform): add k6 load script for HPA demonstration`.
-- **Status:** Pendente.
+- [x] Foco de revisão 2: `restartCount` 0 e nenhum `OOMKilled` depois da carga.
+- [x] Foco de revisão 3: o HPA volta a 1 réplica em até 10 min depois da carga (retornou a 1 réplica em ~6 min após o
+      término da carga, com memória em 44% e CPU em 5%).
+- [x] Commit: `feat(platform): add k6 load script for HPA demonstration`.
+- **Status:** Concluído em 2026-10-24.
+
+**Evidência Checkpoint 2:**
+- Versão do k6: `grafana/k6:0.54.0` (executado via `docker run --rm -i ...`).
+- Script de carga: `scripts/load/service-orders-load.js` com rampa até 50 VUs (1 min), patamar de 50 VUs (3 min) e descida (1 min).
+- Resultados do k6: 3.340 iterações concluídas, 3.343 requisições HTTP (96,2% de checks com sucesso sob pico extremo).
+- HPA durante a carga:
+  ```text
+  NAME           REFERENCE                 TARGETS                          MINPODS   MAXPODS   REPLICAS   AGE
+  workshop-app   Deployment/workshop-app   cpu: 176%/60%, memory: 50%/90%   1         4         4          10m
+  ```
+  Quatro réplicas ativas (`1/1 Running`, zero falhas de probe).
+- `kubectl top pods -n workshop` durante o pico:
+  ```text
+  NAME                            CPU(cores)   MEMORY(bytes)   
+  workshop-app-6cb5597c4b-6kdmf   487m         371Mi           
+  workshop-app-6cb5597c4b-bnczc   52m          330Mi           
+  workshop-app-6cb5597c4b-gmwgs   288m         499Mi           
+  workshop-app-6cb5597c4b-rf2w9   348m         336Mi           
+  ```
+- Foco de revisão 2 (zero OOM e zero restarts):
+  ```text
+  Pod                                 Restarts TerminatedReason
+  ---                                 -------- ----------------
+  mysql-0                                    0                 
+  supplier-simulator-6589f5958c-fpkcn        0                 
+  workshop-app-6cb5597c4b-6kdmf              0                 
+  workshop-app-6cb5597c4b-bnczc              0                 
+  workshop-app-6cb5597c4b-gmwgs              0                 
+  workshop-app-6cb5597c4b-rf2w9              0                 
+  ```
+- Foco de revisão 3 (scale-down para 1 réplica):
+  ```text
+  NAME           REFERENCE                 TARGETS                        MINPODS   MAXPODS   REPLICAS   AGE
+  workshop-app   Deployment/workshop-app   cpu: 5%/60%, memory: 44%/90%   1         4         1          17m
+  ```
+  Deployment estabilizado em 1 réplica (`workshop-app-6cb5597c4b-rf2w9`), 0 restarts.
 
 ### 3. Overlay AWS e validação estática
 
