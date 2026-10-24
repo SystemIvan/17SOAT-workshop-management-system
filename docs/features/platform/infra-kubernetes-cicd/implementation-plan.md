@@ -219,13 +219,26 @@ checkpoint 0), `node_instance_type` (`t3.medium`), `node_count` (`2`), `db_insta
 (`10.40.0.0/16`), `availability_zones` (`us-east-1a`, `us-east-1b`), `allowed_role_name` (`voclabs`); outputs
 `cluster_name`, `ecr_repository_url`, `db_endpoint`, `region`.
 
-- [ ] `terraform fmt -check -recursive infra` e `terraform validate` (bootstrap e stack, com `-backend=false`).
-- [ ] Foco de revisão 4: `AWS_PROFILE=default terraform plan` falha na postcondition de identidade, sem criar nada.
+- [x] `terraform fmt -check -recursive infra` e `terraform validate` (bootstrap e stack, com `-backend=false`).
+- [x] Foco de revisão 4: `AWS_PROFILE=default terraform plan` falha na postcondition de identidade, sem criar nada.
 - [ ] Bootstrap aplicado com `AWS_PROFILE=academy`: bucket criado com versionamento, SSE-S3 e bloqueio público
       (`aws s3api get-bucket-versioning`, `get-public-access-block`).
 - [ ] `terraform plan` da stack com o backend S3: lista de recursos esperada e zero mudanças fora dela.
-- [ ] Commits: `feat(platform): add Terraform state bootstrap` e `feat(platform): add Terraform stack for EKS, RDS and ECR`.
-- **Status:** Pendente.
+- [x] Commits: `feat(platform): add Terraform state bootstrap` e `feat(platform): add Terraform stack for EKS, RDS and ECR`.
+- **Status:** Em andamento (código e validação estática concluídos; aplicação no Learner Lab pendente).
+
+**Evidência Checkpoint 4 (Validação e trava de segurança):**
+- `terraform fmt -check -recursive infra`: 100% formatado conforme convenções.
+- `terraform validate -backend=false`:
+  - `infra/bootstrap`: `Success! The configuration is valid.`
+  - `infra`: `Success! The configuration is valid.`
+- Foco de revisão 4 (trava com perfil default/não-voclabs):
+  ```text
+  Error: Resource postcondition failed
+    on main.tf line 15, in data "aws_caller_identity" "current":
+    condition = can(regex(":assumed-role/${var.allowed_role_name}/", self.arn))
+  Current session must assume role 'voclabs'. Refusing to create state bucket with wrong credentials.
+  ```
 
 ### 5. Provisionamento na AWS e deploy manual
 
@@ -248,20 +261,20 @@ kubeconfig, cria o namespace, o Secret e o ConfigMap dos mappings, aplica o kust
 - [ ] Sem seeds na AWS: logo depois do primeiro deploy, `GET /api/customers` e `GET /api/stock-items` com o token do
       `admin` devolvem listas vazias.
 - [ ] ADR-008 passa para `Accepted` (os dois itens do approval checklist cumpridos).
-- [ ] Commit: `feat(platform): add AWS deploy and destroy scripts`.
-- **Status:** Pendente.
+- [x] Commit: `feat(platform): add AWS deploy and destroy scripts`.
+- **Status:** Em andamento (scripts criados e commitados; execução na AWS aguarda credenciais da sessão).
 
 ### 6. Pipelines
 
 **Arquivos:** alterar `.github/workflows/ci.yml`; criar `.github/workflows/cd.yml` e
 `.github/workflows/infra-destroy.yml`.
 
-- [ ] Resolver os SHAs (tags publicadas há pelo menos duas semanas) de `aws-actions/configure-aws-credentials`,
+- [x] Resolver os SHAs (tags publicadas há pelo menos duas semanas) de `aws-actions/configure-aws-credentials`,
       `aws-actions/amazon-ecr-login`, `hashicorp/setup-terraform`, `docker/setup-buildx-action` e
       `docker/build-push-action`, conferindo tag → commit com `gh api`.
-- [ ] `ci.yml`: gatilho `workflow_call` e job `Infra lint` (fmt, validate e kubeconform). O job `Quality gate` não
+- [x] `ci.yml`: gatilho `workflow_call` e job `Infra lint` (fmt, validate e kubeconform). O job `Quality gate` não
       muda.
-- [ ] `cd.yml` e `infra-destroy.yml` conforme a technical-spec; os jobs de deploy e destroy só chamam os scripts do
+- [x] `cd.yml` e `infra-destroy.yml` conforme a technical-spec; os jobs de deploy e destroy só chamam os scripts do
       checkpoint 5.
 - [ ] Configurar no repositório (ação com autorização do Leandro): secrets `AWS_ACCESS_KEY_ID`,
       `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `DB_PASSWORD`, `APP_SECURITY_JWT_SECRET`,
@@ -270,8 +283,8 @@ kubeconfig, cria o namespace, o Secret e o ConfigMap dos mappings, aplica o kust
 - [ ] Teste ponta a ponta antes do merge: o `workflow_dispatch` só funciona com o workflow na branch padrão (`main`),
       então o teste usa um gatilho `push` temporário na própria branch da feature, removido antes do PR. Evidência: os
       cinco jobs verdes, imagem com a tag do SHA no ECR e smoke `200`.
-- [ ] Commit: `feat(platform): add CD and infrastructure destroy workflows`.
-- **Status:** Pendente.
+- [x] Commit: `feat(platform): add CD and infrastructure destroy workflows`.
+- **Status:** Em andamento (workflows criados, parametrizados e commitados).
 
 ### 7. Cenários de falha, HPA na AWS e destroy
 
