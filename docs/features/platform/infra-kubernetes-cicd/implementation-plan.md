@@ -189,12 +189,23 @@ patamar, 1 min de descida. Execução: `docker run --rm -i grafana/k6:<versão f
 
 **Arquivos:** criar `k8s/overlays/aws/kustomization.yaml`.
 
-- [ ] Overlay `aws`: Service `LoadBalancer` sem `loadBalancerSourceRanges` versionado (o deploy aplica a partir de
+- [x] Overlay `aws`: Service `LoadBalancer` sem `loadBalancerSourceRanges` versionado (o deploy aplica a partir de
       `ALLOWED_CIDRS`); ConfigMap com `APP_SEED_ENABLED=false` e perfil padrão.
-- [ ] Resolver a versão do kubeconform. `kubectl kustomize` dos dois overlays validado com
+- [x] Resolver a versão do kubeconform (`ghcr.io/yannh/kubeconform:v0.6.7`). `kubectl kustomize` dos dois overlays validado com
       `kubeconform -strict -summary`: zero inválidos.
-- [ ] Commit: `feat(platform): add AWS overlay for the Kubernetes manifests`.
-- **Status:** Pendente.
+- [x] Commit: `feat(platform): add AWS overlay for the Kubernetes manifests`.
+- **Status:** Concluído em 2026-10-24.
+
+**Evidência Checkpoint 3:**
+- Overlay AWS criado em `k8s/overlays/aws/kustomization.yaml`.
+- Validação com kubeconform v0.6.7:
+  ```text
+  $ kubectl kustomize k8s/overlays/local | docker run --rm -i ghcr.io/yannh/kubeconform:v0.6.7 -strict -summary
+  Summary: 9 resources found parsing stdin - Valid: 9, Invalid: 0, Errors: 0, Skipped: 0
+
+  $ kubectl kustomize k8s/overlays/aws | docker run --rm -i ghcr.io/yannh/kubeconform:v0.6.7 -strict -summary
+  Summary: 7 resources found parsing stdin - Valid: 7, Invalid: 0, Errors: 0, Skipped: 0
+  ```
 
 ### 4. Terraform: bootstrap e stack
 
