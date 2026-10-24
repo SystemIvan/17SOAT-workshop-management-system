@@ -36,6 +36,16 @@ build/
 .env
 rascunho/
 
+### Kubernetes and Terraform (infra-kubernetes-cicd) ###
+k8s/overlays/local/.env.local
+*.kubeconfig
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+*.tfplan
+
 ### Claude Code local context (Santiago / Épico 3) ###
 CLAUDE.local.md
 .claude/settings.local.json

@@ -1,0 +1,63 @@
+# External supplier simulator (WireMock), the same image and mappings as the supplier-simulator service in
+# docker-compose.yml. The supplier-simulator-mappings ConfigMap is generated from docker/wiremock/mappings at deploy
+# time, so the compose stack and the cluster share a single source of mappings.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supplier-simulator
+  labels:
+    app.kubernetes.io/name: supplier-simulator
+    app.kubernetes.io/part-of: workshop-management-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: supplier-simulator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: supplier-simulator
+        app.kubernetes.io/part-of: workshop-management-system
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: wiremock
+          image: wiremock/wiremock:3.13.1
+          args: ["--global-response-templating"]
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          volumeMounts:
+            - name: mappings
+              mountPath: /home/wiremock/mappings
+              readOnly: true
+      volumes:
+        - name: mappings
+          configMap:
+            name: supplier-simulator-mappings
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: supplier-simulator
+  labels:
+    app.kubernetes.io/name: supplier-simulator
+    app.kubernetes.io/part-of: workshop-management-system
+spec:
+  selector:
+    app.kubernetes.io/name: supplier-simulator
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

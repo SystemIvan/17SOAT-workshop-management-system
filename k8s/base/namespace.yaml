@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: workshop
+  labels:
+    app.kubernetes.io/part-of: workshop-management-system
+    # The application pod meets "restricted"; MySQL (local overlay) and WireMock run as root, so the namespace
+    # enforces "baseline" and only warns/audits "restricted".
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted

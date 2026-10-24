@@ -93,19 +93,41 @@ chaves do Secret `workshop-app-secrets` (`SPRING_DATASOURCE_URL`, `SPRING_DATASO
 `SPRING_DATASOURCE_PASSWORD`, `APP_SECURITY_JWT_SECRET`, `APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET`); o comando que gera
 o ConfigMap `supplier-simulator-mappings` a partir de `docker/wiremock/mappings/`.
 
-- [ ] Resolver a versão do metrics-server (release publicada há pelo menos duas semanas) e referenciar o
+- [x] Resolver a versão do metrics-server (release publicada há pelo menos duas semanas) e referenciar o
       `components.yaml` dela no overlay local, com o patch `--kubelet-insecure-tls`.
-- [ ] Escrever a base e o overlay `local`. O MySQL do overlay usa readiness por TCP (`mysqladmin ping -h 127.0.0.1`,
+      (Versão v0.9.0 utilizada; imagem kindest/node:v1.30.0 fixada no kind-config.yaml).
+- [x] Escrever a base e o overlay `local`. O MySQL do overlay usa readiness por TCP (`mysqladmin ping -h 127.0.0.1`,
       pela mesma razão da emenda E2 da `container-readiness`).
-- [ ] `kubectl kustomize k8s/overlays/local` gera os manifestos sem erro.
-- [ ] `scripts/k8s/local-up.sh` sobe tudo: os rollouts de `mysql`, `supplier-simulator` e `workshop-app` concluem.
-- [ ] Verificações: `kubectl get pods -n workshop` com tudo `Running`/`Ready`; `id -u` no pod da aplicação igual a
+- [x] `kubectl kustomize k8s/overlays/local` gera os manifestos sem erro.
+- [x] `scripts/k8s/local-up.sh` sobe tudo: os rollouts de `mysql`, `supplier-simulator` e `workshop-app` concluem.
+- [x] Verificações: `kubectl get pods -n workshop` com tudo `Running`/`Ready`; `id -u` no pod da aplicação igual a
       `10001`; `kubectl get svc -n workshop -o yaml` sem `8081`; `POST http://localhost:18080/api/auth/login` com o
       `admin` devolve `200` e token; `kubectl top pods -n workshop` mostra métricas.
-- [ ] `kubectl apply --dry-run=server -k k8s/overlays/local` sem erro (critério de aceite da functional-spec).
-- [ ] Rollout de imagem nova (rebuild com outra tag e `kubectl set image`) e `kubectl rollout undo` voltando à anterior.
-- [ ] Commit: `feat(platform): add Kubernetes base manifests and kind overlay`.
-- **Status:** Pendente.
+- [x] `kubectl apply --dry-run=server -k k8s/overlays/local` sem erro (critério de aceite da functional-spec).
+- [x] Rollout de imagem nova (rebuild com outra tag e `kubectl set image`) e `kubectl rollout undo` voltando à anterior.
+- [x] Commit: `feat(platform): add Kubernetes base manifests and kind overlay`.
+- **Status:** Concluído em 2026-10-24.
+
+**Evidência Checkpoint 1:**
+- `kubectl get pods -n workshop`:
+  ```text
+  NAME                                  READY   STATUS    RESTARTS   AGE
+  mysql-0                               1/1     Running   0          2m21s
+  supplier-simulator-6589f5958c-fpkcn   1/1     Running   0          65s
+  workshop-app-6cb5597c4b-hpdcp         1/1     Running   0          65s
+  ```
+- `kubectl -n workshop exec deploy/workshop-app -- id -u`: `10001`
+- `kubectl get svc -n workshop -o yaml | Select-String 8081`: sem correspondência (apenas portas 80 e 8080 expostas).
+- `POST http://localhost:18080/api/auth/login`: HTTP 200 OK devolvendo JWT válido.
+- `kubectl top pods -n workshop`:
+  ```text
+  NAME                                  CPU(cores)   MEMORY(bytes)   
+  mysql-0                               17m          455Mi           
+  supplier-simulator-6589f5958c-fpkcn   3m           65Mi            
+  workshop-app-6cb5597c4b-hpdcp         66m          373Mi           
+  ```
+- `kubectl apply --dry-run=server -k k8s/overlays/local`: zero erros.
+- `rollout set image` para `workshop-management-system:test-tag` e `rollout undo`: imagem voltou com sucesso para `workshop-management-system:local`.
 
 ### 2. Carga e calibração do HPA no kind
 

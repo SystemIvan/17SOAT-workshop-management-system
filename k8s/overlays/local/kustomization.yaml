@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Local kind cluster "wms" (scripts/k8s/local-up.sh): MySQL runs in the cluster, the image is loaded with
+# `kind load docker-image` and the API is reached on http://localhost:18080 (see kind-config.yaml).
+namespace: workshop
+
+resources:
+  - ../../base
+  - mysql.yaml
+
+images:
+  - name: workshop-management-system
+    newTag: local
+
+patches:
+  - target:
+      kind: Service
+      name: workshop-app
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: NodePort
+      - op: add
+        path: /spec/ports/0/nodePort
+        value: 30080
+  # Same profile and demonstration seeds as the docker-compose stack.
+  - target:
+      kind: ConfigMap
+      name: workshop-app-config
+    patch: |-
+      - op: add
+        path: /data/SPRING_PROFILES_ACTIVE
+        value: dev
+      - op: add
+        path: /data/APP_SEED_ENABLED
+        value: "true"

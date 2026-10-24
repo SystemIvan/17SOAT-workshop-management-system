@@ -1,0 +1,13 @@
+# kind cluster used by scripts/k8s/local-up.sh. The NodePort 30080 of the workshop-app Service is published on
+# http://localhost:18080, away from the ports used by docker-compose (8080, 3306, 8089, 8025, 1025).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: wms
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.30.0
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 18080
+        listenAddress: "127.0.0.1"
+        protocol: TCP
