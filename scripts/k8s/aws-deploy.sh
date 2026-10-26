@@ -53,8 +53,9 @@ kubectl -n "${NAMESPACE}" create configmap supplier-simulator-mappings \
   --from-file="$(native_path "${ROOT_DIR}/docker/wiremock/mappings")" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-# Prepare temporary kustomization overlay
-TMP_DIR="$(mktemp -d)"
+# Prepare temporary kustomization overlay within k8s/overlays to preserve relative paths
+TMP_DIR="${ROOT_DIR}/k8s/overlays/.tmp_deploy_$$"
+mkdir -p "${TMP_DIR}"
 cleanup() {
   rm -rf "${TMP_DIR}"
 }
@@ -62,14 +63,13 @@ trap cleanup EXIT
 
 IMAGE_NAME="${IMAGE%:*}"
 IMAGE_TAG="${IMAGE##*:}"
-OVERLAY_PATH="$(native_path "${ROOT_DIR}/k8s/overlays/aws")"
 
 cat <<EOF > "${TMP_DIR}/kustomization.yaml"
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - ${OVERLAY_PATH}
+  - ../aws
 
 images:
   - name: workshop-management-system

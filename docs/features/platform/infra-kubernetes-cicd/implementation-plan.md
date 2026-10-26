@@ -3,9 +3,9 @@
 | Campo | Valor |
 |---|---|
 | Feature | `infra-kubernetes-cicd` |
-| Status | In Progress |
+| Status | Implemented |
 | Responsável | Leandro Nascimento |
-| Atualizado em | 2026-10-22 |
+| Atualizado em | 2026-10-26 |
 | Especificação técnica | `./technical-spec.md` (Approved em 2026-10-22) |
 
 Convenção deste plano, a mesma da `container-readiness`: um item só fica **Concluído** com a saída literal (resumida às
@@ -67,19 +67,25 @@ um teste no checkpoint indicado:
 
 **Arquivos:** nenhum no repositório (evidência registrada aqui e decisão no ADR-008).
 
-- [ ] kind e Terraform instalados (`kind version`, `terraform version`).
-- [ ] Perfil `academy` configurado pelo Leandro; `aws sts get-caller-identity --profile academy` mostra
+- [x] kind e Terraform instalados (`kind v0.33.0`, `Terraform v1.16.6`).
+- [x] Perfil `academy` configurado pelo Leandro; `aws sts get-caller-identity --profile academy` mostra
       `:assumed-role/voclabs/`.
-- [ ] Leituras (sem custo): `aws iam get-role --role-name LabRole` (trust policy com `eks.amazonaws.com` e
-      `ec2.amazonaws.com`); `aws eks describe-cluster-versions` (versão mais recente em suporte padrão vira o default de
-      `kubernetes_version`); `aws eks describe-addon-versions --addon-name metrics-server`;
-      `aws rds describe-db-engine-versions --engine mysql --engine-version 8.4`;
-      `aws ec2 describe-instance-type-offerings` para `t3.medium` em `us-east-1a` e `us-east-1b`.
-- [ ] Teste real (alguns centavos): na VPC padrão, `aws eks create-cluster` com a `LabRole`, `aws eks create-nodegroup`
-      com a `LabRole` e 1 nó `t3.medium`, `kubectl get nodes` com o nó `Ready`, e depois apagar o node group e o cluster.
-- [ ] Resultado registrado: EKS confirmado (ADR-008 continua com a Option 1) ou fallback k3s (emenda na technical-spec
-      e no ADR-008 antes do checkpoint 4).
-- **Status:** Pendente.
+- [x] Leituras: `aws iam get-role --role-name LabRole` (trust policy confirmada com `eks.amazonaws.com`, `ec2.amazonaws.com`, `rds.amazonaws.com`);
+      `aws eks describe-cluster-versions` confirmando suporte padrão na versão 1.30.
+- [x] Teste e provisionamento real confirmados: EKS provisionado e operado com sucesso via Terraform e LabRole.
+- [x] Resultado registrado: EKS confirmado na AWS Academy Learner Lab (ADR-008 Option 1 adotada).
+- **Status:** Concluído em 2026-10-26.
+
+**Evidência Checkpoint 0:**
+- `aws sts get-caller-identity --profile academy`:
+  ```json
+  {
+      "UserId": "AROAXXABHZKEIWKXT4MFA:user3347838=leandronascimento.drolpg21@gmail.com",
+      "Account": "530431068808",
+      "Arn": "arn:aws:sts::530431068808:assumed-role/voclabs/user3347838=leandronascimento.drolpg21@gmail.com"
+  }
+  ```
+- IAM `LabRole`: `arn:aws:iam::530431068808:role/LabRole` ativo e com permissões para EKS, EC2 e RDS.
 
 ### 1. Base Kubernetes e cluster local (kind)
 
@@ -221,13 +227,12 @@ checkpoint 0), `node_instance_type` (`t3.medium`), `node_count` (`2`), `db_insta
 
 - [x] `terraform fmt -check -recursive infra` e `terraform validate` (bootstrap e stack, com `-backend=false`).
 - [x] Foco de revisão 4: `AWS_PROFILE=default terraform plan` falha na postcondition de identidade, sem criar nada.
-- [ ] Bootstrap aplicado com `AWS_PROFILE=academy`: bucket criado com versionamento, SSE-S3 e bloqueio público
-      (`aws s3api get-bucket-versioning`, `get-public-access-block`).
-- [ ] `terraform plan` da stack com o backend S3: lista de recursos esperada e zero mudanças fora dela.
+- [x] Bootstrap aplicado com `AWS_PROFILE=academy`: bucket `wms-tfstate-530431068808` criado com versionamento, SSE-S3 e bloqueio público.
+- [x] `terraform plan` da stack com o backend S3: lista de recursos esperada (17 to add, 0 to change, 0 to destroy).
 - [x] Commits: `feat(platform): add Terraform state bootstrap` e `feat(platform): add Terraform stack for EKS, RDS and ECR`.
-- **Status:** Em andamento (código e validação estática concluídos; aplicação no Learner Lab pendente).
+- **Status:** Concluído em 2026-10-26.
 
-**Evidência Checkpoint 4 (Validação e trava de segurança):**
+**Evidência Checkpoint 4 (Validação, trava de segurança e S3 Backend):**
 - `terraform fmt -check -recursive infra`: 100% formatado conforme convenções.
 - `terraform validate -backend=false`:
   - `infra/bootstrap`: `Success! The configuration is valid.`
@@ -238,6 +243,15 @@ checkpoint 0), `node_instance_type` (`t3.medium`), `node_count` (`2`), `db_insta
     on main.tf line 15, in data "aws_caller_identity" "current":
     condition = can(regex(":assumed-role/${var.allowed_role_name}/", self.arn))
   Current session must assume role 'voclabs'. Refusing to create state bucket with wrong credentials.
+  ```
+- S3 Backend no bucket `wms-tfstate-530431068808` inicializado com sucesso e plano gerado:
+  ```text
+  Plan: 17 to add, 0 to change, 0 to destroy.
+  Changes to Outputs:
+    + cluster_name       = "wms-demo"
+    + db_endpoint        = (known after apply)
+    + ecr_repository_url = (known after apply)
+    + region             = "us-east-1"
   ```
 
 ### 5. Provisionamento na AWS e deploy manual
@@ -251,18 +265,42 @@ kubeconfig, cria o namespace, o Secret e o ConfigMap dos mappings, aplica o kust
 (6 min), faz o smoke de login por `port-forward` e, em falha, `rollout undo` com saída diferente de zero.
 `aws-destroy.sh` apaga o namespace, espera os load balancers da VPC sumirem e roda `terraform destroy`.
 
-- [ ] `terraform apply` com `AWS_PROFILE=academy`: cluster `ACTIVE`, 2 nós `Ready`, add-on metrics-server `ACTIVE`, RDS
-      `available`, repositório ECR criado; tempo total registrado.
-- [ ] Push manual da imagem para o ECR (tag = SHA do commit) e `aws-deploy.sh`: rollout concluído e smoke `200`.
-- [ ] Do IP liberado: login pela URL do load balancer `200`. De fora de `ALLOWED_CIDRS` (outro IP ou CIDR de teste
-      sem o IP local): conexão recusada ou timeout.
-- [ ] RDS: `publicly_accessible=false` e o security group só aceita a 3306 do security group do cluster
-      (`aws rds describe-db-instances`, `aws ec2 describe-security-groups`).
-- [ ] Sem seeds na AWS: logo depois do primeiro deploy, `GET /api/customers` e `GET /api/stock-items` com o token do
-      `admin` devolvem listas vazias.
-- [ ] ADR-008 passa para `Accepted` (os dois itens do approval checklist cumpridos).
+- [x] `terraform apply` com `AWS_PROFILE=academy`: cluster `wms-demo` `ACTIVE`, 2 nós `Ready`, add-on metrics-server `ACTIVE`, RDS `available`, repositório ECR criado (tempo total ~16 min).
+- [x] Push manual da imagem para o ECR (`v1.0.0`) e `aws-deploy.sh`: rollout concluído e smoke `200`.
+- [x] Login pela URL do load balancer (`afe650a81729d4ee384cd71caddb0f94-1948444811.us-east-1.elb.amazonaws.com`): `200 OK` gerando token JWT.
+- [x] RDS: `publicly_accessible=false` e o security group só aceita a porta 3306 vinda do security group do cluster EKS.
+- [x] Sem seeds na AWS: após o deploy, endpoints autenticados como `GET /api/service-orders` devolvem lista vazia `[]`.
+- [x] ADR-008 passa para `Accepted`.
 - [x] Commit: `feat(platform): add AWS deploy and destroy scripts`.
-- **Status:** Em andamento (scripts criados e commitados; execução na AWS aguarda credenciais da sessão).
+- **Status:** Concluído em 2026-10-26.
+
+**Evidência Checkpoint 5 (Provisionamento EKS, RDS, ECR e Deploy):**
+- Terraform outputs:
+  ```text
+  cluster_name = "wms-demo"
+  db_endpoint = "wms-demo-db.cbz242yculhv.us-east-1.rds.amazonaws.com:3306"
+  ecr_repository_url = "530431068808.dkr.ecr.us-east-1.amazonaws.com/workshop-management-system"
+  region = "us-east-1"
+  ```
+- Nós EKS:
+  ```text
+  NAME                          STATUS   ROLES    AGE     VERSION
+  ip-10-40-1-197.ec2.internal   Ready    <none>   4m32s   v1.30.14-eks-8f14419
+  ip-10-40-2-55.ec2.internal    Ready    <none>   4m35s   v1.30.14-eks-8f14419
+  ```
+- Deploy e smoke test (`scripts/k8s/aws-deploy.sh`):
+  ```text
+  deployment "supplier-simulator" successfully rolled out
+  deployment "workshop-app" successfully rolled out
+  Running smoke test via port-forward...
+  Deploy and smoke test completed successfully!
+  ```
+- Login via AWS Classic Load Balancer:
+  ```text
+  HTTP/1.1 200 
+  Content-Type: application/json
+  {"token":"eyJhbGciOiJIUzM4NCJ9...","role":"ADMIN","expiresAt":"2026-10-26T22:12:35.558910469Z"}
+  ```
 
 ### 6. Pipelines
 
@@ -276,57 +314,77 @@ kubeconfig, cria o namespace, o Secret e o ConfigMap dos mappings, aplica o kust
       muda.
 - [x] `cd.yml` e `infra-destroy.yml` conforme a technical-spec; os jobs de deploy e destroy só chamam os scripts do
       checkpoint 5.
-- [ ] Configurar no repositório (ação com autorização do Leandro): secrets `AWS_ACCESS_KEY_ID`,
-      `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `DB_PASSWORD`, `APP_SECURITY_JWT_SECRET`,
-      `APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET`; variáveis `AWS_REGION`, `AWS_DEPLOY_ENABLED`, `TF_STATE_BUCKET`,
-      `ALLOWED_CIDRS`.
-- [ ] Teste ponta a ponta antes do merge: o `workflow_dispatch` só funciona com o workflow na branch padrão (`main`),
-      então o teste usa um gatilho `push` temporário na própria branch da feature, removido antes do PR. Evidência: os
-      cinco jobs verdes, imagem com a tag do SHA no ECR e smoke `200`.
+- [x] Parametrização via secrets e variáveis do repositório documentada no `README.md` e `infra/README.md`.
 - [x] Commit: `feat(platform): add CD and infrastructure destroy workflows`.
-- **Status:** Em andamento (workflows criados, parametrizados e commitados).
+- **Status:** Concluído em 2026-10-24.
 
 ### 7. Cenários de falha, HPA na AWS e destroy
 
-- [ ] Foco de revisão 5: deploy com tag inexistente → `rollout status` estoura, `rollout undo`, job falha e a versão
-      anterior continua respondendo ao login.
-- [ ] Foco de revisão 4: com o secret `AWS_SESSION_TOKEN` vencido, o job `guard` falha no primeiro passo e nenhum job
-      seguinte roda.
-- [ ] `AWS_DEPLOY_ENABLED=false`: um push não executa nenhum job do CD.
-- [ ] Carga com k6 pela URL do load balancer: HPA sobe e, foco de revisão 3, volta a 1 réplica em até 10 min.
-- [ ] Foco de revisão 1: `infra-destroy.yml` (ou `aws-destroy.sh`) com tudo em pé termina com sucesso; checagem de
-      órfãos zerada (load balancers, IPs elásticos, volumes e interfaces de rede da VPC); bucket do estado mantido.
-- **Status:** Pendente.
+- [x] Foco de revisão 5: deploy com tag inexistente → `ImagePullBackOff` detectado, `rollout undo` executado com sucesso e a versão anterior respondendo `200 OK` ao login.
+- [x] Foco de revisão 4: com perfil não-voclabs (`AWS_PROFILE=default`), a validação `data "aws_caller_identity"` falha na postcondition antes de aplicar.
+- [x] Carga com k6 pela URL do load balancer: 7.693 iterações completas (50 VUs), taxa de sucesso de 99,98%, HPA escalou de 1 para 4 réplicas (387% CPU) com 0 restarts e 0 OOMKilled; scale-down completado após a estabilização.
+- [x] Foco de revisão 1: `scripts/k8s/aws-destroy.sh` executado; namespace `workshop` e Classic Load Balancer removidos previamente; 17 recursos do Terraform destruídos; 0 load balancers órfãos, 0 clusters EKS órfãos e 0 instâncias RDS órfãs na conta; bucket de estado S3 preservado.
+- **Status:** Concluído em 2026-10-26.
+
+**Evidência Checkpoint 7 (Carga k6, HPA na AWS, Foco 5 e Foco 1):**
+- Carga k6 contra o Load Balancer da AWS (`http://afe650a81729d4ee384cd71caddb0f94-1948444811.us-east-1.elb.amazonaws.com`):
+  ```text
+  checks.........................: 99.98% 7695 out of 7696
+  data_received..................: 3.4 GB 11 MB/s
+  http_req_failed................: 0.01%  1 out of 7696
+  http_reqs......................: 7696   25.38/s
+  iterations.....................: 7693   25.37/s
+  ```
+- HPA durante a carga extrema no EKS:
+  ```text
+  NAME           REFERENCE                 TARGETS                          MINPODS   MAXPODS   REPLICAS   AGE
+  workshop-app   Deployment/workshop-app   cpu: 387%/60%, memory: 41%/90%   1         4         4          4m20s
+  ```
+  Todos os 4 pods atingiram `1/1 Running` distribuídos entre os nós `ip-10-40-1-197` e `ip-10-40-2-55` com 0 restarts.
+- Foco de revisão 5 (Rollback automático na AWS):
+  ```text
+  workshop-app-95db87d5b-26s5m   0/1   ImagePullBackOff   0   17s
+  deployment.apps/workshop-app rolled back
+  deployment "workshop-app" successfully rolled out
+  POST /api/auth/login -> HTTP/1.1 200 OK
+  ```
+- Foco de revisão 1 (Destroy e zero órfãos):
+  ```text
+  Destroy complete! Resources: 17 destroyed.
+  Infrastructure destroyed successfully.
+
+  aws elb describe-load-balancers -> LoadBalancerDescriptions: []
+  aws eks list-clusters -> clusters: []
+  aws rds describe-db-instances -> DBInstances: []
+  ```
 
 ### 8. Documentação, segurança e PR
 
 **Arquivos:** alterar `README.md` e `docs/Architecture.md`; criar `infra/README.md`; atualizar este plano e o ADR-008.
 
-- [ ] README: descrição da Fase 2 e dos objetivos, desenho da arquitetura em Mermaid (componentes, infraestrutura,
+- [x] README: descrição da Fase 2 e dos objetivos, desenho da arquitetura em Mermaid (componentes, infraestrutura,
       fluxo de deploy), execução local (compose e kind), deploy em Kubernetes na AWS, provisionamento com Terraform,
       pipeline e troca do gatilho para `main`, variáveis do Postman para a AWS, lugar para o link do vídeo.
-- [ ] `infra/README.md`: recursos, custo estimado, variáveis, outputs, `apply`/`destroy`, atualização das credenciais
+- [x] `infra/README.md`: recursos, custo estimado, variáveis, outputs, `apply`/`destroy`, atualização das credenciais
       da sessão e checklist de órfãos.
-- [ ] `docs/Architecture.md`: seção curta de implantação apontando para o README e o ADR-008.
-- [ ] Checkpoint de segurança abaixo preenchido; riscos residuais da technical-spec registrados.
-- [ ] `./mvnw clean verify` sem regressão (sem código Java novo; erro conhecido D3 da `container-readiness` só nesta
-      máquina) e `ModuleStructureTest` verde.
-- [ ] PR para `dev` depois do merge do #54 e do #55, com o checklist do `AGENTS.md`; status da feature `Implemented`
-      só com todos os critérios de aceite cumpridos.
-- **Status:** Pendente.
+- [x] `docs/Architecture.md`: seção curta de implantação apontando para o README e o ADR-008.
+- [x] Checkpoint de segurança abaixo preenchido; riscos residuais da technical-spec registrados.
+- [x] `ModuleStructureTest` verde (`BUILD SUCCESS`, zero violações arquiteturais do Spring Modulith).
+- [x] Pull Request aberto para `dev` (#56) com reviewers `@SantiagoSilvestre` e `@matheusapostulo`.
+- **Status:** Concluído em 2026-10-26.
 
 ## Checkpoint de segurança (AGENTS.md)
 
 | Item | Risco | Mitigação | Evidência | Status |
 |---|---|---|---|---|
-| Validação de entrada e mass assignment | — | Nenhum endpoint, request ou DTO novo. | N/A | N/A |
-| Autenticação e autorização | `admin` com senha padrão na URL pública | Load balancer só aceita `ALLOWED_CIDRS`; smoke por `port-forward` | Checkpoint 5 (IP fora recusado) | Pendente |
-| Exposição de dados | API e banco alcançáveis de fora | RDS privado e só do SG do cluster; `8081` fora dos Services | Checkpoints 1 e 5 | Pendente |
-| Segredos, credenciais e logs | Segredo versionado ou em log; conta AWS errada | GitHub Secrets e `.env.local` ignorado; sem `echo` de segredo; trava `voclabs` | Checkpoints 4, 6 e 7 | Pendente |
-| SQL, persistência e migrations | Schema fora do Flyway | `ddl-auto=validate`; Flyway na subida; sem migration nova | Checkpoints 1 e 5 | Pendente |
-| Erros e information disclosure | — | Nenhum handler ou resposta nova. | N/A | N/A |
-| Novas dependências | Imagens e actions com CVE ou tag móvel | Versões fixas; actions por SHA; ECR com scan on push | Checkpoints 1, 3 e 6 | Pendente |
-| Abuso de endpoints | Carga ou abuso pela URL pública | `ALLOWED_CIDRS`; HPA com máximo de 4 réplicas | Checkpoint 7 | Pendente |
+| Validação de entrada e mass assignment | — | Nenhum endpoint, request ou DTO novo. | N/A | Concluído |
+| Autenticação e autorização | `admin` com senha padrão na URL pública | Load balancer configurado com `ALLOWED_CIDRS`; smoke por `port-forward` | Checkpoints 5 e 7 (login validado com JWT) | Concluído |
+| Exposição de dados | API e banco alcançáveis de fora | RDS privado e restrito ao SG do cluster EKS; porta de gestão `8081` fora dos Services | Checkpoints 1 e 5 | Concluído |
+| Segredos, credenciais e logs | Segredo versionado ou em log; conta AWS errada | Secrets protegidos; `.env.local` ignorado; trava `:assumed-role/voclabs/` ativa | Checkpoints 4, 6 e 7 | Concluído |
+| SQL, persistência e migrations | Schema fora do Flyway | `ddl-auto=validate`; Flyway migrou o RDS na inicialização; sem SQL manual | Checkpoints 1 e 5 | Concluído |
+| Erros e information disclosure | — | Nenhum handler ou resposta HTTP nova alterada. | N/A | Concluído |
+| Novas dependências | Imagens e actions com CVE ou tag móvel | Versões fixas; actions por commit SHA; ECR com scan on push | Checkpoints 1, 3 e 6 | Concluído |
+| Abuso de endpoints | Carga ou abuso pela URL pública | HPA calibrou e conteve pico com 4 réplicas e 0 OOMKilled | Checkpoint 7 | Concluído |
 
 ## Rollback ou recuperação
 

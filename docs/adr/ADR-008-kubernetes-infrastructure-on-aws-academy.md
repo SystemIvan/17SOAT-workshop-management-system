@@ -1,8 +1,8 @@
 # ADR 008: Infraestrutura Kubernetes na AWS Academy com Terraform e GitHub Actions
 
-**Status:** Proposed
+**Status:** Accepted
 
-**Date:** 2026-10-22
+**Date:** 2026-10-26
 
 **Deciders:** Leandro Nascimento
 
@@ -115,12 +115,12 @@ Option 2 passa a valer por emenda deste ADR e da technical-spec da feature `infr
 ## Approval Checklist
 
 - [x] Technical-spec da `infra-kubernetes-cicd` aprovada (Leandro Nascimento, 2026-10-22).
-- [ ] Teste do checkpoint 0 confirma o EKS com a `LabRole` no Learner Lab.
+- [x] Teste do checkpoint 0 e validação no Learner Lab confirmam o EKS com a `LabRole` (2026-10-26).
 
 ---
 
-**Last Updated:** 2026-10-22
+**Last Updated:** 2026-10-26
 
 **Decision Maker:** Leandro Nascimento
 
-**Status:** Proposed, aguardando a aprovação da technical-spec e o checkpoint 0.
+**Status:** Accepted.

@@ -40,6 +40,7 @@ fi
 
 echo "Running terraform destroy in ${INFRA_DIR}..."
 cd "${INFRA_DIR}"
-terraform destroy -auto-approve -input=false
+DESTROY_PASS="${DB_PASSWORD:-placeholderForDestroy123!}"
+terraform destroy -auto-approve -input=false -var="db_password=${DESTROY_PASS}"
 
 echo "Infrastructure destroyed successfully."
