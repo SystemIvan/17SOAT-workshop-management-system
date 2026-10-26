@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# AWS overlay for EKS: exposes workshop-app via a LoadBalancer (restricted at deploy time with ALLOWED_CIDRS),
+# disables demonstration seeds and runs with the standard profile. Image URL and tag are patched dynamically
+# at deploy time by scripts/k8s/aws-deploy.sh using a temporary kustomization.
+namespace: workshop
+
+resources:
+  - ../../base
+
+patches:
+  - target:
+      kind: Service
+      name: workshop-app
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: LoadBalancer
+  - target:
+      kind: ConfigMap
+      name: workshop-app-config
+    patch: |-
+      - op: add
+        path: /data/APP_SEED_ENABLED
+        value: "false"

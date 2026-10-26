@@ -35,23 +35,36 @@ Caso o GNU Make não esteja disponível, execute diretamente:
 docker compose up -d --build
 ```
 
-**Tempo de inicialização:** todos os containers iniciam automaticamente. O MySQL pode levar até 90 segundos para se tornar saudável (o script `wait-for-mysql.sh` aguarda a inicialização do InnoDB). A aplicação fica pronta em aproximadamente 3 minutos. Para monitorar o progresso:
+**Tempo de inicialização:** todos os containers iniciam automaticamente. O serviço `app` só é iniciado depois que o
+healthcheck do `mysql` passa, e esse healthcheck testa a conexão TCP, então a aplicação não sobe antes de o banco
+aceitar conexões (detalhes em [DOCKER.md](DOCKER.md)). Na primeira subida, com o volume do MySQL vazio, o banco é
+inicializado antes de ficar saudável (cerca de 1 minuto na máquina de referência) e a aplicação fica `healthy` cerca de
+1 minuto depois, com as migrations do Flyway aplicadas. Nas subidas seguintes, o MySQL fica pronto em cerca de 10
+segundos. A primeira execução também compila a imagem (cerca de 3 minutos). Para monitorar o progresso:
 
 ```bash
+docker compose ps
 docker logs -f workshop-app
 ```
 
 Aguarde as mensagens:
-```
-⏳ Aguardando MySQL em mysql:3306...
-✓ MySQL autenticação bem-sucedida - iniciando aplicação
-🚀 Iniciando aplicação...
-Tomcat started on port 8080
+
+```text
+Tomcat started on port 8080 (http) with context path '/'
+Tomcat started on port 8081 (http) with context path '/'
+Started WorkshopManagementSystemApplication in ... seconds
 ```
 
 O ambiente Docker local utiliza o perfil `dev` e carrega dados de demonstração idempotentes de Customer e Stock Item.
 Copie `.env.example` para `.env` para alterar esse comportamento. Os seeds ficam desativados no perfil padrão da
 aplicação.
+
+A aplicação também escuta na porta de gestão `8081`, que serve apenas os probes de saúde (`GET` anônimo):
+`/actuator/health/liveness`, `/actuator/health/readiness` e `/actuator/health`. Qualquer outro caminho de gestão
+responde `401`, mesmo com JWT válido. No Docker, a `8081` não é publicada no host; o healthcheck do serviço `app` usa o
+readiness e o serviço aparece como `healthy` quando a aplicação terminou de subir e o MySQL está acessível (detalhes,
+`JAVA_OPTS` e `DB_PORT` em [DOCKER.md](DOCKER.md)). Executando fora do Docker com `make run-dev`, os probes ficam em
+`http://localhost:8081/actuator/health/readiness` e equivalentes.
 
 Todos os endpoints administrativos exigem JWT (consulte `docs/adr/ADR-003-authentication-strategy.md`). As exceções
 são os dois endpoints do gateway externo de aprovação do Customer, autenticados por assinatura HMAC
@@ -675,3 +688,170 @@ aplicação em vez de enviados:
 make docker-up
 docker compose logs app | grep -i "status change notification"
 ```
+
+## Fase 2 — Infraestrutura Kubernetes, IaC e CI/CD
+
+Esta seção documenta a arquitetura de implantação em nuvem, orquestração Kubernetes, provisionamento via Terraform e esteira de CI/CD implementados para o Tech Challenge (Fase 2).
+
+---
+
+### Vídeo de Apresentação da Fase 2
+
+> [!NOTE]
+> **Link do Vídeo no YouTube:** [Assista à demonstração da Fase 2 no YouTube](https://youtu.be/DEMO_PLACEHOLDER) *(placeholder: insira o link final da gravação aqui)*.
+
+---
+
+### 1. Arquitetura de Infraestrutura na AWS
+
+A infraestrutura é provisionada como código com Terraform na região `us-east-1` (AWS Academy Learner Lab), garantindo isolamento de rede, resiliência e controle de custos:
+
+```mermaid
+graph TD
+    subgraph Internet ["Internet Pública"]
+        DevOps["Equipe / Postman (ALLOWED_CIDRS)"]
+        GitHubActions["GitHub Actions (Runner)"]
+    end
+
+    subgraph AWS ["AWS Cloud (us-east-1)"]
+        subgraph VPC ["VPC 10.40.0.0/16"]
+            IGW["Internet Gateway"]
+
+            subgraph PublicSubnets ["Sub-redes Públicas (us-east-1a / us-east-1b)"]
+                NLB["Network / Classic Load Balancer (:80)"]
+                
+                subgraph EKS ["EKS Cluster wms-demo (K8s 1.30)"]
+                    subgraph NodeGroup ["Managed Node Group (2x t3.medium)"]
+                        AppPod1["Pod: workshop-app (App)"]
+                        AppPod2["Pod: workshop-app (HPA Replica)"]
+                        SimPod["Pod: supplier-simulator (WireMock)"]
+                        MetricsServer["Pod: metrics-server"]
+                    end
+                end
+            end
+
+            subgraph PrivateSubnets ["Sub-redes Privadas (us-east-1a / us-east-1b)"]
+                RDS["RDS MySQL 8.4 (db.t3.micro, gp3)"]
+            end
+        end
+
+        ECR["AWS ECR: workshop-management-system"]
+        S3State["S3 Bucket: wms-tfstate-<account_id> (Lock nativo)"]
+    end
+
+    DevOps -->|HTTP :80| NLB
+    GitHubActions -->|OIDC / STS voclabs| EKS
+    NLB -->|NodePort| AppPod1
+    NLB -->|NodePort| AppPod2
+    AppPod1 -->|HTTP :8080| SimPod
+    AppPod1 -->|TCP :3306 (TLS)| RDS
+    AppPod2 -->|TCP :3306 (TLS)| RDS
+    EKS -->|Image Pull| ECR
+    NodeGroup -->|HPA Metrics| MetricsServer
+```
+
+---
+
+### 2. Fluxo da Pipeline de Entrega Contínua (CI/CD)
+
+A entrega automatizada no GitHub Actions garante qualidade de código, lint estático da infraestrutura e deploy com smoke test e recuperação automática:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as Desenvolvedor
+    participant GH as GitHub Actions (CD)
+    participant ECR as AWS ECR
+    participant TF as Terraform (S3 Backend)
+    participant EKS as AWS EKS Cluster
+    participant App as Pod workshop-app
+
+    Dev->>GH: Push na branch 'dev' (ou manual workflow_dispatch)
+    Note over GH: 1. Guard Job: Valida credenciais e role voclabs
+    Note over GH: 2. Quality Gate: ./mvnw clean verify (80% cobertura)
+    Note over GH: 3. Infra Job: terraform apply (VPC, EKS, RDS, ECR)
+    GH->>TF: terraform apply -auto-approve
+    TF-->>GH: Outputs (cluster_name, ecr_url, db_endpoint)
+    Note over GH: 4. Image Job: docker build & push com tag do SHA
+    GH->>ECR: Push da imagem com SHA do commit
+    Note over GH: 5. Deploy Job: Executa scripts/k8s/aws-deploy.sh
+    GH->>EKS: kubectl apply -k (overlay AWS dinâmico com tag do SHA)
+    EKS->>App: RollingUpdate com novos Pods
+    GH->>App: Port-forward & Smoke test (POST /api/auth/login)
+    alt Smoke test HTTP 200 OK
+        GH-->>Dev: Pipeline verde (Deploy concluído com sucesso)
+    else Falha no rollout ou smoke test
+        GH->>EKS: kubectl rollout undo deployment/workshop-app
+        GH-->>Dev: Pipeline falha (Versão anterior restaurada)
+    end
+```
+
+---
+
+### 3. Execução em Kubernetes Local (Kind)
+
+Para testar os manifestos de orquestração localmente com os mesmos padrões de produção:
+
+1. **Pré-requisitos:** Docker Desktop em execução, `kind` (v0.33+) e `kubectl`.
+2. **Subir o ambiente completo:**
+   ```bash
+   bash scripts/k8s/local-up.sh
+   ```
+   * O script cria o cluster Kind `wms`, compila a imagem local `workshop-management-system:local`, injeta no nó e aplica os manifestos de MySQL, simulador WireMock, `metrics-server` e aplicação.
+   * **API disponível em:** `http://localhost:18080` (NodePort mapeado).
+   * **Login de teste:** `POST http://localhost:18080/api/auth/login` (`admin` / `changeme123`).
+
+3. **Executar teste de carga e validar HPA:**
+   ```bash
+   docker run --rm -i -e BASE_URL=http://host.docker.internal:18080 grafana/k6:0.54.0 run - < scripts/load/service-orders-load.js
+   ```
+   * O teste gera 50 VUs concorrentes e demonstra o HPA escalando de 1 para 4 réplicas e retornando automaticamente para 1 após o término da carga.
+
+4. **Encerrar o ambiente local:**
+   ```bash
+   bash scripts/k8s/local-down.sh
+   ```
+
+---
+
+### 4. Provisionamento e Deploy na Nuvem (AWS)
+
+1. **Bootstrap do Estado Remoto (S3):**
+   ```bash
+   cd infra/bootstrap
+   export AWS_PROFILE=academy
+   terraform init && terraform apply
+   ```
+2. **Provisionamento da Stack (VPC, EKS, RDS, ECR):**
+   ```bash
+   cd ../
+   export TF_STATE_BUCKET="wms-tfstate-<account_id>"
+   terraform init -backend-config="bucket=${TF_STATE_BUCKET}" -backend-config="region=us-east-1"
+   terraform apply -var="db_password=SuaSenhaForte123!"
+   ```
+3. **Deploy Automatizado:**
+   ```bash
+   export DB_ENDPOINT="$(terraform output -raw db_endpoint)"
+   export IMAGE="$(terraform output -raw ecr_repository_url):latest"
+   export DB_PASSWORD="SuaSenhaForte123!"
+   export APP_SECURITY_JWT_SECRET="segredo-jwt-com-ao-menos-32-bytes-seguro"
+   export APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET="segredo-hmac-para-gateway-externo"
+
+   bash scripts/k8s/aws-deploy.sh
+   ```
+
+4. **Destruição Completa (Teardown):**
+   Para evitar consumo de créditos do laboratório:
+   ```bash
+   bash scripts/k8s/aws-destroy.sh
+   ```
+
+---
+
+### 5. Coleção Postman e Testes na AWS
+
+Para testar a aplicação hospedada no EKS via Postman:
+1. Abra a coleção `docs/api/postman/workshop-management-system.postman_collection.json`.
+2. Altere a variável de ambiente `baseUrl` de `http://localhost:8080` para a URL pública gerada pelo Load Balancer do EKS (ex: `http://a1b2c3d4e5...us-east-1.elb.amazonaws.com`).
+3. Certifique-se de que o seu IP de saída está contido na variável `ALLOWED_CIDRS` configurada no deploy.
+

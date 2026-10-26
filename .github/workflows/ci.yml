@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_call:
   pull_request:
     branches:
       - dev
@@ -18,6 +19,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  infra-lint:
+    name: Infra lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        # actions/checkout v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Set up Terraform
+        # hashicorp/setup-terraform v3
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
+        with:
+          terraform_version: "1.16.6"
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive infra
+
+      - name: Validate Terraform bootstrap configuration
+        run: |
+          terraform -chdir=infra/bootstrap init -backend=false
+          terraform -chdir=infra/bootstrap validate
+
+      - name: Validate Terraform stack configuration
+        run: |
+          terraform -chdir=infra init -backend=false
+          terraform -chdir=infra validate
+
+      - name: Validate Kubernetes manifests with kubeconform
+        run: |
+          kubectl kustomize k8s/overlays/local | docker run --rm -i ghcr.io/yannh/kubeconform:v0.6.7 -strict -summary
+          kubectl kustomize k8s/overlays/aws | docker run --rm -i ghcr.io/yannh/kubeconform:v0.6.7 -strict -summary
+
   quality-gate:
     name: Quality gate
     runs-on: ubuntu-24.04

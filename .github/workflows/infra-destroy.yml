@@ -1,0 +1,59 @@
+name: Infrastructure Destroy
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Type 'destroy' to confirm infrastructure teardown"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-pipeline
+  cancel-in-progress: false
+
+jobs:
+  destroy:
+    name: Teardown Infrastructure
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    if: ${{ github.event.inputs.confirmation == 'destroy' }}
+
+    steps:
+      - name: Check out repository
+        # actions/checkout v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Configure AWS credentials
+        # aws-actions/configure-aws-credentials v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Set up Terraform
+        # hashicorp/setup-terraform v3
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
+        with:
+          terraform_version: "1.16.6"
+
+      - name: Initialize Terraform backend
+        env:
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+        run: |
+          terraform -chdir=infra init \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="region=${{ vars.AWS_REGION || 'us-east-1' }}"
+
+      - name: Run AWS destroy script
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+          CLUSTER_NAME: wms-demo
+        run: bash scripts/k8s/aws-destroy.sh

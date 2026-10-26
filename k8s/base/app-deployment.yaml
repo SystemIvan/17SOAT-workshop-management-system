@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workshop-app
+  labels:
+    app.kubernetes.io/name: workshop-app
+    app.kubernetes.io/part-of: workshop-management-system
+spec:
+  # No "replicas": the HorizontalPodAutoscaler owns the replica count, and a fixed value would be reapplied on every
+  # deploy.
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: workshop-app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: workshop-app
+        app.kubernetes.io/part-of: workshop-management-system
+    spec:
+      automountServiceAccountToken: false
+      # Longer than spring.lifecycle.timeout-per-shutdown-phase (30 s) plus the preStop pause.
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: workshop-management-system
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+            # Health probes only; never exposed by a Service.
+            - name: management
+              containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: workshop-app-config
+            - secretRef:
+                name: workshop-app-secrets
+          resources:
+            requests:
+              cpu: 250m
+              memory: 768Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          # Flyway and the Spring context can take a while; liveness only starts once startup succeeds.
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: management
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 36
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: management
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          lifecycle:
+            # Gives the endpoint time to leave the Service before SIGTERM starts the graceful shutdown.
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            # Tomcat and the JVM need a writable /tmp (container-readiness, read-only filesystem evidence).
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

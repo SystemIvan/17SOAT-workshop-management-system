@@ -10,8 +10,9 @@ any bounded context or epic, not tied to one contributor.
 `docs/adr/` uses sequential numbers: `ADR-001-escolha-do-banco-de-dados.md`,
 `ADR-002-realtime-updates-strategy.md`, `ADR-003-authentication-strategy.md`,
 `ADR-004-notifications-boundary.md`, `ADR-005-inter-module-integration-contract.md`,
-`ADR-006-average-service-execution-time.md`, `ADR-007-external-gateway-hmac-authentication.md`. Any new ADR must use
-the next free sequential number (currently 008) — do not reuse 001–007. Check `docs/adr/` before creating one.
+`ADR-006-average-service-execution-time.md`, `ADR-007-external-gateway-hmac-authentication.md`,
+`ADR-008-kubernetes-infrastructure-on-aws-academy.md`. Any new ADR must use the next free sequential number
+(currently 009) — do not reuse 001–008. Check `docs/adr/` before creating one.
 
 ## Per-epic local rules
 

@@ -1,0 +1,15 @@
+# Example variable values for local Terraform planning or manual execution.
+# Copy this file to terraform.tfvars (ignored by git) and set real values.
+
+region             = "us-east-1"
+cluster_name       = "wms-demo"
+kubernetes_version = "1.30"
+node_instance_type = "t3.medium"
+node_count         = 2
+db_instance_class  = "db.t3.micro"
+db_engine_version  = "8.4"
+db_username        = "workshop_app"
+db_password        = "ChangeMeToAStrongPassword123!"
+vpc_cidr           = "10.40.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b"]
+allowed_role_name  = "voclabs"

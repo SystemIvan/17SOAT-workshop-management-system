@@ -112,6 +112,52 @@ A feature `average-service-execution-time` implementa a decisão AD-019 ratifica
 - Domínio, casos de uso, persistência, migration, endpoint, autorização e OpenAPI possuem cobertura automatizada; o
   roteiro Postman executa a consulta imediatamente depois da conclusão de uma execução.
 
+## Atualização de implementação — 06 de outubro de 2026: Container Readiness (I)
+
+A feature `container-readiness` (tarefa K8S-1) prepara a aplicação para probes de orquestrador. Esta atualização
+substitui, para o estado vigente, as menções da baseline de 10 de agosto à ausência de Actuator.
+
+- O Spring Boot Actuator expõe somente o endpoint `health`, na porta de gestão `8081`, separada da porta de negócio
+  `8080`: `/actuator/health/liveness` (só `livenessState`), `/actuator/health/readiness` (`readinessState` e banco) e
+  o agregado `/actuator/health`. As respostas trazem apenas o status (o agregado também lista os nomes dos grupos).
+- Uma `SecurityFilterChain` dedicada (`@Order(1)`, `securityMatcher("/actuator/**")`, módulo `identity`) libera só
+  `GET` nesses três caminhos e nega todo o resto com `401`; ela não autentica, então um JWT válido não concede acesso.
+  A matriz de autorização de negócio não mudou.
+- `ContainerProbesIntegrationTest` sobe a aplicação com porta de gestão separada e prova: probes sem token na
+  porta de gestão, `401` para os demais caminhos e métodos, `401` nos caminhos de health na porta de negócio e
+  readiness `503` com liveness `200` quando o indicador do banco falha.
+- `server.shutdown=graceful` com `spring.lifecycle.timeout-per-shutdown-phase=30s`.
+- Imagem: build com `./mvnw` sobre `eclipse-temurin:21.0.12.1_1-jdk-noble` e runtime
+  `eclipse-temurin:21.0.12.1_1-jre-noble`, ambas fixadas pelo digest do índice multi-arch; camadas do Spring Boot
+  (`jarmode=tools`); UID/GID `10001`; `ENTRYPOINT` com `exec java $JAVA_OPTS`, deixando a JVM como PID 1.
+- Compose: o serviço `app` não publica a `8081`, usa `docker/healthcheck.sh` (readiness via `/dev/tcp`, sem pacotes
+  extras) e define `stop_grace_period: 35s`, acima do timeout de shutdown do Spring.
+
+## Atualização de implementação — 24 de outubro de 2026: Infraestrutura Kubernetes, IaC e CI/CD (I)
+
+A feature `infra-kubernetes-cicd` implementou a infraestrutura em nuvem, orquestração Kubernetes e entrega contínua
+exigidas na Fase 2, conforme especificado na `functional-spec.md`, `technical-spec.md` e no [ADR-008](adr/ADR-008-kubernetes-infrastructure-on-aws-academy.md).
+
+- **Manifestos Kubernetes (`k8s/`):** organizados com Kustomize sobre a base comum `k8s/base/` e dois overlays:
+  - `k8s/overlays/local/`: adaptado para cluster Kind (`wms`), incluindo StatefulSet com MySQL 8.4 local, WireMock e
+    Service NodePort 30080 exposto em `http://localhost:18080`, com metrics-server oficial e patch `--kubelet-insecure-tls`.
+  - `k8s/overlays/aws/`: adaptado para produção/AWS EKS (`wms-demo`), Service `LoadBalancer` restrito via `ALLOWED_CIDRS`,
+    e perfil de produção sem dados de demonstração (`APP_SEED_ENABLED=false`).
+  - Ambos os overlays validados estaticamente com `kubeconform -strict -summary` (zero erros).
+- **Autoescalabilidade (HPA):** configurado no deployment `workshop-app` (min: 1, max: 4) com métricas de CPU (60%) e
+  memória (90%). Validado com teste de carga k6 de 5 minutos sob 50 VUs (`scripts/load/service-orders-load.js`), comprovando
+  escalamento de 1 para 4 réplicas, ausência de restarts/OOMKilled e retorno automático (*scale down*) para 1 réplica.
+- **Infraestrutura como Código (`infra/`):** provisionada via Terraform `>= 1.10` e provider `hashicorp/aws ~> 6.0`:
+  - `infra/bootstrap/`: bucket S3 versionado e criptografado para o estado remoto com trava nativa (`use_lockfile = true`).
+  - `infra/`: VPC com 2 sub-redes públicas e 2 privadas, cluster AWS EKS (`wms-demo`, K8s 1.30, `LabRole`), 2 nós EC2 `t3.medium`,
+    RDS MySQL 8.4 privado (`workshop_app`) e repositório ECR com tags imutáveis e scan de segurança.
+  - Trava de segurança no `data "aws_caller_identity"` exigindo a role `:assumed-role/voclabs/`, impedindo deploys em contas não autorizadas.
+- **Pipelines CI/CD (`.github/workflows/`):**
+  - `ci.yml`: enriquecido com job `Infra lint` (`terraform fmt`, `terraform validate -backend=false` e `kubeconform`).
+  - `cd.yml`: pipeline completa (`guard` -> `quality-gate` -> `infra` -> `image` -> `deploy`) acionada em push na `dev` e `workflow_dispatch`.
+  - `infra-destroy.yml`: workflow de teardown com remoção de balanceadores órfãos e destruição controlada da infraestrutura.
+- Documentação detalhada em `infra/README.md` e na seção de Implantação e Nuvem do `README.md`.
+
 ## 1. Tech Challenge overview
 
 ### 1.1 Problema oficial (A)
