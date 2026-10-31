@@ -18,14 +18,15 @@ serviço. A fase 2 leva a mesma aplicação a uma plataforma orquestrada:
 - **Kubernetes:** Deployment, Service, ConfigMap, Secret e HPA, com escala automática sob carga;
 - **Infraestrutura como código:** cluster, componente de métricas e banco MySQL criados e destruídos por Terraform,
   no kind (local) e na AWS (VPC, EKS e RDS);
-- **CI/CD:** a cada push, build, testes, imagem publicada no GHCR e deploy num cluster efêmero com smoke test; sob
-  demanda, deploy do banco e da aplicação no EKS com smoke test pelo load balancer.
+- **CI/CD:** PRs para `dev` e `main` passam pelo quality gate; pushes na `dev`, incluindo merges de PRs, executam
+  build, testes, publicação da imagem no GHCR e deploy num cluster kind efêmero com smoke test; sob demanda, deploy
+  do banco e da aplicação no EKS com smoke test pelo load balancer.
 
 ## Visão geral
 
 ```mermaid
 flowchart LR
-    code["Código<br/>(GitHub)"] -->|"push"| cd["Pipeline<br/>GitHub Actions"]
+    code["Código<br/>(GitHub)"] -->|"push na dev"| cd["Pipeline<br/>GitHub Actions"]
     cd -->|"build + testes<br/>docker build"| ghcr[("Imagem<br/>GHCR :sha")]
     tf["Terraform"]
     client(["Postman / k6"])
@@ -81,6 +82,21 @@ Detalhes: [execução local com Docker Compose](docs/setup/local-docker-compose.
 Siga o [guia completo de Kubernetes local](docs/setup/local-kubernetes.md), desde a preparação das dependências.
 Todas as etapas estão lá, em ordem: conferir ferramentas e recursos, criar a infraestrutura, implantar a aplicação,
 testar a API e encerrar o ambiente. O guia também inclui comandos para Ubuntu/WSL e solução de problemas.
+
+## Testes e qualidade
+
+Pré-requisitos para os testes automatizados: Java 21 e GNU Make. Os comandos usam o Maven Wrapper do projeto.
+
+```bash
+make test       # Executa os testes automatizados
+make verify     # Executa o quality gate completo
+make coverage   # Executa a verificação e gera o relatório JaCoCo
+```
+
+O quality gate verifica os testes, as fronteiras Modulith e a cobertura global de linhas, com mínimo de 80%.
+O relatório de cobertura fica em `target/site/jacoco/index.html`. Detalhes em [CONTRIBUTING.md](CONTRIBUTING.md).
+Para validar as APIs, siga o [roteiro manual pelo Postman](docs/api/manual-testing.md); para carga e escala,
+consulte o [teste de carga e HPA](docs/operations/load-testing-hpa.md).
 
 ## Documentação
 
