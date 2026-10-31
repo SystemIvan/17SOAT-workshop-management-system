@@ -5,7 +5,7 @@ on:
   push:
     branches:
       # The ONLY place with the delivery branch name; rename it here (docs/operations/ci-cd.md).
-      - feat/platform-kubernetes-infrastructure-delivery
+      - dev
 
 permissions:
   contents: read
