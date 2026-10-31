@@ -23,4 +23,8 @@ public interface VehicleJpaRepository extends JpaRepository<VehicleJpaEntity, UU
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select vehicle from VehicleJpaEntity vehicle where vehicle.id = :id")
     Optional<VehicleJpaEntity> findByIdForUpdate(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select vehicle from VehicleJpaEntity vehicle where vehicle.licensePlate = :licensePlate")
+    Optional<VehicleJpaEntity> findByLicensePlateForUpdate(@Param("licensePlate") String licensePlate);
 }

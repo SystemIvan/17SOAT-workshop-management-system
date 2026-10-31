@@ -32,18 +32,18 @@ LABEL version="1.0.0"
 # Criar usuário non-root por segurança
 RUN useradd -m -u 1000 appuser
 
-# Copiar JAR do stage anterior
+# O JAR fica com dono root e somente leitura para o appuser: o processo não consegue alterar o próprio binário.
 COPY --from=builder /app/target/*.jar app.jar
 
-# Ownership do arquivo
-RUN chown appuser:appuser app.jar
+# Heap proporcional ao limite de memória do container (docker/K8s), em vez de um -Xmx fixo.
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0"
 
-# Trocar para usuário non-root
-USER appuser
+# UID numérico: o Kubernetes só consegue verificar runAsNonRoot com um UID, não com um nome de usuário.
+USER 1000
 
 # Porta padrão do Spring Boot
 EXPOSE 8080
 
-# Comando de execução
-ENTRYPOINT ["java", "-jar", "app.jar"]
-CMD ["--server.port=8080"]
+# Forma exec (sem shell): a JVM é o PID 1 e recebe o SIGTERM para o desligamento gracioso. A espera pelo banco fica
+# com o orquestrador (depends_on no compose, readiness no Kubernetes).
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

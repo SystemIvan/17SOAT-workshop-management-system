@@ -35,7 +35,8 @@ public class ServiceOrderPersistenceMapper {
                 serviceOrder.status(),
                 serviceOrder.openDiagnosisId(),
                 serviceOrder.hasSentEstimateWithPendingLines(),
-                serviceOrder.approvedEstimateIds());
+                serviceOrder.approvedEstimateIds(),
+                serviceOrder.createdAt());
         for (ServiceExecution execution : serviceOrder.serviceExecutions()) {
             entity.addExecution(toExecutionEntity(execution, entity));
         }
@@ -63,7 +64,8 @@ public class ServiceOrderPersistenceMapper {
                 entity.getOpenDiagnosisId(),
                 entity.isHasSentEstimateWithPendingLines(),
                 entity.getApprovedEstimateIds(),
-                executions);
+                executions,
+                entity.getCreatedAt());
     }
 
     private ServiceExecutionJpaEntity toExecutionEntity(ServiceExecution execution, ServiceOrderJpaEntity owner) {

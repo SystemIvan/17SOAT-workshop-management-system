@@ -12,6 +12,8 @@ public interface EstimateJpaRepository
 
     boolean existsByDiagnosisId(UUID diagnosisId);
 
+    List<EstimateJpaEntity> findByServiceOrderIdAndStatus(UUID serviceOrderId, EstimateStatus status);
+
     List<EstimateJpaEntity> findByStatusAndExpiresAtLessThanEqual(
             EstimateStatus status,
             Instant expiresAt

@@ -301,7 +301,10 @@ Authorization Server) e seu racional.
 
 - **ADR-002:** Real-Time Updates Strategy (Polling vs WebSocket)
 - **ADR-004:** Notifications Are an Outbound Capability
-- **ADR-007:** (Futuro, número provisório) Spring Authorization Server para Fase 2+
+- **ADR-007:** Autenticação de sistemas externos por assinatura HMAC de webhook — complementa esta ADR para
+  chamadores sistema-a-sistema (RF41); o JWT continua sendo o mecanismo dos usuários internos
+- **(Futuro, número a definir):** Spring Authorization Server para Fase 2+ — o número provisório ADR-007
+  anteriormente citado aqui foi usado pela ADR de HMAC
 
 ---
 

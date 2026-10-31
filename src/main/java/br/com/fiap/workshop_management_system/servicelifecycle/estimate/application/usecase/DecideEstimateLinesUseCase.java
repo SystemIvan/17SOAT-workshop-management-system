@@ -125,6 +125,9 @@ public class DecideEstimateLinesUseCase {
         if (allLinesDecided) {
             estimate.close();
             estimateRepository.save(estimate);
+            if (!hasAnotherSentEstimate(serviceOrder.id(), estimate.id())) {
+                serviceOrder.markEstimateFullyDecided();
+            }
         }
 
         List<ReserveStockItemsCommand> reservationCommands = request.decisions().stream()
@@ -148,6 +151,16 @@ public class DecideEstimateLinesUseCase {
 
         serviceOrderRepository.save(serviceOrder);
         return ServiceOrderMapper.toResponse(serviceOrder);
+    }
+
+    /**
+     * A SENT Estimate always has a pending line (it becomes CLOSED once the last one is decided), so another SENT
+     * Estimate keeps the ServiceOrder awaiting approval. The closed one is filtered by id instead of relying on its
+     * new status having been flushed before the query.
+     */
+    private boolean hasAnotherSentEstimate(UUID serviceOrderId, UUID closedEstimateId) {
+        return estimateRepository.findByServiceOrderIdAndStatus(serviceOrderId, EstimateStatus.SENT).stream()
+                .anyMatch(other -> !other.id().equals(closedEstimateId));
     }
 
     private ReserveStockItemsCommand toReservationCommand(ServiceExecution execution) {

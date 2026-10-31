@@ -54,7 +54,8 @@ class ServiceOrderControllerGetStatusTest {
         mockMvc.perform(get("/api/service-orders/{id}/status", serviceOrderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(serviceOrderId))
-                .andExpect(jsonPath("$.status").value("RECEIVED"));
+                .andExpect(jsonPath("$.status").value("RECEIVED"))
+                .andExpect(jsonPath("$.statusLabel").value("RECEBIDA"));
     }
 
     @Test
@@ -73,7 +74,8 @@ class ServiceOrderControllerGetStatusTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(serviceOrderId))
                 .andExpect(jsonPath("$.executions[0].id").value(executionId))
-                .andExpect(jsonPath("$.executions[0].status").value("PENDING"));
+                .andExpect(jsonPath("$.executions[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.statusLabel").value("DIAGNOSTICO"));
     }
 
     @Test

@@ -1,0 +1,50 @@
+# EKS in the AWS Academy Learner Lab (technical-spec D8, D10, D12).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Created by the Terraform "database" stack (infra/aws/database) before anything here is applied.
+namespace: workshop
+
+resources:
+  - ../../base
+
+# No configMapGenerator merge: the base values (SPRING_PROFILES_ACTIVE=default, APP_SEED_ENABLED=false) are exactly
+# what AWS needs, since AWS is the "production" of the demonstration and never gets seeds (D10).
+
+# Last image built by a green cd.yml run; the deploy (manual or cd-aws.yml) replaces it with the commit being
+# deployed through "kustomize edit set image".
+images:
+  - name: workshop-management-system
+    newName: ghcr.io/santiagosilvestre/workshop-management-system
+    newTag: 37bd708cc42dbbfae749533a1f5ebe9ec3ba4053
+
+secretGenerator:
+  # secrets.env is not versioned: generated per developer from secrets.env.example, written by cd-aws.yml in CI.
+  - name: workshop-app
+    envs:
+      - secrets.env
+
+patches:
+  # Internet -> load balancer in the public subnets -> any ready app pod in the private subnets.
+  - patch: |-
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: workshop-app
+      spec:
+        type: LoadBalancer
+  # The source ranges hold the developer IP, so they live in a git-ignored file. Without it the build fails instead
+  # of exposing the bootstrap admin (known password) to the whole internet.
+  - path: allowed-cidr.yaml
+  # Two replicas survive the loss of one node; the longer scale-down window avoids flapping between load peaks.
+  - patch: |-
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: workshop-app
+      spec:
+        minReplicas: 2
+        maxReplicas: 4
+        behavior:
+          scaleDown:
+            stabilizationWindowSeconds: 120

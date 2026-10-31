@@ -11,7 +11,7 @@ COMPOSE := docker compose
 
 .PHONY: help test coverage verify compile build clean run run-dev \
 	docker-build docker-up docker-up-interactive docker-down docker-reset docker-logs docker-ps db-shell e2e \
-	sca dast
+	sca dast infra-local-up infra-local-down k8s-local-deploy k8s-local-delete load-test
 
 help:
 	@echo "Workshop Management System"
@@ -32,6 +32,13 @@ help:
 	@echo "  make docker-reset  Stop containers and DELETE the local MySQL volume"
 	@echo "  make docker-logs   Follow application logs"
 	@echo "  make db-shell      Open the MySQL client"
+	@echo ""
+	@echo "Local Kubernetes (Terraform):"
+	@echo "  make infra-local-up    Create the kind cluster, metrics-server and MySQL (cluster, then database)"
+	@echo "  make infra-local-down  Destroy MySQL and its data, then the kind cluster"
+	@echo "  make k8s-local-deploy  Build and load the :local image, then apply k8s/overlays/local"
+	@echo "  make k8s-local-delete  Remove the app, Mailpit and WireMock (keeps MySQL and its data)"
+	@echo "  make load-test         Run the k6 HPA load test (k6 via container)"
 	@echo ""
 	@echo "Security:"
 	@echo "  make sca           Run OWASP Dependency-Check over every declared dependency"
@@ -127,7 +134,7 @@ db-shell:
 	$(COMPOSE) exec mysql sh -lc 'mysql -u"$$MYSQL_USER" -p"$$MYSQL_PASSWORD" "$$MYSQL_DATABASE"'
 
 # Runs the requests named below, one Newman invocation per request, in this order. This mirrors the
-# happy-path sequence documented in README.md without duplicating requests into a second collection.
+# happy-path sequence documented in docs/api/manual-testing.md without duplicating requests into a second collection.
 # Newman's --folder flag matches individual request names too, but it does NOT reorder execution: a
 # single invocation with several --folder flags still runs matched items in the collection's own
 # physical order, not the order the flags were given. Chaining one invocation per step, wiring
@@ -137,6 +144,8 @@ db-shell:
 # would break later steps (e.g. archiving the customer the rest of the flow depends on).
 E2E_ENV_FILE := .e2e-newman-env.json
 E2E_STEPS := \
+	"Liveness probe" \
+	"Readiness probe" \
 	"Login (bootstrap admin)" \
 	"Create customer" \
 	"Create vehicle" \
@@ -158,7 +167,10 @@ E2E_STEPS := \
 	"Complete execution" \
 	"Get average execution time" \
 	"Get service order status" \
-	"Finalize service order"
+	"Finalize service order" \
+	"Open full intake with services" \
+	"Open full intake without services" \
+	"Get full intake estimate"
 
 e2e:
 	@rm -f $(E2E_ENV_FILE)
@@ -177,3 +189,63 @@ e2e:
 		fi; \
 	done
 	@rm -f $(E2E_ENV_FILE)
+
+# Convenience shortcuts: while learning, run the terraform commands directly and read every plan first.
+# Order matters: the database stack needs the cluster, so it is applied after it and destroyed before it.
+INFRA_LOCAL := infra/local
+
+infra-local-up:
+	terraform -chdir=$(INFRA_LOCAL)/cluster init
+	terraform -chdir=$(INFRA_LOCAL)/cluster apply -auto-approve
+	terraform -chdir=$(INFRA_LOCAL)/database init
+	terraform -chdir=$(INFRA_LOCAL)/database apply -auto-approve
+
+infra-local-down:
+	terraform -chdir=$(INFRA_LOCAL)/database destroy -auto-approve
+	terraform -chdir=$(INFRA_LOCAL)/cluster destroy -auto-approve
+
+# Local Kubernetes deploy. kind CLI is not a prerequisite (technical-spec), so the image is loaded the way
+# "kind load docker-image" does it internally: save it as a tar and import it into the node's containerd.
+# --platform keeps a single-platform archive: with Docker's containerd image store the image index also lists
+# attestation manifests whose content is absent, which makes the import fail.
+# /var/tmp, not /tmp: /tmp is a tmpfs inside the kind node, so "docker cp" would write underneath the mount and
+# the file would be invisible to ctr.
+K8S_LOCAL := k8s/overlays/local
+KIND_NODE := workshop-control-plane
+LOCAL_IMAGE := workshop-management-system:local
+LOCAL_IMAGE_TAR := target/workshop-app-local.tar
+LOCAL_PLATFORM = linux/$(shell docker version --format '{{.Server.Arch}}')
+
+k8s-local-deploy:
+	@test -f $(K8S_LOCAL)/secrets.env || cp $(K8S_LOCAL)/secrets.env.example $(K8S_LOCAL)/secrets.env
+	docker build -t $(LOCAL_IMAGE) .
+	@mkdir -p target
+	docker save --platform $(LOCAL_PLATFORM) -o $(LOCAL_IMAGE_TAR) $(LOCAL_IMAGE)
+	docker cp $(LOCAL_IMAGE_TAR) $(KIND_NODE):/var/tmp/workshop-app-local.tar
+	docker exec $(KIND_NODE) ctr --namespace=k8s.io images import /var/tmp/workshop-app-local.tar
+	docker exec $(KIND_NODE) rm /var/tmp/workshop-app-local.tar
+	@rm -f $(LOCAL_IMAGE_TAR)
+	kubectl create configmap supplier-simulator-mappings -n workshop --from-file=docker/wiremock/mappings \
+		--dry-run=client -o yaml | kubectl apply -f -
+# Same ":local" tag after a rebuild means an unchanged Deployment, so an existing one is restarted explicitly.
+	@if kubectl get deployment/workshop-app -n workshop >/dev/null 2>&1; then \
+		kubectl apply -k $(K8S_LOCAL) && kubectl rollout restart deployment/workshop-app -n workshop; \
+	else \
+		kubectl apply -k $(K8S_LOCAL); \
+	fi
+	kubectl rollout status deployment/workshop-app -n workshop --timeout=300s
+
+# Keeps the namespace, MySQL and its data (owned by Terraform).
+k8s-local-delete:
+	kubectl delete -k $(K8S_LOCAL) --ignore-not-found
+	kubectl delete configmap supplier-simulator-mappings -n workshop --ignore-not-found
+
+# Watch the scaling in another terminal: kubectl get hpa -n workshop -w
+# --add-host makes host.docker.internal resolvable on Linux too (Docker Desktop already provides it).
+K6_IMAGE := grafana/k6:1.3.0
+LOAD_TEST_BASE_URL ?= http://host.docker.internal:8080
+
+load-test:
+	docker run --rm --add-host=host.docker.internal:host-gateway \
+		-v "$(CURDIR)/load-test:/scripts:ro" -e BASE_URL=$(LOAD_TEST_BASE_URL) \
+		$(K6_IMAGE) run /scripts/hpa-load.js

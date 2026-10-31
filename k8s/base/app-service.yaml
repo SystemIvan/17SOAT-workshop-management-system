@@ -1,0 +1,17 @@
+# Stable address for every app pod. ClusterIP here; the local overlay switches to NodePort and the AWS overlay to
+# LoadBalancer.
+apiVersion: v1
+kind: Service
+metadata:
+  name: workshop-app
+  labels:
+    app.kubernetes.io/name: workshop-app
+    app.kubernetes.io/part-of: workshop-management-system
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: workshop-app
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

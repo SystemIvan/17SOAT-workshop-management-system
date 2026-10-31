@@ -10,6 +10,7 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.port.TechnicianNotificationPort;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.port.VehicleEligibility;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.port.VehicleEligibilityPort;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
 import br.com.fiap.workshop_management_system.servicelifecycle.technician.domain.model.Specialty;
 import br.com.fiap.workshop_management_system.servicelifecycle.technician.domain.model.Technician;
@@ -17,6 +18,9 @@ import br.com.fiap.workshop_management_system.servicelifecycle.technician.domain
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -124,5 +128,21 @@ class CreateServiceOrderUseCaseTest {
         assertThrows(NullPointerException.class, () -> useCase.execute(invalidRequest));
 
         verifyNoInteractions(vehicleEligibilityPort, repository, technicianRepository, technicianNotificationPort);
+    }
+
+    @Test
+    void createdAtComesFromTheInjectedClock() {
+        Instant fixedInstant = Instant.parse("2026-09-19T12:00:00Z");
+        Clock fixedClock = Clock.fixed(fixedInstant, ZoneOffset.UTC);
+        CreateServiceOrderUseCase useCaseWithFixedClock = new CreateServiceOrderUseCase(
+                repository, technicianRepository, technicianNotificationPort, vehicleEligibilityPort, fixedClock);
+        when(technicianRepository.findAll()).thenReturn(List.of());
+
+        ServiceOrderResponse response = useCaseWithFixedClock.execute(request);
+
+        assertNotNull(response.id());
+        org.mockito.ArgumentCaptor<ServiceOrder> captor = org.mockito.ArgumentCaptor.forClass(ServiceOrder.class);
+        verify(repository).save(captor.capture());
+        assertEquals(fixedInstant, captor.getValue().createdAt());
     }
 }

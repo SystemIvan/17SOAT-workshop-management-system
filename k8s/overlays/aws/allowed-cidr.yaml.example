@@ -1,0 +1,10 @@
+# Copy to allowed-cidr.yaml (ignored by git) and replace the example address with your public IP + /32.
+# Find it with: (Invoke-RestMethod https://checkip.amazonaws.com).Trim()
+# cd-aws.yml writes this file from the AWS_ALLOWED_CIDR secret of the aws-academy environment.
+apiVersion: v1
+kind: Service
+metadata:
+  name: workshop-app
+spec:
+  loadBalancerSourceRanges:
+    - 203.0.113.10/32

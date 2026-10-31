@@ -1,0 +1,56 @@
+# kind on the developer machine and in the pipeline job (technical-spec D4, D8, D10).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Created by the Terraform "database" stack before anything here is applied.
+namespace: workshop
+
+resources:
+  - ../../base
+
+# Locally the image is built and loaded into the kind node (make k8s-local-deploy); the pipeline replaces this
+# entry with ghcr.io/<owner>/workshop-management-system:<sha> through "kustomize edit set image".
+images:
+  - name: workshop-management-system
+    newName: workshop-management-system
+    newTag: local
+
+configMapGenerator:
+  # Demonstration seeds only here, never on AWS (D10).
+  - name: workshop-app-config
+    behavior: merge
+    literals:
+      - SPRING_PROFILES_ACTIVE=dev
+      - APP_SEED_ENABLED=true
+
+secretGenerator:
+  # secrets.env is not versioned: copied from secrets.env.example on the PC, written by the pipeline in CI.
+  - name: workshop-app
+    envs:
+      - secrets.env
+
+patches:
+  # localhost:8080 -> kind extraPortMappings -> node port 30080 -> Service -> any ready app pod (D4).
+  - patch: |-
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: workshop-app
+      spec:
+        type: NodePort
+        ports:
+          - name: http
+            port: 80
+            nodePort: 30080
+  # Mailpit web UI at localhost:8025 (kind maps 30025 -> 8025).
+  - patch: |-
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: mailpit
+      spec:
+        type: NodePort
+        ports:
+          - name: http
+            port: 8025
+            nodePort: 30025

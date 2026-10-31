@@ -40,3 +40,26 @@ rascunho/
 CLAUDE.local.md
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+
+### Terraform (infra/) ###
+# Provider binaries downloaded by terraform init: large and rebuilt from the lock file.
+**/.terraform/
+# State and its backups describe every created resource and may hold secrets (e.g. the generated DB password).
+*.tfstate
+*.tfstate.*
+# Saved plans ("terraform plan -out") embed the same sensitive values as the state.
+*.tfplan
+# Per-developer variable values; only the documented *.tfvars.example is versioned.
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+# .terraform.lock.hcl is intentionally NOT ignored: it pins provider versions and checksums for everyone.
+
+### Kubernetes ###
+# Cluster credentials written by the kind provider or exported from EKS.
+kubeconfig*
+# Input of the Kustomize secretGenerator; only secrets.env.example is versioned.
+k8s/overlays/*/secrets.env
+# Developer public IP for the AWS load balancer; only allowed-cidr.yaml.example is versioned.
+k8s/overlays/aws/allowed-cidr.yaml

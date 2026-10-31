@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workshop-app
+  labels:
+    app.kubernetes.io/name: workshop-app
+    app.kubernetes.io/part-of: workshop-management-system
+spec:
+  # No "replicas": the HPA owns the replica count. Declaring it here would reset the HPA's decision on every apply.
+  revisionHistoryLimit: 5
+  # A version that never becomes ready fails "kubectl rollout status" after 5 minutes.
+  progressDeadlineSeconds: 300
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # One extra pod during the update and none removed before its replacement is ready: zero downtime, and a
+      # broken version (bad image, wrong DB_URL) leaves the previous pods serving traffic.
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: workshop-app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: workshop-app
+        app.kubernetes.io/part-of: workshop-management-system
+    spec:
+      # The API never calls the Kubernetes API, so it gets no service account token to leak.
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          # Tag set by each overlay ("images:") and, in the pipeline, by "kustomize edit set image".
+          image: workshop-management-system
+          # Explicit so the locally loaded ":local" image is never pulled from a registry.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          # Later sources win on duplicated keys; the lists below do not overlap.
+          envFrom:
+            - configMapRef:
+                name: workshop-app-config
+            - configMapRef:
+                name: workshop-db
+            - secretRef:
+                name: workshop-db
+            - secretRef:
+                name: workshop-app
+          resources:
+            requests:
+              cpu: 250m
+              memory: 768Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          # Up to 60 x 5 s = 5 min before liveness takes over. Calibrated, not derived: the first boot on an empty
+          # database (all Flyway migrations) measured 165 s on kind; an already migrated database boots in ~27 s.
+          # Killing the container mid-migration would leave non-transactional MySQL DDL half applied.
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 5
+            failureThreshold: 60
+          # Internal state only (no db): restarting never fixes a database outage.
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          # Includes db: a database outage removes the pod from the Service without restarting it.
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            # The only writable path: Tomcat work/upload dirs and JVM temp files.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi

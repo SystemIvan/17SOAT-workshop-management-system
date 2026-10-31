@@ -111,11 +111,12 @@ class ServiceOrderControllerAverageExecutionTimeTest {
         UUID serviceOrderId = UUID.randomUUID();
         jdbcTemplate.update(
                 "insert into service_orders (id, vehicle_year, status_snapshot, "
-                        + "has_sent_estimate_with_pending_lines) values (?, ?, ?, ?)",
+                        + "has_sent_estimate_with_pending_lines, created_at) values (?, ?, ?, ?, ?)",
                 serviceOrderId,
                 2020,
                 "COMPLETED",
-                false);
+                false,
+                java.time.Instant.now());
         return serviceOrderId;
     }
 

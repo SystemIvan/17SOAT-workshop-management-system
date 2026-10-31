@@ -19,8 +19,12 @@ import br.com.fiap.workshop_management_system.servicelifecycle.technician.domain
 import br.com.fiap.workshop_management_system.servicelifecycle.technician.domain.repository.TechnicianRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.Instant;
 
 @Service
 public class CreateServiceOrderUseCase {
@@ -31,13 +35,23 @@ public class CreateServiceOrderUseCase {
     private final TechnicianRepository technicianRepository;
     private final TechnicianNotificationPort technicianNotificationPort;
     private final VehicleEligibilityPort vehicleEligibilityPort;
+    private final Clock clock;
 
+    @Autowired
     public CreateServiceOrderUseCase(ServiceOrderRepository repository, TechnicianRepository technicianRepository,
             TechnicianNotificationPort technicianNotificationPort, VehicleEligibilityPort vehicleEligibilityPort) {
+        this(repository, technicianRepository, technicianNotificationPort, vehicleEligibilityPort,
+                Clock.systemUTC());
+    }
+
+    CreateServiceOrderUseCase(ServiceOrderRepository repository, TechnicianRepository technicianRepository,
+            TechnicianNotificationPort technicianNotificationPort, VehicleEligibilityPort vehicleEligibilityPort,
+            Clock clock) {
         this.repository = repository;
         this.technicianRepository = technicianRepository;
         this.technicianNotificationPort = technicianNotificationPort;
         this.vehicleEligibilityPort = vehicleEligibilityPort;
+        this.clock = clock;
     }
 
     @Transactional
@@ -46,7 +60,8 @@ public class CreateServiceOrderUseCase {
         Priority priority = request.priority() != null ? request.priority() : Priority.NORMAL;
         requireActiveVehicle(request.vehicleId());
         ServiceOrder serviceOrder = ServiceOrder.create(
-                request.customerId(), request.vehicleId(), vehicleSnapshot, priority, request.initialAssessment());
+                request.customerId(), request.vehicleId(), vehicleSnapshot, priority, request.initialAssessment(),
+                Instant.now(clock));
         repository.save(serviceOrder);
         notifyActiveTechnicians(serviceOrder);
         return ServiceOrderMapper.toResponse(serviceOrder);

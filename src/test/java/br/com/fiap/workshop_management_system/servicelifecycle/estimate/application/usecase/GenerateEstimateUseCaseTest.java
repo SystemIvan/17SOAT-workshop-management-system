@@ -6,6 +6,7 @@ import br.com.fiap.workshop_management_system.servicelifecycle.estimate.domain.r
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.DiagnosisItem;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.Money;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrderStatus;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockItemType;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.StockRequirement;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.VehicleSnapshot;
@@ -275,6 +276,24 @@ class GenerateEstimateUseCaseTest {
                 useCase.execute(serviceOrder.id(), diagnosisId);
 
         verify(eventPublisher).publishEvent(result.event());
+    }
+
+    @Test
+    void movesTheServiceOrderToAwaitingApprovalWhenTheEstimateIsSent() {
+        ServiceOrder serviceOrder = diagnosedServiceOrder();
+        UUID diagnosisId = serviceOrder.openDiagnosisId();
+        InMemoryServiceOrderRepository serviceOrders = new InMemoryServiceOrderRepository(serviceOrder);
+        GenerateEstimateUseCase useCase = new GenerateEstimateUseCase(
+                serviceOrders,
+                new InMemoryEstimateRepository(),
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                mock(ApplicationEventPublisher.class));
+
+        useCase.execute(serviceOrder.id(), diagnosisId);
+
+        ServiceOrder saved = serviceOrders.findById(serviceOrder.id()).orElseThrow();
+        assertTrue(saved.hasSentEstimateWithPendingLines());
+        assertEquals(ServiceOrderStatus.AWAITING_APPROVAL, saved.status());
     }
 
     @Test

@@ -19,14 +19,17 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final EstimateGatewayHmacAuthenticationFilter estimateGatewayHmacAuthenticationFilter;
     private final ApiAuthenticationEntryPoint authenticationEntryPoint;
     private final ApiAccessDeniedHandler accessDeniedHandler;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
+            EstimateGatewayHmacAuthenticationFilter estimateGatewayHmacAuthenticationFilter,
             ApiAuthenticationEntryPoint authenticationEntryPoint,
             ApiAccessDeniedHandler accessDeniedHandler) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.estimateGatewayHmacAuthenticationFilter = estimateGatewayHmacAuthenticationFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
     }
@@ -42,6 +45,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        // Kubernetes probes and the compose healthcheck call these without a token; the body never
+                        // carries components or details (actuator.properties). Any other /actuator/** stays behind
+                        // anyRequest().authenticated() and is not exposed at all.
+                        .requestMatchers(HttpMethod.GET,
+                                "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness")
+                        .permitAll()
 
                         .requestMatchers(HttpMethod.POST, "/api/auth/users").hasAuthority("ADMIN")
 
@@ -62,18 +71,32 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/service-orders/*/estimates")
                         .hasAnyAuthority("MANAGER", "ADMIN")
 
+                        // Full intake registers Customers and Vehicles and generates an Estimate, all of which
+                        // are MANAGER/ADMIN actions; declared before the general rule that grants TECHNICIAN.
+                        .requestMatchers(HttpMethod.POST, "/api/service-orders/intake")
+                        .hasAnyAuthority("MANAGER", "ADMIN")
+
                         .requestMatchers(HttpMethod.GET, "/api/service-orders/metrics/average-execution-time")
                         .hasAnyAuthority("MANAGER", "ADMIN")
 
+                        // ESTIMATE_APPROVAL_GATEWAY is granted only by the HMAC filter (RF41), never by a JWT
+                        // role, so the external gateway reaches only this route and the RF40 one below.
                         .requestMatchers(HttpMethod.POST, "/api/estimates/*/decisions")
-                        .hasAnyAuthority("CUSTOMER", "ADMIN")
+                        .hasAnyAuthority("CUSTOMER", "ADMIN", "ESTIMATE_APPROVAL_GATEWAY")
                         .requestMatchers(HttpMethod.GET, "/api/estimates/**")
                         .hasAnyAuthority("CUSTOMER", "MANAGER", "ADMIN")
+
+                        // RF40: gateway-only. Declared before the general service-orders rule, otherwise a JWT
+                        // ADMIN/MANAGER would reach it; internal users decide through /api/estimates/*/decisions.
+                        .requestMatchers(HttpMethod.POST, "/api/service-orders/*/external-status-updates")
+                        .hasAuthority("ESTIMATE_APPROVAL_GATEWAY")
 
                         .requestMatchers("/api/service-orders/**").hasAnyAuthority("MANAGER", "TECHNICIAN", "ADMIN")
 
                         .anyRequest().authenticated())
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                // Runs first so a Bearer token sent alongside the HMAC headers still wins in the JWT filter.
+                .addFilterBefore(estimateGatewayHmacAuthenticationFilter, JwtAuthenticationFilter.class);
         return http.build();
     }
 }

@@ -1,0 +1,70 @@
+# WireMock standing in for the external supplier API; same image and flags as docker-compose.yml.
+# The "supplier-simulator-mappings" ConfigMap is created from docker/wiremock/mappings by the deploy command
+# (technical-spec D13): Kustomize cannot read files outside the kustomization directory.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supplier-simulator
+  labels:
+    app.kubernetes.io/name: supplier-simulator
+    app.kubernetes.io/part-of: workshop-management-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: supplier-simulator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: supplier-simulator
+        app.kubernetes.io/part-of: workshop-management-system
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: wiremock
+          image: wiremock/wiremock:3.13.1
+          args:
+            - --global-response-templating
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 384Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: mappings
+              mountPath: /home/wiremock/mappings
+              readOnly: true
+      volumes:
+        - name: mappings
+          configMap:
+            name: supplier-simulator-mappings
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: supplier-simulator
+  labels:
+    app.kubernetes.io/name: supplier-simulator
+    app.kubernetes.io/part-of: workshop-management-system
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: supplier-simulator
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

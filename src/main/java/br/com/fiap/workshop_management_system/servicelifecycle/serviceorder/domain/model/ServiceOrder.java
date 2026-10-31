@@ -1,10 +1,14 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model;
 
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.event.ServiceOrderStatusChanged;
+
 import java.util.ArrayList;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -19,6 +23,7 @@ public class ServiceOrder {
     private final UUID vehicleId;
     private final VehicleSnapshot vehicleSnapshot;
     private final String initialAssessment;
+    private final Instant createdAt;
     private UUID diagnosisAssigneeId;
     private final Set<UUID> approvedEstimateIds = new LinkedHashSet<>();
     private final List<ServiceExecution> serviceExecutions = new ArrayList<>();
@@ -28,16 +33,24 @@ public class ServiceOrder {
     private UUID openDiagnosisId;
 
     /**
+     * RF52 - status this instance was created or reconstituted with, used as the baseline by
+     * {@link #pullStatusChange()}. Transient: never persisted.
+     */
+    private ServiceOrderStatus statusAtLoad;
+
+    /**
      * Integration points for the Diagnoses & Estimate bounded context (Epic 2):
      * ServiceOrder does not hold Estimate objects (one-way reference), so it relies
-     * on these flags - toggled by policies reacting to Estimate domain events - to
-     * know what to show in the derived status.
+     * on these flags to know what to show in the derived status. The Estimate use cases
+     * that already load this ServiceOrder in the same transaction toggle it directly
+     * (GenerateEstimateUseCase, DecideEstimateLinesUseCase, ExpireEstimatesUseCase - see
+     * docs/features/servicelifecycle/awaiting-approval-status).
      */
     private boolean hasSentEstimateWithPendingLines;
 
     public static ServiceOrder create(
             UUID customerId, UUID vehicleId, VehicleSnapshot vehicleSnapshot, String initialAssessment) {
-        return create(customerId, vehicleId, vehicleSnapshot, Priority.NORMAL, initialAssessment);
+        return create(customerId, vehicleId, vehicleSnapshot, Priority.NORMAL, initialAssessment, Instant.now());
     }
 
     public static ServiceOrder create(
@@ -46,14 +59,33 @@ public class ServiceOrder {
             VehicleSnapshot vehicleSnapshot,
             Priority priority,
             String initialAssessment) {
+        return create(customerId, vehicleId, vehicleSnapshot, priority, initialAssessment, Instant.now());
+    }
+
+    /**
+     * RF38 - permite ao chamador controlar explicitamente o instante de criação (usado por
+     * {@code CreateServiceOrderUseCase}, que injeta um {@code Clock} para testabilidade). As duas
+     * sobrecargas acima continuam usando {@code Instant.now()} para não quebrar call sites existentes
+     * que não precisam desse controle.
+     */
+    public static ServiceOrder create(
+            UUID customerId,
+            UUID vehicleId,
+            VehicleSnapshot vehicleSnapshot,
+            Priority priority,
+            String initialAssessment,
+            Instant createdAt) {
         ServiceOrder serviceOrder = new ServiceOrder(
                 UUID.randomUUID(),
                 customerId,
                 vehicleId,
                 vehicleSnapshot,
                 priority,
-                requireInitialAssessment(initialAssessment));
+                requireInitialAssessment(initialAssessment),
+                Objects.requireNonNull(createdAt, "createdAt must not be null"));
         serviceOrder.statusSnapshot = ServiceOrderStatus.RECEIVED;
+        // Creation is not a status change (RF52): the baseline starts equal to the initial status.
+        serviceOrder.statusAtLoad = ServiceOrderStatus.RECEIVED;
         return serviceOrder;
     }
 
@@ -63,13 +95,15 @@ public class ServiceOrder {
             UUID vehicleId,
             VehicleSnapshot vehicleSnapshot,
             Priority priority,
-            String initialAssessment) {
+            String initialAssessment,
+            Instant createdAt) {
         this.id = id;
         this.customerId = customerId;
         this.vehicleId = vehicleId;
         this.vehicleSnapshot = vehicleSnapshot;
         this.priority = priority;
         this.initialAssessment = initialAssessment;
+        this.createdAt = createdAt;
     }
 
     /**
@@ -89,11 +123,14 @@ public class ServiceOrder {
             UUID openDiagnosisId,
             boolean hasSentEstimateWithPendingLines,
             Set<UUID> approvedEstimateIds,
-            List<ServiceExecution> serviceExecutions) {
+            List<ServiceExecution> serviceExecutions,
+            Instant createdAt) {
         ServiceOrder serviceOrder = new ServiceOrder(
-                id, customerId, vehicleId, vehicleSnapshot, priority, initialAssessment);
+                id, customerId, vehicleId, vehicleSnapshot, priority, initialAssessment,
+                Objects.requireNonNull(createdAt, "createdAt must not be null"));
         serviceOrder.diagnosisAssigneeId = diagnosisAssigneeId;
         serviceOrder.statusSnapshot = statusSnapshot;
+        serviceOrder.statusAtLoad = statusSnapshot;
         serviceOrder.openDiagnosisId = openDiagnosisId;
         serviceOrder.hasSentEstimateWithPendingLines = hasSentEstimateWithPendingLines;
         serviceOrder.approvedEstimateIds.addAll(approvedEstimateIds);
@@ -257,11 +294,37 @@ public class ServiceOrder {
     }
 
     /**
+     * The sent Estimate expired before every line was decided. Same state change as
+     * {@link #markEstimateFullyDecided()}, kept separate to reveal the intent: with the diagnosis
+     * still open, the ServiceOrder goes back to IN_DIAGNOSIS.
+     */
+    public void markSentEstimateExpired() {
+        this.hasSentEstimateWithPendingLines = false;
+        recomputeStatusSnapshot(false);
+    }
+
+    /**
      * RF23 - consultar o status derivado (tracking) da Service Order.
      * Read-only: just returns the stored value, no computation happens here.
      */
     public ServiceOrderStatus status() {
         return statusSnapshot;
+    }
+
+    /**
+     * RF52 - returns the transition between the status this instance was loaded with and the current one, if any,
+     * and moves the baseline forward so the same transition is never reported twice. Comparing against the loaded
+     * status (instead of recording every recompute) guarantees at most one event per command, even when a command
+     * recomputes the status several times.
+     */
+    public Optional<ServiceOrderStatusChanged> pullStatusChange() {
+        if (statusSnapshot == statusAtLoad) {
+            return Optional.empty();
+        }
+        ServiceOrderStatusChanged change = new ServiceOrderStatusChanged(
+                id, customerId, statusAtLoad, statusSnapshot, Instant.now());
+        statusAtLoad = statusSnapshot;
+        return Optional.of(change);
     }
 
     public String initialAssessment() {
@@ -352,6 +415,10 @@ public class ServiceOrder {
 
     public UUID vehicleId() {
         return vehicleId;
+    }
+
+    public Instant createdAt() {
+        return createdAt;
     }
 
     public VehicleSnapshot vehicleSnapshot() {

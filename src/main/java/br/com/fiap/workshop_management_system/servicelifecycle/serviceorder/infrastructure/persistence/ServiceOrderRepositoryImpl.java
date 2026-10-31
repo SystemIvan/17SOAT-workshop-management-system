@@ -1,6 +1,7 @@
 package br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.infrastructure.persistence;
 
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrder;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.model.ServiceOrderStatus;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository.ServiceOrderRepository;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.domain.repository
         .ServiceOrderSearchCriteria;
@@ -9,26 +10,37 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.doma
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
  * Infrastructure adapter for the {@link ServiceOrderRepository} port, backed by JPA.
+ *
+ * <p>RF52: {@link #save} is the single persistence path for every command that changes a ServiceOrder, so it is
+ * also where the aggregate's status transition is published. Publishing happens inside the caller's transaction,
+ * so after-commit listeners only see it if that transaction commits.
  */
 @Repository
 public class ServiceOrderRepositoryImpl implements ServiceOrderRepository {
 
     private final ServiceOrderJpaRepository jpaRepository;
     private final ServiceOrderPersistenceMapper mapper;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public ServiceOrderRepositoryImpl(ServiceOrderJpaRepository jpaRepository, ServiceOrderPersistenceMapper mapper) {
+    public ServiceOrderRepositoryImpl(
+            ServiceOrderJpaRepository jpaRepository,
+            ServiceOrderPersistenceMapper mapper,
+            ApplicationEventPublisher eventPublisher) {
         this.jpaRepository = jpaRepository;
         this.mapper = mapper;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -48,6 +60,9 @@ public class ServiceOrderRepositoryImpl implements ServiceOrderRepository {
             List<Predicate> predicates = new ArrayList<>();
             if (criteria.status() != null) {
                 predicates.add(builder.equal(root.get("statusSnapshot"), criteria.status()));
+            } else {
+                predicates.add(root.get("statusSnapshot")
+                        .in(ServiceOrderStatus.COMPLETED, ServiceOrderStatus.DELIVERED).not());
             }
             if (criteria.customerId() != null) {
                 predicates.add(builder.equal(root.get("customerId"), criteria.customerId()));
@@ -65,7 +80,11 @@ public class ServiceOrderRepositoryImpl implements ServiceOrderRepository {
             }
             return builder.and(predicates.toArray(Predicate[]::new));
         };
-        return jpaRepository.findAll(specification).stream().map(mapper::toDomain).toList();
+        return jpaRepository.findAll(specification).stream()
+                .map(mapper::toDomain)
+                .sorted(Comparator.<ServiceOrder>comparingInt(serviceOrder -> serviceOrder.status().listingRank())
+                        .thenComparing(ServiceOrder::createdAt))
+                .toList();
     }
 
     @Override
@@ -80,5 +99,6 @@ public class ServiceOrderRepositoryImpl implements ServiceOrderRepository {
     @Override
     public void save(ServiceOrder serviceOrder) {
         jpaRepository.save(mapper.toEntity(serviceOrder));
+        serviceOrder.pullStatusChange().ifPresent(eventPublisher::publishEvent);
     }
 }

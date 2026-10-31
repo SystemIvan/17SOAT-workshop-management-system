@@ -1,0 +1,195 @@
+name: CD AWS
+
+# Delivery to EKS in the AWS Academy Learner Lab (ADR-008, technical-spec D12 and "Pipelines").
+# Manual only: the lab is off most of the time, so a push trigger would fail in every session without it.
+# GitHub lists a workflow_dispatch workflow only when the file is on the default branch; the fork uses the delivery
+# branch as its default branch for this reason (docs/operations/ci-cd.md).
+# Precondition: infra/aws/cluster was applied in the current lab session (docs/setup/aws-academy.md).
+on:
+  workflow_dispatch:
+    inputs:
+      image_sha:
+        description: "Commit SHA of an image already pushed by cd.yml (empty = the commit of this run)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+# Never cancel a running deploy: an interrupted terraform apply leaves the state lock behind and half-created
+# resources. A second dispatch waits for the first one instead.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: workshop-management-system
+  CLUSTER_NAME: workshop
+  NAMESPACE: workshop
+
+defaults:
+  run:
+    # Explicit shell turns on "-eo pipefail": a failing command in a pipe fails the step.
+    shell: bash
+
+jobs:
+  deploy-aws:
+    name: Deploy to EKS and smoke test
+    runs-on: ubuntu-24.04
+    # The RDS instance alone takes ~6 minutes to create.
+    timeout-minutes: 40
+    environment: aws-academy
+    env:
+      # Lab session credentials (expire with the session); the AWS CLI, Terraform and kubectl all read them from here.
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_DEFAULT_REGION: ${{ vars.AWS_REGION }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      # A secret, not a variable: GitHub prints every env value at the top of each step, and only secrets are masked.
+      # As a variable, the developer IP appeared in the public logs of this fork (CP8 security review).
+      AWS_ALLOWED_CIDR: ${{ secrets.AWS_ALLOWED_CIDR }}
+      # Passed through env, never interpolated into a script, so the input cannot inject shell commands.
+      IMAGE_SHA: ${{ inputs.image_sha || github.sha }}
+
+    steps:
+      - name: Check out repository
+        # actions/checkout v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Validate inputs
+        run: |
+          [[ "$IMAGE_SHA" =~ ^[0-9a-f]{40}$ ]] \
+            || { echo "::error::image_sha must be a full 40-character commit SHA"; exit 1; }
+          # Fail-safe: only a single address may reach the bootstrap admin, never 0.0.0.0/0 or a wide range.
+          [[ "$AWS_ALLOWED_CIDR" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/32$ ]] \
+            || { echo "::error::AWS_ALLOWED_CIDR must be a single IPv4 address with /32"; exit 1; }
+          test -n "$TF_STATE_BUCKET" || { echo "::error::TF_STATE_BUCKET is not set"; exit 1; }
+          image="${REGISTRY}/${GITHUB_REPOSITORY_OWNER,,}/${IMAGE_NAME}:${IMAGE_SHA}"
+          echo "IMAGE=${image}" >> "$GITHUB_ENV"
+
+      # Fails fast and explicitly when the session credentials expired, before Terraform prints a confusing error.
+      # The output is discarded: in the Learner Lab the session ARN carries the account number and the student e-mail.
+      - name: Check AWS credentials
+        run: aws sts get-caller-identity > /dev/null
+
+      - name: Check preconditions
+        run: |
+          aws eks describe-cluster --name "$CLUSTER_NAME" --query cluster.status --output text \
+            || { echo "::error::EKS cluster not found: apply infra/aws/cluster in this lab session first"; exit 1; }
+          # The package is public, so an anonymous manifest check proves the pods will be able to pull it.
+          docker manifest inspect "$IMAGE" > /dev/null \
+            || { echo "::error::Image $IMAGE not found: wait for the cd.yml run of that commit"; exit 1; }
+
+      - name: Set up Terraform
+        # hashicorp/setup-terraform v4.0.1
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e
+        with:
+          terraform_version: "1.16.6"
+          # The wrapper captures stdout for step outputs; plain output is enough here.
+          terraform_wrapper: false
+
+      # Creates the namespace, the RDS instance and the workshop-db ConfigMap/Secret consumed by the overlay.
+      - name: Deploy database
+        run: |
+          terraform -chdir=infra/aws/database init -input=false -backend-config="bucket=${TF_STATE_BUCKET}"
+          terraform -chdir=infra/aws/database apply -auto-approve -input=false \
+            -var="state_bucket=${TF_STATE_BUCKET}" -var="region=${AWS_REGION}"
+
+      - name: Configure kubectl
+        id: kubeconfig
+        run: aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$AWS_REGION"
+
+      - name: Write application secrets
+        env:
+          APP_SECURITY_JWT_SECRET: ${{ secrets.APP_SECURITY_JWT_SECRET }}
+          APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET: ${{ secrets.APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET }}
+        run: |
+          umask 077
+          {
+            echo "SUPPLIER_API_KEY="
+            echo "APP_SECURITY_JWT_SECRET=${APP_SECURITY_JWT_SECRET}"
+            echo "APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET=${APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET}"
+            echo "SPRING_MAIL_USERNAME="
+            echo "SPRING_MAIL_PASSWORD="
+          } > k8s/overlays/aws/secrets.env
+
+      # The runner reaches the load balancer from its own public IP, outside AWS_ALLOWED_CIDR. That /32 is opened
+      # here and closed again by "Revoke runner access", which runs even when the smoke test fails.
+      - name: Deploy application
+        id: deploy
+        working-directory: k8s/overlays/aws
+        run: |
+          runner_ip=$(curl -sSf --retry 3 https://checkip.amazonaws.com | tr -d '[:space:]')
+          [[ "$runner_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] \
+            || { echo "::error::Could not resolve the runner IP"; exit 1; }
+          printf '%s\n' \
+            "apiVersion: v1" "kind: Service" "metadata:" "  name: workshop-app" "spec:" \
+            "  loadBalancerSourceRanges:" "    - ${AWS_ALLOWED_CIDR}" "    - ${runner_ip}/32" > allowed-cidr.yaml
+
+          # Created outside Kustomize (mounted by the supplier simulator); forgetting it in the first manual deploy
+          # left WireMock in ContainerCreating with FailedMount (CP8 incident).
+          kubectl create configmap supplier-simulator-mappings -n "$NAMESPACE" \
+            --from-file=../../../docker/wiremock/mappings --dry-run=client -o yaml | kubectl apply --server-side -f -
+          kustomize edit set image "workshop-management-system=${IMAGE}"
+          # Server-side apply does not copy the Secret into the last-applied-configuration annotation (CP5 finding).
+          kubectl apply -k . --server-side
+
+      - name: Smoke test
+        run: |
+          kubectl rollout status deployment/workshop-app -n "$NAMESPACE" --timeout=300s
+
+          host=""
+          for _ in $(seq 1 30); do
+            host=$(kubectl get service workshop-app -n "$NAMESPACE" \
+              -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            test -n "$host" && break
+            sleep 10
+          done
+          test -n "$host" || { echo "::error::The load balancer got no hostname in 5 minutes"; exit 1; }
+          base="http://${host}"
+          echo "Load balancer: ${base}"
+
+          # A new load balancer needs a few minutes until its DNS name resolves and its instances pass the health
+          # check; until then curl fails with "could not resolve host" or a reset, so retry instead of failing.
+          curl -sSf --retry 30 --retry-delay 10 --retry-all-errors --max-time 5 \
+            "${base}/actuator/health/readiness" | grep -q '"UP"'
+
+          token=$(curl -sSf -X POST "${base}/api/auth/login" \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"changeme123"}' | jq -r '.token')
+          test -n "$token" && test "$token" != "null"
+          echo "::add-mask::$token"
+
+          status=$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $token" \
+            "${base}/api/service-orders")
+          test "$status" = "200"
+          echo "Smoke test passed for $IMAGE at ${base}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # Without a kubeconfig, kubectl falls back to localhost:8080 and only prints connection errors.
+      - name: Diagnostics
+        if: ${{ failure() && steps.kubeconfig.outcome == 'success' }}
+        run: |
+          kubectl get pods,service,hpa -n "$NAMESPACE" -o wide || true
+          kubectl describe deployment/workshop-app -n "$NAMESPACE" || true
+          kubectl describe pods -n "$NAMESPACE" -l app.kubernetes.io/name=workshop-app || true
+          kubectl logs -n "$NAMESPACE" deployment/workshop-app --tail=200 || true
+
+      # Runs after success, failure or a failed deploy step; only a cancelled job skips it (then rerun the workflow
+      # or apply the overlay manually before using the environment).
+      - name: Revoke runner access
+        if: ${{ always() && steps.deploy.outcome != 'skipped' }}
+        working-directory: k8s/overlays/aws
+        run: |
+          printf '%s\n' \
+            "apiVersion: v1" "kind: Service" "metadata:" "  name: workshop-app" "spec:" \
+            "  loadBalancerSourceRanges:" "    - ${AWS_ALLOWED_CIDR}" > allowed-cidr.yaml
+          kubectl apply -k . --server-side
+          # Compared, never printed: the logs of a public fork must not show the developer IP.
+          ranges=$(kubectl get service workshop-app -n "$NAMESPACE" -o jsonpath='{.spec.loadBalancerSourceRanges}')
+          test "$ranges" = "[\"${AWS_ALLOWED_CIDR}\"]" || { echo "::error::Runner IP still allowed"; exit 1; }
+          echo "Runner access revoked: only AWS_ALLOWED_CIDR remains"

@@ -1,0 +1,2 @@
+# Copy to terraform.tfvars (ignored by git) and fill in the bucket name from infra/aws/bootstrap/README.md.
+state_bucket = "workshop-tfstate-xxxxxxxx"

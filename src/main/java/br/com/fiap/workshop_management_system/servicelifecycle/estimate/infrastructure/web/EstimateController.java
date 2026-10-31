@@ -8,6 +8,9 @@ import br.com.fiap.workshop_management_system.servicelifecycle.estimate.applicat
 import br.com.fiap.workshop_management_system.servicelifecycle.estimate.application.usecase.GetEstimateUseCase;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.dto.ServiceOrderResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -85,9 +88,24 @@ public class EstimateController {
     }
 
     @PostMapping("/estimates/{estimateId}/decisions")
-    @Operation(summary = "Decide one or more estimate lines (approve or reject the underlying service execution)")
+    @Operation(
+            summary = "Decide one or more estimate lines (approve or reject the underlying service execution)",
+            description = "Accepts either a Bearer JWT (CUSTOMER or ADMIN) or, for the external customer approval "
+                    + "gateway, an HMAC signature without JWT: X-Estimate-Gateway-Signature is the lowercase hex "
+                    + "HMAC-SHA256 of timestamp + \".\" + raw request body, keyed with the shared gateway secret. "
+                    + "Signatures older or newer than 300 seconds, and signed bodies over 64 KiB, are rejected "
+                    + "with 401.")
+    @Parameter(in = ParameterIn.HEADER, name = "X-Estimate-Gateway-Timestamp", required = false,
+            description = "External gateway only: signing instant in UTC epoch seconds",
+            schema = @Schema(type = "string", example = "1790434800"))
+    @Parameter(in = ParameterIn.HEADER, name = "X-Estimate-Gateway-Signature", required = false,
+            description = "External gateway only: hex HMAC-SHA256(timestamp + \".\" + rawBody, secret)",
+            schema = @Schema(type = "string"))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Decisions applied"),
+            @ApiResponse(responseCode = "401",
+                    description = "No valid JWT and no valid gateway signature (missing, wrong or expired)"),
+            @ApiResponse(responseCode = "403", description = "Authenticated with a role not allowed to decide"),
             @ApiResponse(responseCode = "400", description = "Invalid, missing or duplicated decision fields"),
             @ApiResponse(responseCode = "404", description = "Estimate not found or service execution not part of it"),
             @ApiResponse(responseCode = "409",

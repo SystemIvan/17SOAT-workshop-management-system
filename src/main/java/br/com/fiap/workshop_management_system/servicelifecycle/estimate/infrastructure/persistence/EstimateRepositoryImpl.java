@@ -47,6 +47,14 @@ public class EstimateRepositoryImpl implements EstimateRepository {
     }
 
     @Override
+    public List<Estimate> findByServiceOrderIdAndStatus(UUID serviceOrderId, EstimateStatus status) {
+        return jpaRepository.findByServiceOrderIdAndStatus(serviceOrderId, status)
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public void save(Estimate estimate) {
         jpaRepository.saveAndFlush(mapper.toEntity(estimate));
     }

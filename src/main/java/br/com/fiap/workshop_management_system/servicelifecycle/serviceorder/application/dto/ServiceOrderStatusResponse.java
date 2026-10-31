@@ -6,5 +6,6 @@ import java.util.UUID;
 
 public record ServiceOrderStatusResponse(
         UUID id,
-        ServiceOrderStatus status) {
+        ServiceOrderStatus status,
+        ServiceOrderStatusLabel statusLabel) {
 }

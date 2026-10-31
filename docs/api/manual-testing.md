@@ -1,0 +1,587 @@
+# Teste manual do fluxo principal pelo Postman
+
+Esta seção descreve o fluxo completo da oficina, do cadastro até a entrega do veículo. Ela usa como referência a
+coleção [Workshop Management System](postman/workshop-management-system.postman_collection.json): importe
+esse arquivo no Postman e execute as requisições indicadas abaixo. A ordem das pastas na coleção é organizacional; a
+ordem de execução é a desta seção.
+
+## Pré-requisitos e variáveis
+
+Para seguir este roteiro, tenha Docker Compose e GNU Make instalados. Inicie a API e o MySQL com:
+
+```bash
+make docker-up
+```
+
+Sem GNU Make, use:
+
+```bash
+docker compose up -d --build
+```
+
+Espere a aplicação estar disponível (`docker compose ps` mostra `workshop-app` como `(healthy)`, ou
+`Health / Readiness probe` na coleção responde `200`), importe a coleção e mantenha as
+variáveis no escopo da coleção. Todos os endpoints administrativos exigem um JWT (`AD-016`,
+`docs/adr/ADR-003-authentication-strategy.md`), exceto os caminhos por HMAC do gateway externo de aprovação do
+Customer (RF40 e RF41, `docs/adr/ADR-007-external-gateway-hmac-authentication.md`); a coleção já está configurada
+com autenticação `Bearer {{authToken}}` no nível de collection, então basta executar o login do passo 0 antes do
+restante do roteiro. `baseUrl` deve conter apenas a origem, sem `/api`: para a execução local, use
+`http://localhost:8080`.
+
+| Variável | Como preencher |
+| --- | --- |
+| `baseUrl` | `http://localhost:8080` no Docker Compose e no kind; na AWS, o hostname do load balancer (ver [Outros ambientes](#outros-ambientes-kind-e-aws)). |
+| `authToken` | Preenchida automaticamente pelo passo 0 (`Login (bootstrap admin)`); as demais requisições a usam via `Authorization: Bearer {{authToken}}`. |
+| `customerId`, `vehicleId`, `technicianId`, `stockItemId`, `serviceOrderId`, `executionId`, `serviceExecutionId`, `diagnosisId` e `estimateId` | A coleção as atualiza automaticamente quando a respectiva requisição de criação/diagnóstico obtém sucesso. |
+| `stockReservationId` | É preenchida pelo script de `Retry stock reservation` quando houver `reservationId`; se a reserva já ocorreu na decisão, copie `executions[0].stockReservationId` da resposta da decisão para consultar ou consumir a reserva. |
+| `purchaseDemandId` | Variável para testes manuais isolados de Purchase Order. |
+| `purchaseOrderFlowDemandId` | É preenchida por `List open purchase demands` com a primeira demanda retornada e é usada pelo fluxo principal de Purchase Order. |
+| `lowStockPurchaseDemandId` e `lowStockSuggestedQuantity` | São preenchidas por `List open low-stock purchase demands` e usadas pela Purchase Order de reposição preventiva. |
+| `purchaseOrderId` | É preenchida pelas criações de Purchase Order confirmadas pelo simulador. |
+| `purchaseOrderIdempotencyKey` | Identifica o comando de criação ad hoc. Preserve o mesmo UUID e body em retries; gere outro UUID para uma compra diferente. |
+| `purchaseOrderFlowIdempotencyKey` | É gerada pela collection ao executar `Create Purchase Order from demand`; o `Retry same Purchase Order` reutiliza-a automaticamente. |
+| `customerTaxId` | Informe o CPF/CNPJ sem formatação usado para o Customer; é utilizado somente por `Identify customer by CPF/CNPJ`. |
+| `catalogServiceId` | Preenchida automaticamente por `Registrations / Service Catalog / Create catalog service` (passo 3); identifica o serviço informado no diagnóstico (passo 8). |
+| `estimateGatewaySecret` | Segredo HMAC usado por `Decide estimate lines via external gateway (HMAC)`. O valor padrão coincide com o padrão de `APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET` em `.env.example`/`docker-compose.yml`; se você alterar o segredo da aplicação, altere esta variável também. Na AWS o segredo é outro (ver [Outros ambientes](#outros-ambientes-kind-e-aws)). |
+| `metricFrom` e `metricTo` | Preenchidas automaticamente por `Get average execution time` com uma janela de 24 horas antes e depois da execução da request. Podem ser substituídas por instantes ISO-8601 para uma consulta manual. |
+
+As requisições `Create customer`, `Create vehicle`, `Create catalog service` e `Create stock item` têm um script de
+pré-requisição que gera CPF (com dígitos verificadores válidos), placa, chassi, nome de serviço e SKU únicos a cada
+execução — não é necessário editar esses valores manualmente entre execuções, mesmo em uma base já usada. Os IDs
+retornados em respostas `201 Created` são os que devem ser usados no restante do teste.
+
+### Outros ambientes (kind e AWS)
+
+A mesma coleção e a mesma sequência valem nos três ambientes; mudam só o endereço e, na AWS, o segredo HMAC.
+
+| Ambiente | Como subir | `baseUrl` | Segredo HMAC (`estimateGatewaySecret`) | Mailpit |
+| --- | --- | --- | --- | --- |
+| Docker Compose | Comandos acima | `http://localhost:8080` | Valor padrão da coleção | `http://localhost:8025` |
+| kind (local) | [Ambiente Kubernetes local](../setup/local-kubernetes.md) | `http://localhost:8080` (NodePort mapeado) | Valor padrão da coleção (o `secrets.env.example` do overlay local usa o mesmo) | `http://localhost:8025` |
+| AWS (EKS) | [Ambiente AWS Academy](../setup/aws-academy.md) | `http://<hostname do load balancer>` (porta 80, sem barra no final) | O valor de `APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET` da AWS | Túnel: `kubectl port-forward -n workshop service/mailpit 8025:8025` |
+
+Na AWS:
+
+- Não edite a variável `baseUrl` da coleção. Crie um **environment** `AWS` no Postman com `baseUrl` e selecione-o no
+  canto superior direito: o valor do environment tem precedência sobre o da coleção, e a coleção continua apontando
+  para `localhost` nos outros ambientes. O hostname muda a cada novo load balancer (a cada deploy do zero).
+- O script de assinatura lê o segredo da variável **da coleção** `estimateGatewaySecret`. Cole o valor da AWS no
+  **Current value** dessa variável (nunca no *Initial value*, que é exportado com a coleção) e clique em **Reset** ao
+  terminar.
+- O banco nasce vazio e sem seeds: execute o roteiro desde o passo 0, sem pular os cadastros. Só a conta `admin` de
+  bootstrap existe.
+- A API só responde a partir do IP liberado no load balancer; de outro IP, as requisições terminam em *timeout*.
+- Os IDs padrão das variáveis da coleção (`11111111-...`, `22222222-...`) são só marcadores, em qualquer ambiente:
+  uma requisição enviada antes da criação correspondente responde `404`. Siga a ordem do roteiro, que grava os IDs
+  reais.
+
+## Sequência executável
+
+0. Em `Auth`, envie `Login (bootstrap admin)`:
+
+   ```http
+   POST {{baseUrl}}/api/auth/login
+   ```
+
+   com `{"username":"admin","password":"changeme123"}` — a conta `admin`/`ADMIN` é dado de referência
+   obrigatório, criado por migração Flyway (`V20260824120001__seed_bootstrap_admin_account.sql`), disponível em
+   qualquer ambiente, não só `dev`. Espere `200 OK`; o script grava o `token` retornado em `authToken`, usado pelo
+   restante da coleção. Se quiser testar outros papéis (`CUSTOMER`, `TECHNICIAN`, `MANAGER`), use `Create user
+   account (ADMIN only)` (`POST {{baseUrl}}/api/auth/users`) autenticado como `admin` e depois faça login com a
+   nova conta.
+
+1. Em `Registrations / Customer`, envie `Create customer`:
+
+   ```http
+   POST {{baseUrl}}/api/customers
+   ```
+
+   Use o body da coleção, com `name`, `document` e `contactInfo`. Espere `201 Created`; o script grava o `id` retornado
+   em `customerId`.
+
+2. Em `Registrations / Vehicle`, envie `Create vehicle`. O body deve manter `"customerId": "{{customerId}}"`; os
+   demais campos são `licensePlate`, `chassis` (opcional), `brand`, `model`, `year`, `color` e `mileage` (opcional).
+
+   ```http
+   POST {{baseUrl}}/api/vehicles
+   ```
+
+   Espere `201 Created` e confirme que `vehicleId` recebeu o `id` retornado.
+
+3. Logo após criar o veículo, em `Registrations / Service Catalog`, envie `Create catalog service`:
+
+   ```json
+   {
+     "name": "{{catalogServiceName}}",
+     "basePrice": { "value": 150.00, "currency": "BRL" }
+   }
+   ```
+
+   Espere `201 Created`; o script grava o `id` retornado em `catalogServiceId`, referenciado pelo diagnóstico no
+   passo 8. Cada `catalogServiceId` usado num diagnóstico deve identificar um serviço ativo — pular este passo faz
+   `Perform diagnosis` falhar com `404`.
+
+4. Em `Service Lifecycle / Technicians`, envie `Create technician` com o exemplo da coleção:
+
+   ```json
+   {
+     "name": "Joao Technician",
+     "specialties": ["MECHANICAL", "DIAGNOSTICS"]
+   }
+   ```
+
+   A resposta esperada é `201 Created` e preenche `technicianId`.
+
+5. Se o diagnóstico usar peça ou insumo, crie-o agora em `Stock & Procurement / Create stock item`. O exemplo da
+   coleção cria a peça que será referenciada no diagnóstico:
+
+   ```json
+   {
+     "name": "Oil filter",
+     "sku": "{{stockItemSku}}",
+     "type": "PART",
+     "availableQuantity": 20,
+     "price": { "value": 45.90, "currency": "BRL" }
+   }
+   ```
+
+   Envie `POST {{baseUrl}}/api/stock-items`, espere `201 Created` e use o `stockItemId` gravado pelo script. A
+   quantidade disponível deve ser pelo menos a quantidade exigida no diagnóstico para exercitar a reserva bem-sucedida.
+
+   Para a reposição preventiva, envie em seguida `PUT {{baseUrl}}/api/stock-items/{{stockItemId}}/low-stock-policy`
+   com um `minimumQuantity` maior que o saldo atual e um `targetQuantity` ainda maior — por exemplo,
+   `{ "minimumQuantity": 21, "targetQuantity": 30 }` para o item acima. A consulta
+   `GET {{baseUrl}}/api/stock-items?lowStock=true&active=true` mostra apenas itens configurados cujo saldo está
+   estritamente abaixo do mínimo. Em seguida, execute `Stock & Procurement / List open low-stock purchase demands`;
+   ela consulta `GET {{baseUrl}}/api/purchase-demands?origin=LOW_STOCK&stockItemId={{stockItemId}}` e retorna a
+   demanda aberta para a reposição preventiva. Depois, execute `Create Purchase Order from low-stock demand`: a
+   coleção usa o ID e o `suggestedQuantity` retornados para montar a linha da ordem. Para desabilitar a policy de
+   forma idempotente, envie `DELETE` no mesmo caminho; nenhuma dessas operações cria uma Purchase Order automaticamente.
+
+6. Em `Service Lifecycle / Service Orders`, envie `Create service order` em
+   `POST {{baseUrl}}/api/service-orders`. Mantenha `customerId` e `vehicleId` nas variáveis da coleção e informe o
+   retrato do veículo e a avaliação inicial, como no exemplo:
+
+   ```json
+   {
+     "customerId": "{{customerId}}",
+     "vehicleId": "{{vehicleId}}",
+     "vehicleSnapshot": {
+       "licensePlate": "ABC1D23",
+       "brand": "Fiat",
+       "model": "Argo",
+       "year": 2024
+     },
+     "priority": "NORMAL",
+     "initialAssessment": "Ruído ao frear relatado pelo cliente"
+   }
+   ```
+
+   Espere `201 Created`. A resposta registra `serviceOrderId`; consulte já neste ponto `Get service order status`
+   (`GET {{baseUrl}}/api/service-orders/{{serviceOrderId}}/status`) e espere `status` `RECEIVED` e `statusLabel`
+   `RECEBIDA` (os 6 estados nominais do enunciado da Fase 2 — RF39).
+
+7. Envie `Assign diagnosis assignee`:
+
+   ```http
+   PUT {{baseUrl}}/api/service-orders/{{serviceOrderId}}/diagnosis-assignee
+   ```
+
+   com `{"technicianId":"{{technicianId}}"}`. A resposta é `200 OK` e apresenta `diagnosisAssigneeId`. Esta é a
+   atribuição planejada; ela não substitui o autor efetivo registrado no próximo passo.
+
+8. Envie `Perform diagnosis`:
+
+   ```http
+   POST {{baseUrl}}/api/service-orders/{{serviceOrderId}}/diagnosis
+   ```
+
+   Para o caminho com peça, use o body da coleção, que inclui `diagnosedByTechnicianId`, um item de serviço com preço e
+   `stockRequirements` com `stockItemId`, `type`, `quantity`, `nameSnapshot` e `priceSnapshot`:
+
+   ```json
+   {
+     "diagnosedByTechnicianId": "{{technicianId}}",
+     "items": [{
+       "catalogServiceId": "{{catalogServiceId}}",
+       "name": "Oil and filter change",
+       "price": { "value": 150.00, "currency": "BRL" },
+       "stockRequirements": [{
+         "stockItemId": "{{stockItemId}}",
+         "type": "PART",
+         "quantity": 1,
+         "nameSnapshot": "Oil filter",
+         "priceSnapshot": { "value": 45.90, "currency": "BRL" }
+       }]
+     }]
+   }
+   ```
+
+   Espere `200 OK`. O script define `executionId`, `serviceExecutionId` e `diagnosisId` a partir da primeira execução.
+   Confirme que a execução mostra `diagnosedByTechnicianId` (autor efetivo), `stockAvailability` e consulte `/status`:
+   o status esperado é `IN_DIAGNOSIS`. Se a quantidade observada for insuficiente, a Purchase Demand `PENDING_REPAIR`
+   já é criada neste passo; isso não reserva saldo nem antecipa `AWAITING_ITEMS`.
+
+9. Em `Estimates`, envie `Generate estimate`:
+
+   ```http
+   POST {{baseUrl}}/api/service-orders/{{serviceOrderId}}/estimates
+   ```
+
+   com `{"diagnosisId":"{{diagnosisId}}"}`. O script de pré-requisição usa o `diagnosisId` salvo pela coleção, mesmo
+   que exista uma variável de ambiente com o mesmo nome. Espere `201 Created`, guarde o `estimateId` definido pelo
+   script e use `Get estimate` (`GET {{baseUrl}}/api/estimates/{{estimateId}}`) para conferir `lines`, seus
+   `serviceExecutionId`, preço do serviço, itens comerciais, `stockAvailability`, o `lineTotal` calculado em cada linha
+   e o `total` consolidado da Estimate.
+
+   Os totais são calculados pelo servidor exclusivamente a partir dos snapshots comerciais congelados na Estimate:
+
+   - `lineTotal = servicePrice + soma(priceSnapshot × quantity)` dos Stock Items da linha;
+   - `total = soma dos lineTotal` de todas as linhas da Estimate.
+
+   Dessa forma, o consumidor da API não precisa recalcular o valor comercial do orçamento nem consultar novamente
+   Service Catalog ou Stock Items para obter os preços. Os requisitos permanecem congelados e a disponibilidade é
+   revalidada ao gerar o orçamento, atualizando a mesma demanda quando ainda houver insuficiência.
+
+   Para o exemplo deste roteiro, com serviço de `150.00 BRL` e uma unidade do item de estoque de `45.90 BRL`, a linha
+   deve apresentar um `lineTotal` de `195.90 BRL`. Como há apenas uma linha, o `total` da Estimate também deve ser
+   `195.90 BRL`.
+
+   Consulte `/status` mais uma vez: com o orçamento enviado e a linha ainda sem decisão, espere `status`
+   `AWAITING_APPROVAL` e `statusLabel` `AGUARDANDO_APROVACAO`.
+
+10. Decida todas as linhas consultadas em `Decide estimate lines`:
+
+    ```http
+    POST {{baseUrl}}/api/estimates/{{estimateId}}/decisions
+    ```
+
+    Para aprovar a única linha do exemplo, use:
+
+    ```json
+    {
+      "decisions": [
+        { "serviceExecutionId": "{{executionId}}", "decision": "APPROVED" }
+      ]
+    }
+    ```
+
+    A resposta é `200 OK` com a Service Order. Para múltiplas linhas, inclua uma decisão para cada
+    `lines[].serviceExecutionId` retornado por `Get estimate`; uma linha já decidida não pode ser decidida novamente.
+
+    Para simular a decisão chegando pelo gateway externo do Customer (RF41), envie, **no lugar** de
+    `Decide estimate lines`, a requisição `Isolated / Decide estimate lines via external gateway (HMAC)` — mesmo
+    corpo, sem JWT, assinada pelo pre-request script. O resultado esperado é o mesmo `200 OK`. Os detalhes estão em
+    [Decisão de orçamento pelo gateway externo](#decisão-de-orçamento-pelo-gateway-externo-hmac).
+
+    Para simular a resposta de e-mail do Customer processada por uma ferramenta externa (RF40), envie, também **no
+    lugar** de `Decide estimate lines`, a requisição
+    `Isolated / Update service order status via external channel (HMAC)`, com `{"intendedStatus": "APPROVED"}`: ela
+    decide de uma vez todas as linhas pendentes do orçamento da OS. Os detalhes estão em
+    [Atualização de status da OS via canal externo](#atualização-de-status-da-os-via-canal-externo-hmac).
+
+11. Verifique se a execução aprovada está `READY`.
+
+    - Se o diagnóstico não tiver peça (`"stockRequirements": []`), ela já estará pronta; siga para o passo 12.
+    - Se tiver peça, a decisão do orçamento já tenta reservá-la. Com quantidade suficiente, a execução fica `READY` e
+      recebe `stockReservationId`; siga para o passo 12. A reserva pode ser consultada nas requisições de Stock.
+    - Se ela ficar `AWAITING_ITEMS`, falta material. Execute `Retry stock reservation`, sem body. `RESERVED` a deixa
+      `READY`; `NOT_RESERVED` mostra o motivo em `issues` e o fluxo não pode prosseguir até haver quantidade
+      disponível. RF27 agora permite criar a Purchase Order para a demanda, mas o recebimento e a reposição do saldo
+      continuam fora desta feature (RF29).
+
+12. Para cada execução aprovada que será realizada, envie `Assign technician`:
+
+    ```http
+    POST {{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/assign-technician
+    ```
+
+    com `{"technicianId":"{{technicianId}}"}`. Espere `200 OK` e confira `assignedTechnicianId`. Não atribua uma
+    execução `REJECTED`.
+
+13. Depois de atribuir o Technician no passo 12, e somente com a execução `READY`, envie, nesta ordem,
+    `Start execution`, `Update execution progress` e `Complete execution`. `Start execution` sem
+    `assignedTechnicianId` retorna `409 INVALID_STATE_TRANSITION`:
+
+    ```http
+    POST  {{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/start
+    PATCH {{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/progress
+    POST  {{baseUrl}}/api/service-orders/{{serviceOrderId}}/executions/{{executionId}}/complete
+    ```
+
+    O `PATCH` usa o body `{"note":"Oil drained and filter replaced"}`. Atualmente essa `note` só valida que a
+    execução está `IN_PROGRESS`: ela não é persistida nem é devolvida pela API. Portanto, execute-o para testar o
+    endpoint, mas não o use como histórico de trabalho. Espere `200 OK` em todas: os estados da execução devem ser,
+    respectivamente, `IN_PROGRESS`, `IN_PROGRESS` e `COMPLETED`. Repita o ciclo para cada linha aprovada antes de
+    finalizar a ordem.
+
+14. Depois de `Complete execution`, envie `Get average execution time`:
+
+    ```http
+    GET {{baseUrl}}/api/service-orders/metrics/average-execution-time?from={{metricFrom}}&to={{metricTo}}
+    ```
+
+    O endpoint aceita somente JWT de `MANAGER` ou `ADMIN`; o login bootstrap do passo 0 usa `ADMIN`. O script da
+    coleção define uma janela que inclui a conclusão recém-registrada. Espere `200 OK`, `unit: "HOURS"`,
+    `global.sampleCount >= 1` e um item de `byCatalogService` cujo `catalogServiceId` seja o criado no passo 3.
+    `averageHours` possui duas casas decimais e pode ser `0.00` para uma execução instantânea; sem amostras, a
+    contagem é zero, a média é `null` e os grupos ficam vazios. Não há campos em segundos ou milissegundos.
+
+    O filtro considera `completedAt >= from` e `completedAt < to`. Somente transições realizadas após a adoção da
+    feature possuem `startedAt` e `completedAt`; registros legados não recebem backfill e, portanto, não entram na
+    métrica. Pausas e retomadas não são modeladas neste MVP: a duração é o tempo transcorrido entre a mudança para
+    `IN_PROGRESS` e a mudança para `COMPLETED`.
+
+15. Quando todas as execuções estiverem `COMPLETED` ou `REJECTED`, envie `Finalize service order`:
+
+    ```http
+    POST {{baseUrl}}/api/service-orders/{{serviceOrderId}}/finalize
+    ```
+
+    com `{"vehicleDelivered":true}`. Espere `200 OK`, `statusSnapshot: "DELIVERED"` e `statusLabel: "ENTREGUE"`. O
+    valor `false`, ou tentar finalizar antes de a ordem estar concluída, retorna conflito (`409`).
+
+16. Durante o roteiro, use tanto `Get service order` quanto `Get service order status`. O primeiro retorna o retrato
+    completo, inclusive `executions`, `statusSnapshot` e `statusLabel`; o segundo retorna
+    `{ "id", "status", "statusLabel" }`. No contrato atual, `ServiceOrderResponse.status` está marcado como
+    obsoleto; para a leitura completa, use `statusSnapshot` como o campo de acompanhamento interno (7 valores) e
+    `statusLabel` como a representação nominal externa de 6 estados do enunciado da Fase 2 (RF39) —
+    `AWAITING_ITEMS` e `IN_PROGRESS` mapeiam ambos para `EXECUCAO`.
+
+## Decisão de orçamento pelo gateway externo (HMAC)
+
+`POST /api/estimates/{estimateId}/decisions` aceita, além do JWT `CUSTOMER`/`ADMIN`, uma chamada do gateway externo
+de aprovação do Customer autenticada por assinatura HMAC, sem conta de usuário (RF41,
+`docs/features/servicelifecycle/estimate-decisions-external-auth/`). O corpo e a resposta são os mesmos do passo 10.
+
+| Header | Valor |
+| --- | --- |
+| `X-Estimate-Gateway-Timestamp` | Instante da assinatura em epoch seconds (UTC). |
+| `X-Estimate-Gateway-Signature` | Hex minúsculo de `HMAC-SHA256(timestamp + "." + corpoCru, segredo)`. |
+
+O segredo é `APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET`. O corpo assinado precisa ser byte a byte o corpo enviado:
+qualquer reformatação depois da assinatura invalida a chamada. Timestamps com mais de 300 segundos de diferença do
+relógio do servidor são rejeitados.
+
+Pelo Postman, com a Service Order no ponto do passo 10 (linha ainda `PENDING`):
+
+1. Confirme que `estimateGatewaySecret` é igual ao segredo da aplicação (o padrão local já coincide).
+2. Envie `Isolated / Decide estimate lines via external gateway (HMAC)`. Espere `200 OK` com a Service Order e a
+   execução `READY` (ou `AWAITING_ITEMS`, se faltar material, como no passo 11).
+3. Opcionalmente, envie `Estimates / Decide estimate lines without credentials (expect 401)`: sem JWT e sem
+   assinatura, a API responde `401` antes de qualquer regra de negócio, em qualquer estado da Estimate.
+
+Para reproduzir fora do Postman, com `bash` e `openssl`:
+
+```bash
+SECRET=local-development-only-estimate-gateway-secret-please-rotate
+BODY='{"decisions":[{"serviceExecutionId":"<executionId>","decision":"APPROVED"}]}'
+TS=$(date +%s)
+SIG=$(printf '%s' "$TS.$BODY" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
+curl -i -X POST "http://localhost:8080/api/estimates/<estimateId>/decisions" \
+  -H 'Content-Type: application/json' \
+  -H "X-Estimate-Gateway-Timestamp: $TS" \
+  -H "X-Estimate-Gateway-Signature: $SIG" \
+  --data-raw "$BODY"
+```
+
+Assinatura errada, segredo diferente, timestamp fora da janela, corpo alterado após a assinatura ou corpo assinado
+maior que 64 KiB (`APP_SECURITY_ESTIMATE_GATEWAY_MAX_BODY_BYTES`, padrão `65536`) resultam em
+`401`, sem alterar a Estimate. Se a chamada também trouxer um `Authorization: Bearer` válido, o JWT prevalece, exceto
+quando o corpo assinado passa do limite: nesse caso a chamada é rejeitada antes de o JWT ser avaliado.
+
+## Atualização de status da OS via canal externo (HMAC)
+
+`POST /api/service-orders/{serviceOrderId}/external-status-updates` é o canal de entrada para a resposta do
+Customer a um e-mail de orçamento, já processada por uma ferramenta externa (RF40,
+`docs/features/servicelifecycle/external-status-update/`). O e-mail é simbólico: o endpoint recebe só a intenção
+extraída, não a mensagem.
+
+```json
+{ "intendedStatus": "APPROVED" }
+```
+
+- `intendedStatus` aceita só `APPROVED` ou `REJECTED`. Nomes de status da OS (internos ou os nominais do RF39,
+  como `EXECUCAO`) não são aceitos: o status da OS é recalculado a partir das decisões, nunca setado.
+- A intenção decide **todas** as linhas `PENDING` do orçamento `SENT` da OS, pelas mesmas regras do passo 10. A
+  resposta `200 OK` é a Service Order atualizada, no mesmo formato de `Decide estimate lines`.
+- Autenticação: a mesma assinatura HMAC da seção anterior (headers, segredo, janela de 300 segundos e limite de
+  64 KiB). Este endpoint é exclusivo do gateway: um JWT, mesmo de `ADMIN`, recebe `403`.
+
+| Resposta | Quando |
+| --- | --- |
+| `200` | Intenção aplicada. |
+| `400 VALIDATION_ERROR` | `intendedStatus` ausente ou diferente de `APPROVED`/`REJECTED`. |
+| `401` | Sem assinatura, assinatura inválida, fora da janela ou corpo assinado acima do limite. |
+| `403` | Chamada com JWT e sem a assinatura do gateway. |
+| `404 NOT_FOUND` | OS inexistente. |
+| `409 INVALID_STATE_TRANSITION` | A OS não tem exatamente um orçamento `SENT` com linha `PENDING`: ainda em diagnóstico, orçamento já decidido (inclusive reenvio da mesma intenção), expirado, OS finalizada ou entregue. |
+
+Pelo Postman, com a Service Order no ponto do passo 10 (orçamento gerado, linhas `PENDING`):
+
+1. Confirme que `estimateGatewaySecret` é igual ao segredo da aplicação (o padrão local já coincide).
+2. Envie `Isolated / Update service order status via external channel (HMAC)`. Espere `200 OK` e nenhuma execução
+   `PENDING` na resposta; siga para o passo 11.
+3. Reenviar a mesma requisição resulta em `409`, sem efeito adicional.
+4. Opcionalmente, envie
+   `Estimates / Update service order status via external channel without credentials (expect 401)`: sem
+   assinatura, a API responde `401` em qualquer estado da OS.
+
+Para reproduzir fora do Postman, com `bash` e `openssl` (a assinatura é sempre calculada sobre o corpo exato):
+
+```bash
+SECRET=local-development-only-estimate-gateway-secret-please-rotate
+BODY='{"intendedStatus":"APPROVED"}'
+TS=$(date +%s)
+SIG=$(printf '%s' "$TS.$BODY" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
+curl -i -X POST "http://localhost:8080/api/service-orders/<serviceOrderId>/external-status-updates" \
+  -H 'Content-Type: application/json' \
+  -H "X-Estimate-Gateway-Timestamp: $TS" \
+  -H "X-Estimate-Gateway-Signature: $SIG" \
+  --data-raw "$BODY"
+```
+
+## Fluxo executável de Purchase Order
+
+Execute este roteiro logo depois do **passo 8 — Perform diagnosis** do fluxo principal. Ele é uma compra de reposição:
+não substitui a geração e decisão da Estimate. Ao final, volte ao passo do fluxo principal em que a Service Order estiver.
+
+1. Para criar uma demanda de compra, faça o diagnóstico com `availableQuantity: 1` no Stock Item e requirement de `3`
+   ou mais. A resposta cria a Purchase Demand `PENDING_REPAIR`. Continue depois com o **passo 9** do fluxo principal
+   para gerar a Estimate; se ela já foi aprovada e a reserva falhou, a execução estará em `AWAITING_ITEMS` no **passo
+   11**.
+2. Execute `Stock & Procurement / List open purchase demands`. Espere `200 OK`, confira `suggestedQuantity` e deixe a
+   coleção guardar `purchaseDemandId`.
+3. Gere um novo `purchaseOrderIdempotencyKey` e execute `Create Purchase Order from demand`. A quantidade deve cobrir
+   ao menos a sugerida. Espere `201 Created`, `status: "OPEN"` e o ID da ordem em `Location`.
+4. Execute `Retry same Purchase Order` sem mudar header ou body. Espere `200 OK` e a mesma referência externa.
+   Alterar o body usando a mesma chave retorna `409 PURCHASE_ORDER_IDEMPOTENCY_CONFLICT`.
+5. Execute `Get Purchase Order`; a demanda não aparecerá mais na listagem aberta porque está `ORDERED`. Em seguida,
+   execute `List Purchase Orders pending delivery` e localize a ordem `OPEN`.
+6. Execute `Close Purchase Order` sem body. Espere `200 OK`, `status: "CLOSED"`, `closedAt` e
+   `closedByUserAccountId`. Este é o encerramento de RF28: ele não altera `availableQuantity`.
+7. Execute `Retry close Purchase Order`. Espere `200 OK` e o mesmo `closedAt`; o fechamento é terminal e idempotente.
+8. Execute `Receive Purchase Order` sem body. Espere `201 Created`, `Location`, uma linha de Receipt por linha da
+   ordem e o aumento de `availableQuantity`. Esta é a etapa RF29: ela aceita recebimento histórico de item inativo sem
+   reativá-lo e, após o commit, reavalia reservas elegíveis em `AWAITING_ITEMS` por prioridade.
+9. Execute `Retry Purchase Order Receipt` e `Get Purchase Order Receipt`. Espere `200 OK`, o mesmo ID de Receipt e
+   nenhum novo incremento de saldo.
+10. Retome o fluxo principal: se a Estimate ainda não foi decidida, continue no passo 9; se a execução já estava em
+    `AWAITING_ITEMS`, confirme o novo estado com `Get service order status` antes de prosseguir com a execução.
+
+11. Opcionalmente, para uma compra sem demanda, execute `Create ad hoc Purchase Order` com qualquer Stock Item ativo
+    e `demandIds: []`. Use uma nova chave de idempotência e espere `201 Created`. Para uma ordem mista, mantenha os
+    `demandIds` e inclua as linhas ad hoc; itens repetidos são consolidados.
+12. Opcionalmente, para testar falhas do simulador, use `SUPPLIER-REJECT-001` (retorna
+    `422 SUPPLIER_ORDER_REJECTED` e reabre as demandas) ou `SUPPLIER-TIMEOUT-001` (retorna
+    `503 EXTERNAL_SUPPLIER_UNAVAILABLE`). No timeout, a ordem fica `PENDING_SUBMISSION`; restaure o simulador e
+    repita exatamente o mesmo POST e `Idempotency-Key` para reconciliar sem duplicar a compra. O `make docker-up`
+    sobe o WireMock na porta `8089`; a aplicação o acessa internamente por `http://supplier-simulator:8080`. Não
+    configure um fornecedor real no MVP.
+
+## Abertura completa da OS (cliente, veículo, serviços e peças)
+
+`POST {{baseUrl}}/api/service-orders/intake` faz numa única chamada o que os passos 1, 2 e 6 a 9 do fluxo principal
+fazem separadamente: identifica ou cadastra o Customer (pelo CPF/CNPJ) e o Vehicle (pela placa), abre a Service Order
+e, se houver serviços, atribui o técnico, registra o diagnóstico e gera o orçamento. Nome e preço de serviços e peças
+vêm sempre do catálogo e do estoque, nunca do body. Tudo ocorre numa única transação: qualquer rejeição desfaz a
+operação inteira, inclusive os cadastros novos.
+
+**Pré-requisitos:** token de `MANAGER` ou `ADMIN` (o login do passo 0 serve; `TECHNICIAN` e `CUSTOMER` recebem
+`403`) e as variáveis `technicianId`, `catalogServiceId` e `stockItemId` preenchidas por `Create technician`,
+`Create catalog service` e `Create stock item`. Não é preciso criar Customer nem Vehicle antes.
+
+**Variáveis próprias** (preenchidas pelos scripts; não sobrescrevem `serviceOrderId` nem `estimateId` do fluxo
+principal): `intakeCustomerTaxId`, `intakeLicensePlate` e `intakeReceivedLicensePlate` (gerados a cada execução),
+`intakeServiceOrderId`, `intakeEstimateId` e `intakeReceivedServiceOrderId`.
+
+Na pasta `Service Lifecycle — Full Intake`, execute na ordem:
+
+1. `Open full intake with services`. O script gera um CPF e uma placa novos; o body traz os dados de cadastro, o
+   `diagnosisTechnicianId` e um serviço com 2 unidades da peça. Espere `201 Created`, `Location:
+   /api/service-orders/{id}`, `customer.created` e `vehicle.created` iguais a `true`, `serviceOrder.statusSnapshot`
+   igual a `AWAITING_APPROVAL` e `estimateId` preenchido. O Mailpit (`http://localhost:8025`) recebe o e-mail do
+   orçamento para `joao@example.test`.
+2. `Open full intake without services`. Envia só o documento do Customer anterior e uma placa nova, sem `services` e
+   sem técnico. Espere `201 Created`, `customer.created: false` (cadastro reaproveitado e não alterado),
+   `vehicle.created: true`, `statusSnapshot: "RECEIVED"` e `estimateId: null`.
+3. `Get full intake estimate` (`GET {{baseUrl}}/api/estimates/{{intakeEstimateId}}`). Espere `200 OK`, uma linha e
+   `total.value` = preço do serviço no catálogo + 2 × preço da peça no estoque. Para levar esta OS adiante pelo
+   passo 10 (`Decide estimate lines`) em diante, copie `intakeServiceOrderId` e `intakeEstimateId` para
+   `serviceOrderId` e `estimateId`, que são as variáveis usadas por aquelas requests.
+
+Falhas esperadas, com o código estável do corpo de erro: body inválido ou serviços sem `diagnosisTechnicianId` →
+`400 VALIDATION_ERROR`; técnico inexistente → `404 NOT_FOUND`; serviço do catálogo ou peça inexistente → `404
+CATALOG_SERVICE_NOT_FOUND` ou `404 STOCK_ITEM_NOT_FOUND`; placa já cadastrada para outro
+Customer → `409 VEHICLE_OWNED_BY_ANOTHER_CUSTOMER`; chassi já usado → `409 VEHICLE_CHASSIS_ALREADY_EXISTS`; Customer,
+Vehicle ou serviço arquivado → `409` (`CUSTOMER_ARCHIVED`, `VEHICLE_ARCHIVED`, `CATALOG_SERVICE_ARCHIVED`); peça
+inativa → `409 STOCK_ITEM_INACTIVE`; duas aberturas simultâneas cadastrando o mesmo CPF ou placa → uma delas recebe
+`409 CONCURRENT_REGISTRATION`. Falta de saldo da peça não rejeita a abertura: fica registrada no
+`stockAvailability` da linha do orçamento. Os três requests também rodam no fim de `make e2e`.
+
+## Bifurcações e acompanhamento de status
+
+`statusSnapshot` é recalculado a partir das execuções, dos orçamentos e da entrega. Em uma ordem recém-criada ele é
+`RECEIVED`; após o diagnóstico aberto, `IN_DIAGNOSIS`; com um orçamento enviado e linha ainda sem decisão,
+`AWAITING_APPROVAL`; uma execução aprovada sem requisito de estoque, ou com reserva confirmada, deixa a ordem
+`IN_PROGRESS`; falta de peça deixa-a `AWAITING_ITEMS`; e todas as execuções terminais (`COMPLETED` ou `REJECTED`)
+deixam-na `COMPLETED`. A entrega confirmada no passo final muda-a para `DELIVERED`.
+
+A ordem sai de `AWAITING_APPROVAL` quando o orçamento é totalmente decidido, por `Decide estimate lines` ou pelo canal
+externo, e segue o estado que as decisões produzirem. Uma decisão parcial a mantém em `AWAITING_APPROVAL`, salvo se
+uma execução aprovada já levar a uma fase mais avançada (`IN_PROGRESS`, `AWAITING_ITEMS`). Se o orçamento expirar
+sem decisão, a ordem volta para `IN_DIAGNOSIS`. Nesse caso, hoje não é possível gerar um novo orçamento para o mesmo
+diagnóstico (limitação registrada em `docs/tech-debt/TD-004-os-sem-saida-apos-expiracao-do-orcamento.md`).
+
+Uma linha rejeitada recebe `REJECTED` e não deve ser atribuída, iniciada nem concluída. Se houver linhas aprovadas e
+rejeitadas, execute apenas as aprovadas e complete todas elas; a rejeitada já conta como terminal. Se todas forem
+rejeitadas, a ordem alcança `COMPLETED` e ainda pode ser finalizada com `vehicleDelivered: true`.
+
+Valide o status sempre pela resposta real de `Get service order status`. Para erros de validação, referências
+inexistentes ou transições inválidas, espere os status HTTP documentados no Swagger, em geral `400`, `404` ou `409`, e
+corrija a condição antes de continuar.
+
+## Notificações por e-mail (RF52)
+
+A API envia e-mails reais ao cliente do Workshop Management System em dois cenários: quando um orçamento é gerado
+(RF51) e a cada mudança de status nominal da Ordem de Serviço (RF39, RF52). Confira os e-mails recebidos com
+**Mailpit**, um simulador local de SMTP que oferece uma interface web.
+
+Quando a aplicação inicia com `make docker-up`, o serviço Mailpit é lançado automaticamente:
+
+- **UI do Mailpit:** `http://localhost:8025`
+- **Porta SMTP:** `localhost:1025` (configurada automaticamente no `docker-compose.yml`)
+
+### Verificando e-mails na demo
+
+Após `make docker-up`, siga os passos do fluxo manual Postman. Sempre que houver uma mudança de status da Ordem
+(geração de orçamento, aprovação, início da execução, conclusão ou entrega), abra a UI do Mailpit no navegador.
+
+Exemplo:
+
+1. Execute `Create service order` — a OS nasce em "Recebida", sem e-mail.
+2. Execute `Perform diagnosis` — nenhum e-mail, pois o status nominal continua "Recebida" (status interno muda de
+   `RECEIVED` para `IN_DIAGNOSIS`).
+3. Execute `Generate estimate` — a OS passa de "Recebida" para "Aguardando Aprovação" (nominal), e o cliente recebe
+   **dois e-mails**: (a) orçamento gerado, com serviços, valores, total e validade; (b) notificação de mudança de
+   status para "Aguardando Aprovação".
+4. Após aprovação (passo `Decide estimate lines` ou RF40), o cliente recebe um e-mail informando a mudança para
+   "Execução".
+5. Ao concluir todas as execuções (passo `Complete execution`), o cliente recebe a notificação de "Finalizada".
+6. Ao finalizar a Ordem (passo `Finalize service order`), o cliente recebe a notificação de "Entregue".
+
+### Desabilitar e-mails na demo ou em testes
+
+Para voltar ao canal de log simulado (sem SMTP real), defina:
+
+```bash
+APP_NOTIFICATION_EMAIL_CHANNEL=log make docker-up
+```
+
+Ou altere `.env` e defina `APP_NOTIFICATION_EMAIL_CHANNEL=log`. Nesse modo, e-mails são registrados em log da
+aplicação em vez de enviados:
+
+```bash
+make docker-up
+docker compose logs app | grep -i "status change notification"
+```
