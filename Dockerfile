@@ -32,28 +32,18 @@ LABEL version="1.0.0"
 # Criar usuário non-root por segurança
 RUN useradd -m -u 1000 appuser
 
-# Instalar ferramentas de diagnóstico para health checks e wait scripts
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    netcat-traditional \
-    mysql-client \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copiar JAR do stage anterior
+# O JAR fica com dono root e somente leitura para o appuser: o processo não consegue alterar o próprio binário.
 COPY --from=builder /app/target/*.jar app.jar
 
-# Copiar script de aguarda MySQL
-COPY docker/wait-for-mysql.sh ./wait-for-mysql.sh
-RUN chmod +x wait-for-mysql.sh
+# Heap proporcional ao limite de memória do container (docker/K8s), em vez de um -Xmx fixo.
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0"
 
-# Ownership dos arquivos
-RUN chown appuser:appuser app.jar wait-for-mysql.sh
-
-# Trocar para usuário non-root
-USER appuser
+# UID numérico: o Kubernetes só consegue verificar runAsNonRoot com um UID, não com um nome de usuário.
+USER 1000
 
 # Porta padrão do Spring Boot
 EXPOSE 8080
 
-# Aguarda MySQL antes de iniciar a aplicação
-ENTRYPOINT ["./wait-for-mysql.sh"]
-CMD ["java", "-jar", "app.jar", "--server.port=8080"]
+# Forma exec (sem shell): a JVM é o PID 1 e recebe o SIGTERM para o desligamento gracioso. A espera pelo banco fica
+# com o orquestrador (depends_on no compose, readiness no Kubernetes).
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

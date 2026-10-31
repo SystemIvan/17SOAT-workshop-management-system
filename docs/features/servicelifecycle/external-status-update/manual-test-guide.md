@@ -11,7 +11,7 @@
 Este roteiro exercita, contra a aplicação real, os critérios de aceite de `functional-spec.md`. Ele cobre o item
 "Chamada real via Postman contra a aplicação em Docker" da Definition of Done de `implementation-plan.md`. A
 referência de contrato continua sendo a seção "Atualização de status da OS via canal externo (HMAC)" do
-`README.md`.
+`docs/api/manual-testing.md`.
 
 ## Pré-requisitos
 
@@ -120,8 +120,8 @@ Execute entre A9 e A10.
 - Envie de novo a mesma requisição HMAC.
 - **Esperado:** `409` com `"code": "INVALID_STATE_TRANSITION"`. `Get service order` mostra a OS igual à de T6.
 
-Opcionalmente, siga os passos 12 a 15 da "Sequência executável" do `README.md` (assign technician, start,
-complete, finalize) para confirmar que a OS aprovada por este canal segue o fluxo normal.
+Opcionalmente, siga os passos 12 a 15 da "Sequência executável" de `docs/api/manual-testing.md` (assign
+technician, start, complete, finalize) para confirmar que a OS aprovada por este canal segue o fluxo normal.
 
 ## Parte D — Caminho `REJECTED` (nova OS)
 

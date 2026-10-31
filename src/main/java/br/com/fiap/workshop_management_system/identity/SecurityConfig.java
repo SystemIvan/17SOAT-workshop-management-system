@@ -45,6 +45,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        // Kubernetes probes and the compose healthcheck call these without a token; the body never
+                        // carries components or details (actuator.properties). Any other /actuator/** stays behind
+                        // anyRequest().authenticated() and is not exposed at all.
+                        .requestMatchers(HttpMethod.GET,
+                                "/actuator/health", "/actuator/health/liveness", "/actuator/health/readiness")
+                        .permitAll()
 
                         .requestMatchers(HttpMethod.POST, "/api/auth/users").hasAuthority("ADMIN")
 
@@ -63,6 +69,11 @@ public class SecurityConfig {
                         // Estimate generation lives under /service-orders/{id}/estimates; declared before
                         // the general service-orders rule so it does not inherit the TECHNICIAN grant below.
                         .requestMatchers(HttpMethod.POST, "/api/service-orders/*/estimates")
+                        .hasAnyAuthority("MANAGER", "ADMIN")
+
+                        // Full intake registers Customers and Vehicles and generates an Estimate, all of which
+                        // are MANAGER/ADMIN actions; declared before the general rule that grants TECHNICIAN.
+                        .requestMatchers(HttpMethod.POST, "/api/service-orders/intake")
                         .hasAnyAuthority("MANAGER", "ADMIN")
 
                         .requestMatchers(HttpMethod.GET, "/api/service-orders/metrics/average-execution-time")

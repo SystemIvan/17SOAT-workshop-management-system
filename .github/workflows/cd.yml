@@ -1,0 +1,174 @@
+name: CD
+
+# Delivery to an ephemeral kind cluster inside the runner (ADR-008, technical-spec "Pipelines").
+on:
+  push:
+    branches:
+      # The ONLY place with the delivery branch name; rename it here (docs/operations/ci-cd.md).
+      - feat/platform-kubernetes-infrastructure-delivery
+
+permissions:
+  contents: read
+
+# Every run creates its own cluster, so an older run of the same branch has nothing worth finishing.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: workshop-management-system
+
+defaults:
+  run:
+    # Explicit shell turns on "-eo pipefail": a failing command in a pipe fails the step.
+    shell: bash
+
+jobs:
+  build-test:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        # actions/checkout v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 21
+        # actions/setup-java v5.6.0
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: pom.xml
+
+      - name: Run quality gate
+        run: ./mvnw clean verify
+
+  image:
+    name: Build and push image
+    needs: build-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.ref.outputs.image }}
+
+    steps:
+      - name: Check out repository
+        # actions/checkout v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      # GHCR rejects upper-case owners, and the owner comes from the repository so a fork needs no edit.
+      - name: Compute image reference
+        id: ref
+        run: echo "image=${REGISTRY}/${GITHUB_REPOSITORY_OWNER,,}/${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GH_TOKEN" | docker login "$REGISTRY" -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build image
+        run: docker build -t "${{ steps.ref.outputs.image }}" .
+
+      - name: Push image
+        run: docker push "${{ steps.ref.outputs.image }}"
+
+  deploy-kind:
+    name: Deploy to kind and smoke test
+    needs: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: kind-ci
+    env:
+      IMAGE: ${{ needs.image.outputs.image }}
+
+    steps:
+      - name: Check out repository
+        # actions/checkout v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Set up Terraform
+        # hashicorp/setup-terraform v4.0.1
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e
+        with:
+          terraform_version: "1.16.6"
+          # The wrapper captures stdout for step outputs; plain output is enough here.
+          terraform_wrapper: false
+
+      - name: Check Terraform formatting and validity
+        run: |
+          terraform fmt -check -recursive infra/local
+          for stack in cluster database; do
+            terraform -chdir="infra/local/$stack" init -input=false
+            terraform -chdir="infra/local/$stack" validate
+          done
+
+      # Empty state on a fresh runner: the cluster credentials only show as "(known after apply)", and there is no
+      # destroy step (the runner is discarded), so the provider's non-sensitive client_key is never printed.
+      - name: Provision cluster
+        run: terraform -chdir=infra/local/cluster apply -auto-approve -input=false
+
+      - name: Deploy database
+        run: terraform -chdir=infra/local/database apply -auto-approve -input=false
+
+      - name: Write application secrets
+        env:
+          APP_SECURITY_JWT_SECRET: ${{ secrets.APP_SECURITY_JWT_SECRET }}
+          APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET: ${{ secrets.APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET }}
+        run: |
+          umask 077
+          {
+            echo "SUPPLIER_API_KEY="
+            echo "APP_SECURITY_JWT_SECRET=${APP_SECURITY_JWT_SECRET}"
+            echo "APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET=${APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET}"
+            echo "SPRING_MAIL_USERNAME="
+            echo "SPRING_MAIL_PASSWORD="
+          } > k8s/overlays/local/secrets.env
+
+      - name: Deploy application
+        working-directory: k8s/overlays/local
+        run: |
+          kubectl create configmap supplier-simulator-mappings -n workshop \
+            --from-file=../../../docker/wiremock/mappings --dry-run=client -o yaml | kubectl apply -f -
+          kustomize edit set image "workshop-management-system=${IMAGE}"
+          kubectl apply -k .
+
+      - name: Smoke test
+        run: |
+          kubectl rollout status deployment/workshop-app -n workshop --timeout=300s
+
+          # A Ready pod reaches the NodePort only after kube-proxy syncs its endpoint, a few moments after the
+          # rollout returns; until then the connection is reset, so retry instead of failing on the race.
+          curl -sSf --retry 12 --retry-delay 5 --retry-all-errors --max-time 5 \
+            http://localhost:8080/actuator/health/readiness | grep -q '"UP"'
+
+          token=$(curl -sSf -X POST http://localhost:8080/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"changeme123"}' | jq -r '.token')
+          test -n "$token" && test "$token" != "null"
+          echo "::add-mask::$token"
+
+          status=$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $token" \
+            http://localhost:8080/api/service-orders)
+          test "$status" = "200"
+          echo "Smoke test passed for $IMAGE"
+
+      - name: Diagnostics
+        if: ${{ failure() }}
+        run: |
+          kubectl get pods -n workshop -o wide || true
+          kubectl describe deployment/workshop-app -n workshop || true
+          kubectl describe pods -n workshop -l app.kubernetes.io/name=workshop-app || true
+          kubectl logs -n workshop deployment/workshop-app --tail=200 || true

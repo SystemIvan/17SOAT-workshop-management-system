@@ -46,6 +46,11 @@ public class VehicleRepositoryImpl implements VehicleRepository {
     }
 
     @Override
+    public Optional<Vehicle> findByLicensePlateForUpdate(LicensePlate licensePlate) {
+        return jpaRepository.findByLicensePlateForUpdate(licensePlate.value()).map(mapper::toDomain);
+    }
+
+    @Override
     public Optional<Vehicle> findById(UUID id) {
         return jpaRepository.findById(id).map(mapper::toDomain);
     }

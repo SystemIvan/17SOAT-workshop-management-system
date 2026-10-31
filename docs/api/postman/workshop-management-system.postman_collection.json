@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "c0d4f6e8-0f31-4d2f-9ba8-17f0b5fe2026",
     "name": "Workshop Management System",
-    "description": "REST API collection grouped by bounded context. Every request asserts its HTTP status and key response fields via pm.test, so the collection can run as an E2E smoke suite (manually in the Postman app or via `make e2e` / Newman) in addition to serving as living documentation. See README.md for the ordered happy-path sequence.",
+    "description": "REST API collection grouped by bounded context. Every request asserts its HTTP status and key response fields via pm.test, so the collection can run as an E2E smoke suite (manually in the Postman app or via `make e2e` / Newman) in addition to serving as living documentation. See docs/api/manual-testing.md for the ordered happy-path sequence.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -36,9 +36,73 @@
     { "key": "metricFrom", "value": "" },
     { "key": "metricTo", "value": "" },
     { "key": "authToken", "value": "" },
+    { "key": "intakeCustomerTaxId", "value": "" },
+    { "key": "intakeLicensePlate", "value": "" },
+    { "key": "intakeReceivedLicensePlate", "value": "" },
+    { "key": "intakeServiceOrderId", "value": "" },
+    { "key": "intakeEstimateId", "value": "" },
+    { "key": "intakeReceivedServiceOrderId", "value": "" },
     { "key": "estimateGatewaySecret", "value": "local-development-only-estimate-gateway-secret-please-rotate" }
   ],
   "item": [
+    {
+      "name": "Health",
+      "description": "Liveness and readiness probes used by Kubernetes and the docker-compose healthcheck. Public (no token), GET only, and the body carries only the aggregated status.",
+      "item": [
+        {
+          "name": "Liveness probe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Application is alive', function () { pm.expect(body.status).to.eql('UP'); });",
+                  "pm.test('Body exposes no components or details', function () {",
+                  "    pm.expect(body).to.not.have.any.keys('components', 'details');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/actuator/health/liveness"
+          }
+        },
+        {
+          "name": "Readiness probe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Application is ready (database reachable)', function () { pm.expect(body.status).to.eql('UP'); });",
+                  "pm.test('Body exposes no components or details', function () {",
+                  "    pm.expect(body).to.not.have.any.keys('components', 'details');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/actuator/health/readiness"
+          }
+        }
+      ]
+    },
     {
       "name": "Auth",
       "item": [
@@ -1075,7 +1139,7 @@
               "request": {
                 "method": "GET",
                 "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/status",
-                "description": "Usado em vários pontos da sequência E2E (README passos 5, 7, 10 e 14); o teste valida apenas que o status pertence ao enum, já que o valor exato depende de qual checkpoint do fluxo está em execução."
+                "description": "Usado em vários pontos da sequência E2E (passos 5, 7, 10 e 14 de docs/api/manual-testing.md); o teste valida apenas que o status pertence ao enum, já que o valor exato depende de qual checkpoint do fluxo está em execução."
               }
             },
             {
@@ -1398,6 +1462,167 @@
             },
             "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/external-status-updates",
             "description": "RF40: sem os headers HMAC do gateway a chamada é rejeitada com 401 antes de qualquer regra de domínio, em qualquer estado da OS. Pode ser executada a qualquer momento. Com o JWT da collection (sem HMAC) a resposta seria 403: este endpoint é exclusivo do gateway."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Service Lifecycle — Full Intake",
+      "description": "Abertura completa da OS (POST /api/service-orders/intake, MANAGER/ADMIN). Depende de technicianId, catalogServiceId e stockItemId criados nas pastas anteriores. Usa variáveis próprias (intake*) para não sobrescrever serviceOrderId/estimateId do fluxo principal. Execute na ordem: com serviços, sem serviços, consulta do orçamento.",
+      "item": [
+        {
+          "name": "Open full intake with services",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "['technicianId', 'catalogServiceId', 'stockItemId'].forEach(function (name) {",
+                  "    if (!pm.variables.get(name)) { throw new Error('Run the request that creates ' + name + ' first.'); }",
+                  "});",
+                  "function calcCheckDigit(digits, weights) {",
+                  "    const sum = digits.split('').reduce((acc, digit, index) => acc + Number(digit) * weights[index], 0);",
+                  "    const remainder = sum % 11;",
+                  "    return remainder < 2 ? 0 : 11 - remainder;",
+                  "}",
+                  "function generateValidCpf() {",
+                  "    let base;",
+                  "    do {",
+                  "        base = Array.from({ length: 9 }, () => Math.floor(Math.random() * 10)).join('');",
+                  "    } while (/^(\\d)\\1+$/.test(base));",
+                  "    const firstDigit = calcCheckDigit(base, [10, 9, 8, 7, 6, 5, 4, 3, 2]);",
+                  "    const secondDigit = calcCheckDigit(base + firstDigit, [11, 10, 9, 8, 7, 6, 5, 4, 3, 2]);",
+                  "    return base + String(firstDigit) + String(secondDigit);",
+                  "}",
+                  "function randomMercosulPlate() {",
+                  "    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';",
+                  "    const letter = () => letters[Math.floor(Math.random() * letters.length)];",
+                  "    const digit = () => String(Math.floor(Math.random() * 10));",
+                  "    return letter() + letter() + letter() + digit() + letter() + digit() + digit();",
+                  "}",
+                  "const intakeCustomerTaxId = generateValidCpf();",
+                  "const intakeLicensePlate = randomMercosulPlate();",
+                  "pm.collectionVariables.set('intakeCustomerTaxId', intakeCustomerTaxId);",
+                  "pm.environment.set('intakeCustomerTaxId', intakeCustomerTaxId);",
+                  "pm.collectionVariables.set('intakeLicensePlate', intakeLicensePlate);",
+                  "pm.environment.set('intakeLicensePlate', intakeLicensePlate);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Location points to the new service order', function () {",
+                  "    pm.expect(pm.response.headers.get('Location')).to.eql('/api/service-orders/' + body.serviceOrder.id);",
+                  "});",
+                  "pm.test('Customer and vehicle were created by this intake', function () {",
+                  "    pm.expect(body.customer.created).to.eql(true);",
+                  "    pm.expect(body.vehicle.created).to.eql(true);",
+                  "});",
+                  "pm.test('Diagnosis and estimate were generated automatically', function () {",
+                  "    pm.expect(body.serviceOrder.statusSnapshot).to.eql('AWAITING_APPROVAL');",
+                  "    pm.expect(body.serviceOrder.executions).to.be.an('array').that.is.not.empty;",
+                  "    pm.expect(body.estimateId).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.collectionVariables.set('intakeServiceOrderId', body.serviceOrder.id);",
+                  "pm.environment.set('intakeServiceOrderId', body.serviceOrder.id);",
+                  "pm.collectionVariables.set('intakeEstimateId', body.estimateId);",
+                  "pm.environment.set('intakeEstimateId', body.estimateId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"customer\": {\n    \"document\": \"{{intakeCustomerTaxId}}\",\n    \"name\": \"João Pereira\",\n    \"contactInfo\": {\n      \"email\": \"joao@example.test\",\n      \"phone\": \"+5511988887777\"\n    }\n  },\n  \"vehicle\": {\n    \"licensePlate\": \"{{intakeLicensePlate}}\",\n    \"brand\": \"Chevrolet\",\n    \"model\": \"Onix\",\n    \"year\": 2023,\n    \"color\": \"Branco\",\n    \"mileage\": 31000\n  },\n  \"priority\": \"HIGH\",\n  \"initialAssessment\": \"Cliente relata barulho na suspensão e pede troca de óleo\",\n  \"diagnosisTechnicianId\": \"{{technicianId}}\",\n  \"services\": [\n    {\n      \"catalogServiceId\": \"{{catalogServiceId}}\",\n      \"parts\": [\n        { \"stockItemId\": \"{{stockItemId}}\", \"quantity\": 2 }\n      ]\n    }\n  ]\n}" },
+            "url": "{{baseUrl}}/api/service-orders/intake",
+            "description": "Identifica ou cadastra Customer (CPF/CNPJ) e Vehicle (placa), abre a OS, registra o diagnóstico com nome e preço vindos do catálogo e do estoque e gera o orçamento, numa única transação. O body não tem campos de nome ou preço: eles nunca vêm do cliente. O script gera CPF e placa novos a cada execução."
+          }
+        },
+        {
+          "name": "Open full intake without services",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.variables.get('intakeCustomerTaxId')) { throw new Error('Run Open full intake with services first: this request reuses its Customer.'); }",
+                  "const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';",
+                  "const letter = () => letters[Math.floor(Math.random() * letters.length)];",
+                  "const digit = () => String(Math.floor(Math.random() * 10));",
+                  "pm.collectionVariables.set('intakeReceivedLicensePlate', letter() + letter() + letter() + digit() + letter() + digit() + digit());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Existing customer is reused and a new vehicle is registered', function () {",
+                  "    pm.expect(body.customer.created).to.eql(false);",
+                  "    pm.expect(body.vehicle.created).to.eql(true);",
+                  "});",
+                  "pm.test('Without services the order stays RECEIVED and has no estimate', function () {",
+                  "    pm.expect(body.serviceOrder.statusSnapshot).to.eql('RECEIVED');",
+                  "    pm.expect(body.estimateId).to.eql(null);",
+                  "});",
+                  "pm.collectionVariables.set('intakeReceivedServiceOrderId', body.serviceOrder.id);",
+                  "pm.environment.set('intakeReceivedServiceOrderId', body.serviceOrder.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"customer\": {\n    \"document\": \"{{intakeCustomerTaxId}}\"\n  },\n  \"vehicle\": {\n    \"licensePlate\": \"{{intakeReceivedLicensePlate}}\",\n    \"brand\": \"Renault\",\n    \"model\": \"Kwid\",\n    \"year\": 2021,\n    \"color\": \"Vermelho\"\n  },\n  \"initialAssessment\": \"Revisão geral, ainda sem serviços definidos\"\n}" },
+            "url": "{{baseUrl}}/api/service-orders/intake",
+            "description": "Reaproveita o Customer da request anterior (só o documento é enviado; o cadastro existente não é alterado) e cadastra um segundo veículo. Sem services, a OS fica RECEIVED, sem diagnóstico nem orçamento, e diagnosisTechnicianId é dispensado."
+          }
+        },
+        {
+          "name": "Get full intake estimate",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.variables.get('intakeEstimateId')) { throw new Error('Run Open full intake with services first.'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('Estimate belongs to the intake service order', function () {",
+                  "    pm.expect(body.id).to.eql(pm.variables.get('intakeEstimateId'));",
+                  "    pm.expect(body.serviceOrderId).to.eql(pm.variables.get('intakeServiceOrderId'));",
+                  "    pm.expect(body.lines).to.be.an('array').with.lengthOf(1);",
+                  "});",
+                  "pm.test('Line uses the registered prices and the requested quantity', function () {",
+                  "    const line = body.lines[0];",
+                  "    pm.expect(line.stockItems[0].quantity).to.eql(2);",
+                  "    const expected = line.servicePrice.value + line.stockItems[0].priceSnapshot.value * 2;",
+                  "    pm.expect(line.lineTotal.value).to.be.closeTo(expected, 0.001);",
+                  "    pm.expect(body.total.value).to.be.closeTo(expected, 0.001);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/estimates/{{intakeEstimateId}}",
+            "description": "Confere o orçamento gerado pela abertura completa: total = preço do serviço no catálogo + 2 × preço da peça no estoque."
           }
         }
       ]
@@ -2000,7 +2225,7 @@
               "raw": "{\n  \"decisions\": [\n    { \"serviceExecutionId\": \"{{executionId}}\", \"decision\": \"APPROVED\" }\n  ]\n}"
             },
             "url": "{{baseUrl}}/api/estimates/{{estimateId}}/decisions",
-            "description": "RF41: alternativa a \"Estimates / Decide estimate lines\" que simula o gateway externo de aprovação do Customer — sem JWT, autenticada só por HMAC. Rode NO LUGAR do passo 10 do README (a linha precisa estar PENDING; depois de decidida, uma segunda decisão retorna 409). O pre-request script calcula X-Estimate-Gateway-Timestamp (epoch seconds) e X-Estimate-Gateway-Signature (hex de HMAC-SHA256(timestamp + '.' + corpo)) com a variável estimateGatewaySecret, que deve ser igual a APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET da aplicação. Assinatura errada, timestamp com mais de 300s de diferença ou corpo alterado após a assinatura retornam 401."
+            "description": "RF41: alternativa a \"Estimates / Decide estimate lines\" que simula o gateway externo de aprovação do Customer — sem JWT, autenticada só por HMAC. Rode NO LUGAR do passo 10 de docs/api/manual-testing.md (a linha precisa estar PENDING; depois de decidida, uma segunda decisão retorna 409). O pre-request script calcula X-Estimate-Gateway-Timestamp (epoch seconds) e X-Estimate-Gateway-Signature (hex de HMAC-SHA256(timestamp + '.' + corpo)) com a variável estimateGatewaySecret, que deve ser igual a APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET da aplicação. Assinatura errada, timestamp com mais de 300s de diferença ou corpo alterado após a assinatura retornam 401."
           }
         },
         {
@@ -2056,7 +2281,7 @@
               "raw": "{\n  \"intendedStatus\": \"APPROVED\"\n}"
             },
             "url": "{{baseUrl}}/api/service-orders/{{serviceOrderId}}/external-status-updates",
-            "description": "RF40: simula a ferramenta externa que processou a resposta de e-mail do Customer e envia só a intenção (APPROVED ou REJECTED) para a OS. Todas as linhas PENDING do orçamento SENT da OS são decididas, pelas mesmas regras de \"Estimates / Decide estimate lines\". Rode NO LUGAR do passo 10 do README (com a OS no ponto em que o orçamento foi gerado); reenviar depois de aplicado retorna 409. Autenticação: a mesma assinatura HMAC de RF41, calculada pelo pre-request script com estimateGatewaySecret; sem assinatura válida retorna 401, e um JWT sem assinatura retorna 403."
+            "description": "RF40: simula a ferramenta externa que processou a resposta de e-mail do Customer e envia só a intenção (APPROVED ou REJECTED) para a OS. Todas as linhas PENDING do orçamento SENT da OS são decididas, pelas mesmas regras de \"Estimates / Decide estimate lines\". Rode NO LUGAR do passo 10 de docs/api/manual-testing.md (com a OS no ponto em que o orçamento foi gerado); reenviar depois de aplicado retorna 409. Autenticação: a mesma assinatura HMAC de RF41, calculada pelo pre-request script com estimateGatewaySecret; sem assinatura válida retorna 401, e um JWT sem assinatura retorna 403."
           }
         },
         {

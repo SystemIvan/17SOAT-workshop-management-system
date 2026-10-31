@@ -89,6 +89,7 @@ do fuzzing, conteúdo não armazenável, identificação do endpoint de login) e
 |---|---|---|---|
 | Senha de bootstrap `admin`/`changeme123` fixada na migration `V20260824120001__seed_bootstrap_admin_account.sql` | Corrigir exigiria alterar migration já incorporada à baseline operacional, o que `AGENTS.md` §"Persistent data and seeds" trata como imutável (Decisão D, opção D1) | Acesso administrativo total a quem conhecer a credencial pública do repositório | Rotação obrigatória em qualquer ambiente não demonstrativo, documentada no `README.md`; alternativa futura é migration aditiva com rotação forçada no primeiro login |
 | Contas de demonstração `manager.dev`, `technician.dev`, `customer.dev`, todas com `changeme123` | Mesmo raciocínio; criadas por seeder | Idem, com papéis menores | Só existem sob perfil `dev` **e** `app.seed.enabled=true` |
+| Conta `admin`/`changeme123` acessível pela internet no ambiente AWS Academy (EKS), adicionado em 2026-10-25 | A credencial vem da mesma migration imutável; trocar a senha no lab exigiria um passo manual de SQL a cada deploy ou reabrir a spec, inviável antes da entrega da fase 2 | O load balancer é público; quem estiver no IP liberado (inclusive outros aparelhos da rede ou clientes da operadora que dividem o IP por CGNAT) consegue logar como ADMIN, e sem HTTPS a senha e o JWT trafegam em texto puro | `loadBalancerSourceRanges` com um único `/32` (fail-safe no overlay e no `cd-aws.yml`), banco sem dados reais e `destroy` após cada uso. Risco residual aceito por Santiago Silvestre em 2026-10-25, **só para o lab**; detalhes na revisão de segurança de `docs/features/platform/kubernetes-infrastructure-delivery/implementation-plan.md` |
 | Ausência de análise estática (SAST) | Nunca configurada; item deixado explicitamente aberto no Approval Checklist da `ADR-003` | Defeitos de segurança em código próprio não são detectados automaticamente | Declarado fora de escopo desta feature; exige trabalho próprio de integração |
 
 Os dois primeiros já haviam sido aceitos com mitigação em
@@ -174,5 +175,5 @@ Suposições temporárias a respeitar enquanto a dívida não for paga:
 
 ---
 
-**Last Updated:** 2026-08-28  
+**Last Updated:** 2026-10-25 (Grupo 4: exposição da conta de bootstrap no ambiente AWS Academy)  
 **Status:** Accepted — dívida assumida deliberadamente; ver Recomendação para o encaminhamento proposto

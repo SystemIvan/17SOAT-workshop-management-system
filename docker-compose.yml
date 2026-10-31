@@ -1,7 +1,7 @@
 services:
   # Mailpit — local e-mail testing for RF52 notifications
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.31.4
     container_name: workshop-mailpit
     ports:
       - "${MAILPIT_UI_PORT:-8025}:8025"
@@ -56,16 +56,16 @@ services:
       dockerfile: Dockerfile
     container_name: workshop-app
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${DB_NAME:-workshop}?useSSL=false&serverTimezone=America/Sao_Paulo&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-workshop_user}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-workshop_pass}
-      SPRING_JPA_HIBERNATE_DDL_AUTO: ${DDL_AUTO:-validate}
-      SPRING_JPA_SHOW_SQL: ${SHOW_SQL:-false}
+      # Same DB_* contract used by the Kubernetes ConfigMap/Secret (technical-spec D1).
+      DB_URL: jdbc:mysql://mysql:3306/${DB_NAME:-workshop}?useSSL=false&serverTimezone=America/Sao_Paulo&allowPublicKeyRetrieval=true
+      DB_USERNAME: ${DB_USERNAME:-workshop_user}
+      DB_PASSWORD: ${DB_PASSWORD:-workshop_pass}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       APP_SEED_ENABLED: ${APP_SEED_ENABLED:-true}
       SUPPLIER_BASE_URL: http://supplier-simulator:8080
       SUPPLIER_CONNECT_TIMEOUT: ${SUPPLIER_CONNECT_TIMEOUT:-2s}
       SUPPLIER_READ_TIMEOUT: ${SUPPLIER_READ_TIMEOUT:-5s}
+      SUPPLIER_API_KEY: ${SUPPLIER_API_KEY:-}
       APP_SECURITY_JWT_SECRET: ${APP_SECURITY_JWT_SECRET:-change-me-to-a-random-secret-with-at-least-32-bytes}
       APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET: ${APP_SECURITY_ESTIMATE_GATEWAY_HMAC_SECRET:-local-development-only-estimate-gateway-secret-please-rotate}
       APP_NOTIFICATION_EMAIL_CHANNEL: ${APP_NOTIFICATION_EMAIL_CHANNEL:-smtp}
@@ -78,6 +78,13 @@ services:
       TZ: 'America/Sao_Paulo'
     ports:
       - "${APP_PORT:-8080}:8080"
+    # Same readiness endpoint the Kubernetes readinessProbe uses; curl already ships with the base image.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 180s
     depends_on:
       mysql:
         condition: service_healthy

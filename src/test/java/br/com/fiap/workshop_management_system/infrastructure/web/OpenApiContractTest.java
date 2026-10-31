@@ -151,6 +151,31 @@ class OpenApiContractTest {
     }
 
     @Test
+    void documentServiceOrderFullIntakeContract() throws Exception {
+        String intake = "$.paths['/api/service-orders/intake'].post";
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(intake + ".tags", hasItem("Service Orders")))
+                .andExpect(jsonPath(intake + ".responses['201']").exists())
+                .andExpect(jsonPath(intake + ".responses['400']").exists())
+                .andExpect(jsonPath(intake + ".responses['401']").exists())
+                .andExpect(jsonPath(intake + ".responses['403']").exists())
+                .andExpect(jsonPath(intake + ".responses['404']").exists())
+                .andExpect(jsonPath(intake + ".responses['409']").exists())
+                .andExpect(jsonPath("$.components.schemas.OpenServiceOrderIntakeRequest.required",
+                        hasItem("customer")))
+                .andExpect(jsonPath("$.components.schemas.OpenServiceOrderIntakeRequest.required",
+                        hasItem("vehicle")))
+                .andExpect(jsonPath("$.components.schemas.OpenServiceOrderIntakeRequest.required",
+                        hasItem("initialAssessment")))
+                // Prices and names come from the registrations, so the contract must not offer them as input.
+                .andExpect(jsonPath("$.components.schemas.IntakeServiceRequest.properties.price").doesNotExist())
+                .andExpect(jsonPath("$.components.schemas.IntakePartRequest.properties.price").doesNotExist())
+                .andExpect(jsonPath("$.components.schemas.ServiceOrderIntakeResponse.properties.estimateId")
+                        .exists());
+    }
+
+    @Test
     void documentStartExecutionContract() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())

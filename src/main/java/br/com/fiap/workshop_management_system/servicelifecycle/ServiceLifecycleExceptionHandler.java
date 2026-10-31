@@ -6,6 +6,18 @@ import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.appl
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
         .CatalogServiceNotFoundForNewWorkException;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .ServiceOrderIntakeConcurrentRegistrationException;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .ServiceOrderIntakeCustomerArchivedException;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .ServiceOrderIntakeInvalidDataException;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .ServiceOrderIntakeVehicleChassisConflictException;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .ServiceOrderIntakeVehicleOwnershipConflictException;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
+        .ServiceOrderStockItemInactiveException;
+import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
         .ServiceOrderStockItemNotFoundException;
 import br.com.fiap.workshop_management_system.servicelifecycle.serviceorder.application.exception
         .ServiceOrderVehicleArchivedException;
@@ -63,6 +75,45 @@ class ServiceLifecycleExceptionHandler {
     ResponseEntity<ErrorResponse> handleStockItemNotFound(ServiceOrderStockItemNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse("STOCK_ITEM_NOT_FOUND", exception.getMessage()));
+    }
+
+    @ExceptionHandler(ServiceOrderStockItemInactiveException.class)
+    ResponseEntity<ErrorResponse> handleStockItemInactive(ServiceOrderStockItemInactiveException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("STOCK_ITEM_INACTIVE", exception.getMessage()));
+    }
+
+    @ExceptionHandler(ServiceOrderIntakeInvalidDataException.class)
+    ResponseEntity<ErrorResponse> handleIntakeInvalidData(ServiceOrderIntakeInvalidDataException exception) {
+        return ResponseEntity.badRequest()
+                .body(new ErrorResponse("VALIDATION_ERROR", exception.getMessage()));
+    }
+
+    @ExceptionHandler(ServiceOrderIntakeCustomerArchivedException.class)
+    ResponseEntity<ErrorResponse> handleIntakeCustomerArchived(ServiceOrderIntakeCustomerArchivedException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("CUSTOMER_ARCHIVED", exception.getMessage()));
+    }
+
+    @ExceptionHandler(ServiceOrderIntakeVehicleOwnershipConflictException.class)
+    ResponseEntity<ErrorResponse> handleIntakeVehicleOwnership(
+            ServiceOrderIntakeVehicleOwnershipConflictException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("VEHICLE_OWNED_BY_ANOTHER_CUSTOMER", exception.getMessage()));
+    }
+
+    @ExceptionHandler(ServiceOrderIntakeVehicleChassisConflictException.class)
+    ResponseEntity<ErrorResponse> handleIntakeVehicleChassis(
+            ServiceOrderIntakeVehicleChassisConflictException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("VEHICLE_CHASSIS_ALREADY_EXISTS", exception.getMessage()));
+    }
+
+    @ExceptionHandler(ServiceOrderIntakeConcurrentRegistrationException.class)
+    ResponseEntity<ErrorResponse> handleIntakeConcurrentRegistration(
+            ServiceOrderIntakeConcurrentRegistrationException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("CONCURRENT_REGISTRATION", exception.getMessage()));
     }
 
     @ExceptionHandler(InvalidServiceOrderException.class)
